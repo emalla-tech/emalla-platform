@@ -1,0 +1,9 @@
+{
+  "name": "E-Malla Rwanda",
+  "description": "A comprehensive e-commerce and logistics platform connecting Rwandan merchants and customers with nationwide delivery.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

@@ -1,14 +1,17 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, UserRole } from '../types';
+import { authService } from '../services/authService';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, role: UserRole, token: string) => Promise<void>;
-  register: (userData: any) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
+  register: (userData: { name: string; email: string; password: string; role: UserRole }) => Promise<User>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<User>;
+  logoutAllDevices: () => Promise<void>;
   logout: () => void;
   error: string | null;
 }
@@ -22,16 +25,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate token verification with backend
     const verifyToken = async () => {
       if (token) {
         try {
-          // In production: const response = await api.get('/auth/verify');
-          // For now, we simulate a valid user based on stored role or default
-          const storedUser = localStorage.getItem('emalla_user');
-          if (storedUser) {
-            setUser(JSON.parse(storedUser));
-          }
+          const verifiedUser = await authService.verifyToken(token);
+          setUser(verifiedUser);
+          localStorage.setItem('emalla_user', JSON.stringify(verifiedUser));
         } catch (err) {
           logout();
         }
@@ -41,46 +40,68 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     verifyToken();
   }, [token]);
 
-  const login = async (email: string, role: UserRole, authToken: string) => {
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockUser: User = {
-        id: `USR-${Math.floor(Math.random() * 1000)}`,
-        name: email.split('@')[0],
-        email: email,
-        role: role,
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        orderCount: 0
-      };
-
-      setToken(authToken);
-      setUser(mockUser);
-      localStorage.setItem('emalla_token', authToken);
-      localStorage.setItem('emalla_user', JSON.stringify(mockUser));
+      const response = await authService.login(email, password);
+      setToken(response.token);
+      setUser(response.user);
+      localStorage.setItem('emalla_token', response.token);
+      localStorage.setItem('emalla_user', JSON.stringify(response.user));
+      return response.user;
     } catch (err) {
-      setError('Invalid credentials. Please check your email and password.');
+      setError(err instanceof Error ? err.message : 'Invalid credentials. Please check your email and password.');
       throw err;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const register = async (userData: any) => {
+  const register = async (userData: { name: string; email: string; password: string; role: UserRole }) => {
     setIsLoading(true);
+    setError(null);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      // Registration logic here
+      const response = await authService.register(userData);
+      setToken(response.token);
+      setUser(response.user);
+      localStorage.setItem('emalla_token', response.token);
+      localStorage.setItem('emalla_user', JSON.stringify(response.user));
+      return response.user;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
+      throw err;
     } finally {
       setIsLoading(false);
     }
   };
 
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const updatedUser = await authService.changePassword(currentPassword, newPassword);
+      setUser(updatedUser);
+      localStorage.setItem('emalla_user', JSON.stringify(updatedUser));
+      return updatedUser;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to change password right now.');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logoutAllDevices = async () => {
+    try {
+      await authService.logoutAllSessions();
+    } finally {
+      logout();
+    }
+  };
+
   const logout = () => {
+    authService.logoutCurrentSession().catch(() => undefined);
     setToken(null);
     setUser(null);
     localStorage.removeItem('emalla_token');
@@ -95,6 +116,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       isLoading, 
       login, 
       register, 
+      changePassword,
+      logoutAllDevices,
       logout,
       error 
     }}>

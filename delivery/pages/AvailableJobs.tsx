@@ -1,16 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   Package, MapPin, DollarSign, Clock, 
   ChevronRight, ArrowRight, ShieldCheck,
   Navigation, CheckCircle2
 } from 'lucide-react';
 import { OrderService } from '../../services/orderService';
 import { Order, OrderStatus } from '../../types';
+import { useAuth } from '../../auth/AuthContext';
 
 const AvailableJobs: React.FC = () => {
+  const { user } = useAuth();
   const [jobs, setJobs] = useState<Order[]>([]);
+  const [dismissedJobIds, setDismissedJobIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadPool();
@@ -18,37 +22,54 @@ const AvailableJobs: React.FC = () => {
 
   const loadPool = async () => {
     setLoading(true);
-    // Find orders that are 'ready_for_pickup' but not assigned
-    const data = await OrderService.getAllOrders();
-    setJobs(data.filter(o => o.status === OrderStatus.READY_FOR_PICKUP && !o.riderId));
-    setLoading(false);
+    try {
+      const data = await OrderService.getOrderPool();
+      setJobs(data.filter((o) => o.status === OrderStatus.READY_FOR_PICKUP && !o.riderId));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAcceptJob = async (orderId: string) => {
-    // In real app, get from Rider Profile
-    const riderId = 'RID-001'; 
-    const riderName = 'Nizeyimana Eric';
+    if (!user?.id) return;
+
+    const riderId = user.id;
+    const riderName = user.name || 'E-Malla Rider';
 
     await OrderService.assignRider(orderId, riderId, riderName);
-    alert("Job Accepted! Head to the merchant location.");
+    setMessage('Job accepted. Head to the merchant location.');
+    window.setTimeout(() => setMessage(null), 3000);
     loadPool();
   };
 
+  const handleDismissJob = (orderId: string) => {
+    setDismissedJobIds((current) => [...current, orderId]);
+    setMessage('Job hidden from your list for now.');
+    window.setTimeout(() => setMessage(null), 2500);
+  };
+
+  const visibleJobs = jobs.filter((job) => !dismissedJobIds.includes(job.id));
+
   return (
     <div className="space-y-6 pb-24 animate-in fade-in duration-500">
+      {message ? (
+        <div className="mx-2 rounded-2xl bg-emerald-500 text-white px-5 py-4 text-sm font-black shadow-lg">
+          {message}
+        </div>
+      ) : null}
       <div className="flex justify-between items-end px-2">
         <div>
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Kigali Dispatch</h1>
-          <p className="text-gray-500 text-sm font-medium">New pickup requests in your vicinity.</p>
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Available Pickup Jobs</h1>
+          <p className="text-gray-500 text-sm font-medium">Live fulfillment requests ready for rider assignment.</p>
         </div>
         <div className="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100 flex items-center">
           <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-2 animate-pulse"></div>
-          {jobs.length} Active Jobs
+          {visibleJobs.length} Active Jobs
         </div>
       </div>
 
       <div className="space-y-6">
-        {jobs.map((job) => (
+        {visibleJobs.map((job) => (
           <div key={job.id} className="bg-white rounded-[40px] p-8 border border-gray-100 shadow-sm hover:border-orange-500/30 transition-all group relative overflow-hidden">
              <div className="absolute top-0 right-0 bg-orange-500 text-white px-6 py-2 rounded-bl-3xl text-[10px] font-black uppercase tracking-widest">
                RWF {job.deliveryFee.toLocaleString()}
@@ -71,7 +92,7 @@ const AvailableJobs: React.FC = () => {
                    <div className="mt-1 w-2.5 h-2.5 rounded-full bg-orange-500 border-4 border-orange-100 shadow-sm"></div>
                    <div>
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Pick up items at:</p>
-                      <p className="text-sm font-bold text-gray-700">Kicukiro Hub, Inyange Fashion Warehouse</p>
+                      <p className="text-sm font-bold text-gray-700">{job.merchantName} dispatch point</p>
                    </div>
                 </div>
                 <div className="flex items-start space-x-4">
@@ -84,7 +105,11 @@ const AvailableJobs: React.FC = () => {
              </div>
 
              <div className="grid grid-cols-2 gap-4">
-                <button className="py-5 bg-gray-100 text-gray-400 rounded-[24px] font-black text-xs hover:bg-gray-200 transition-all uppercase tracking-widest active:scale-95">
+                <button
+                  type="button"
+                  onClick={() => handleDismissJob(job.id)}
+                  className="py-5 bg-gray-100 text-gray-500 rounded-[24px] font-black text-xs hover:bg-gray-200 transition-all uppercase tracking-widest active:scale-95"
+                >
                   Dismiss
                 </button>
                 <button 
@@ -98,12 +123,12 @@ const AvailableJobs: React.FC = () => {
           </div>
         ))}
 
-        {jobs.length === 0 && !loading && (
+        {visibleJobs.length === 0 && !loading && (
           <div className="bg-white rounded-[40px] p-24 text-center border-2 border-dashed border-gray-100 shadow-sm">
             <Clock size={56} className="mx-auto text-gray-100 mb-8" />
-            <h2 className="text-2xl font-black text-gray-900 mb-3">Searching for jobs...</h2>
-            <p className="text-gray-500 text-sm max-w-[220px] mx-auto font-medium">New pickup requests appear here instantly. Stay online and ready!</p>
-            <button onClick={loadPool} className="mt-8 bg-gray-900 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest">Force Refresh</button>
+            <h2 className="text-2xl font-black text-gray-900 mb-3">No pickup jobs available</h2>
+            <p className="text-gray-500 text-sm max-w-[260px] mx-auto font-medium">New pickup requests will appear here as soon as sellers prepare orders for collection.</p>
+            <button onClick={loadPool} className="mt-8 bg-gray-900 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest">Refresh Jobs</button>
           </div>
         )}
       </div>
@@ -116,8 +141,8 @@ const AvailableJobs: React.FC = () => {
                   <ShieldCheck size={32} />
                </div>
                <div>
-                  <h4 className="font-black text-lg leading-none mb-2">Safe Hands Bonus</h4>
-                  <p className="text-xs text-gray-400 font-medium">5 safe deliveries = RWF 5,000 extra credit</p>
+                  <h4 className="font-black text-lg leading-none mb-2">Delivery Standards</h4>
+                  <p className="text-xs text-gray-400 font-medium">Handle merchant packages carefully and confirm each handoff accurately.</p>
                </div>
             </div>
             <ChevronRight size={24} className="text-gray-700" />

@@ -1,9 +1,33 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Target, Users, Heart, Zap, ShieldCheck, Globe, ArrowRight } from 'lucide-react';
 // Corrected import from react-router-dom to resolve named export issues
 import { Link } from 'react-router-dom';
+import { PublicSiteService } from '../services/publicSiteService';
+import { useLanguage } from '../i18n/LanguageContext';
 
 const About: React.FC = () => {
+  const { t } = useLanguage();
+  const [metrics, setMetrics] = useState({
+    verifiedMerchants: 0,
+    completedOrders: 0,
+    activeRiders: 0,
+    districtsCovered: 30
+  });
+
+  useEffect(() => {
+    const load = async () => {
+      const insights = await PublicSiteService.getInsights();
+      setMetrics({
+        verifiedMerchants: insights.metrics.verifiedMerchants,
+        completedOrders: insights.metrics.completedOrders,
+        activeRiders: insights.metrics.activeRiders,
+        districtsCovered: insights.metrics.districtsCovered
+      });
+    };
+
+    load();
+  }, []);
+
   return (
     <div className="bg-white min-h-screen">
       {/* Hero Section */}
@@ -11,13 +35,13 @@ const About: React.FC = () => {
         <div className="absolute inset-0 imigongo-bg opacity-10"></div>
         <div className="max-w-7xl mx-auto px-4 relative z-10 text-center">
           <span className="bg-orange-500 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-6 inline-block">
-            Our Journey
+            {t.about.badge}
           </span>
           <h1 className="text-4xl md:text-7xl font-black text-white mb-8 leading-tight">
-            Connecting Rwanda <br/>Through <span className="text-orange-500">Digital Innovation</span>
+            {t.about.titleLine1} <br/><span className="text-orange-500">{t.about.titleLine2}</span>
           </h1>
           <p className="text-gray-400 text-lg md:text-xl max-w-3xl mx-auto leading-relaxed">
-            E-Malla Rwanda is more than just a marketplace. We are a digital bridge connecting the vibrant local economy to the global digital era, built by Rwandans for Rwanda.
+            {t.about.subtitle}
           </p>
         </div>
       </section>
@@ -33,9 +57,9 @@ const About: React.FC = () => {
               <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-orange-500 shadow-sm mb-8">
                 <Target size={32} />
               </div>
-              <h2 className="text-3xl font-black text-gray-900 mb-6">Our Mission</h2>
+              <h2 className="text-3xl font-black text-gray-900 mb-6">{t.about.mission}</h2>
               <p className="text-orange-900/70 text-lg leading-relaxed font-medium">
-                To empower Rwandan youth through employment and provide small-to-medium enterprises with a world-class platform to reach customers nationwide with ease and reliability.
+                {t.about.missionText}
               </p>
             </div>
           </div>
@@ -48,9 +72,9 @@ const About: React.FC = () => {
               <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-orange-500 shadow-sm mb-8 border border-white/10">
                 <Globe size={32} />
               </div>
-              <h2 className="text-3xl font-black text-white mb-6">Our Vision</h2>
+              <h2 className="text-3xl font-black text-white mb-6">{t.about.vision}</h2>
               <p className="text-gray-400 text-lg leading-relaxed">
-                To become the heartbeat of Rwandan commerce, driving the nation's digital transformation and fostering an ecosystem where every local merchant can thrive in the 21st century.
+                {t.about.visionText}
               </p>
             </div>
           </div>
@@ -62,10 +86,10 @@ const About: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
             {[
-              { label: 'Verified Merchants', value: '1,500+' },
-              { label: 'Orders Delivered', value: '50k+' },
-              { label: 'Youth Employed', value: '300+' },
-              { label: 'Districts Covered', value: '30/30' }
+              { label: t.about.stats1, value: `${metrics.verifiedMerchants}` },
+              { label: t.about.stats2, value: `${metrics.completedOrders}` },
+              { label: t.about.stats3, value: `${metrics.activeRiders}` },
+              { label: t.about.stats4, value: `${metrics.districtsCovered}/30` }
             ].map((stat, idx) => (
               <div key={idx} className="text-center p-6 bg-white rounded-3xl shadow-sm border border-gray-100">
                 <p className="text-4xl font-black text-gray-900 mb-2">{stat.value}</p>
@@ -79,8 +103,8 @@ const About: React.FC = () => {
       {/* Core Values */}
       <section className="py-24 max-w-7xl mx-auto px-4">
         <div className="text-center mb-20">
-          <h2 className="text-4xl font-black text-gray-900 mb-4">Values that Drive Us</h2>
-          <p className="text-gray-500 max-w-2xl mx-auto">Our culture is built on the pillars of trust, innovation, and community impact.</p>
+          <h2 className="text-4xl font-black text-gray-900 mb-4">{t.about.valuesTitle}</h2>
+          <p className="text-gray-500 max-w-2xl mx-auto">{t.about.valuesSubtitle}</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -123,8 +147,48 @@ const About: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 relative z-10">
           <div className="flex flex-col lg:flex-row items-center gap-20">
             <div className="lg:w-1/2">
-              <div className="aspect-[4/3] rounded-[60px] overflow-hidden border-8 border-white/5 shadow-2xl">
-                 <img src="https://picsum.photos/id/10/800/600" className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-1000" alt="E-Malla team" />
+              <div className="group aspect-[4/3] rounded-[60px] overflow-hidden border-8 border-white/5 shadow-2xl bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.14),_transparent_35%),linear-gradient(145deg,_rgba(31,41,55,0.98),_rgba(17,24,39,0.96))] p-5 md:p-7 transition-all duration-500 hover:shadow-[0_30px_80px_rgba(251,146,60,0.18)]">
+                <div className="w-full h-full rounded-[42px] border border-white/10 bg-white/[0.03] backdrop-blur-sm p-4 md:p-6 flex flex-col justify-between transition-all duration-500 group-hover:bg-white/[0.07] group-hover:border-orange-300/20">
+                  <div className="grid grid-cols-1 sm:grid-cols-[1.2fr,1fr] gap-3 md:gap-4">
+                    <div className="rounded-[28px] bg-white/[0.06] border border-white/10 p-4 md:p-5 min-w-0 transition-all duration-500 group-hover:bg-white/[0.1]">
+                      <p className="text-white font-black text-xl md:text-2xl leading-tight break-words">E-Malla Rwanda</p>
+                      <p className="text-white/70 text-[11px] md:text-xs font-bold uppercase tracking-wide mt-3 leading-relaxed">
+                        Marketplace • Logistics • Payments
+                      </p>
+                    </div>
+                    <div className="rounded-[28px] bg-white/95 text-gray-800 border border-white/70 p-4 md:p-5 min-w-0 transition-all duration-500 group-hover:bg-orange-50 group-hover:border-orange-200">
+                      <p className="text-sm md:text-base font-black leading-snug break-words">
+                        Nationwide digital commerce
+                      </p>
+                      <p className="text-[11px] md:text-xs text-gray-500 font-semibold mt-3 leading-relaxed break-words">
+                        Real platform operations, real seller growth, real customer trust.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[28px] bg-white border border-white/80 p-4 md:p-6 shadow-xl shadow-black/10 transition-all duration-500 group-hover:bg-orange-50/95 group-hover:border-orange-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5">
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-gray-900 break-words">Trusted merchants</p>
+                        <p className="text-[11px] text-gray-500 font-semibold mt-2 leading-relaxed break-words">
+                          Verified catalog and approvals
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-gray-900 break-words">Fast fulfillment</p>
+                        <p className="text-[11px] text-gray-500 font-semibold mt-2 leading-relaxed break-words">
+                          Admin, seller, buyer, rider in sync
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-gray-900 break-words">Secure payments</p>
+                        <p className="text-[11px] text-gray-500 font-semibold mt-2 leading-relaxed break-words">
+                          MoMo, Airtel, bank, COD
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="lg:w-1/2 space-y-8">
@@ -137,7 +201,7 @@ const About: React.FC = () => {
               </p>
               <div className="pt-4">
                 <Link to="/contact" className="inline-flex items-center space-x-3 text-orange-500 font-bold hover:text-orange-400 transition-colors">
-                  <span>Contact our team</span>
+                  <span>{t.about.contactTeam}</span>
                   <ArrowRight size={20} />
                 </Link>
               </div>
@@ -150,13 +214,13 @@ const About: React.FC = () => {
       <section className="py-24 max-w-7xl mx-auto px-4">
         <div className="bg-yellow-400 rounded-[40px] p-12 md:p-20 text-center relative overflow-hidden">
           <div className="relative z-10 max-w-3xl mx-auto">
-            <h2 className="text-3xl md:text-5xl font-black text-black mb-8">Be part of the Rwandan digital revolution.</h2>
+            <h2 className="text-3xl md:text-5xl font-black text-black mb-8">{t.about.ctaTitle}</h2>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/become-seller" className="bg-black text-white px-10 py-5 rounded-2xl font-black text-lg hover:bg-gray-800 transition-all shadow-xl shadow-black/10">
-                Join as a Merchant
+                {t.about.ctaMerchant}
               </Link>
               <Link to="/shop" className="bg-white text-black px-10 py-5 rounded-2xl font-black text-lg hover:bg-gray-50 transition-all shadow-xl shadow-black/10">
-                Start Shopping
+                {t.about.ctaShop}
               </Link>
             </div>
           </div>

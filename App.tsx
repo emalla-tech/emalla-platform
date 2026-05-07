@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { HashRouter as Router, Routes, Route, Navigate, Outlet, Link } from 'react-router-dom';
+import React, { Suspense, lazy, useEffect } from 'react';
+import { HashRouter as Router, Routes, Route, Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { UserRole } from './types';
 import { 
   LayoutDashboard, 
@@ -8,168 +8,291 @@ import {
   Wallet, 
   History, 
   Home as HomeIcon, 
-  ArrowLeft, 
   User, 
-  Settings,
   MapPin,
   ShoppingBag,
-  Truck,
-  Phone,
-  Bell
+  Bell,
+  LogOut,
+  Settings,
+  ChevronUp
 } from 'lucide-react';
 
 // Components
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
-import Home from './pages/Home';
-import BecomeSeller from './pages/BecomeSeller';
-import Shop from './pages/Shop';
-import ProductDetails from './pages/ProductDetails';
-import FAQ from './pages/FAQ';
-import ShippingPolicy from './pages/ShippingPolicy';
-import TermsOfService from './pages/TermsOfService';
-import Contact from './pages/Contact';
-import HowItWorks from './pages/HowItWorks';
-import Cart from './pages/Cart';
-import Checkout from './pages/Checkout';
-import About from './pages/About';
-import Team from './pages/Team';
-import Investors from './pages/Investors';
+import { LanguageProvider } from './i18n/LanguageContext';
 
-// Payment Pages
-import PaymentProcessing from './pages/Payment/PaymentProcessing';
-import PaymentSuccess from './pages/Payment/PaymentSuccess';
-import PaymentFailure from './pages/Payment/PaymentFailure';
-
-// Dashboards
-import AdminLayout from './admin/AdminLayout';
-import DashboardOverview from './admin/pages/DashboardOverview';
-import OrderManagement from './admin/pages/OrderManagement';
-import MerchantDashboard from './pages/Dashboard/MerchantDashboard';
-import MerchantInventory from './merchant/pages/Inventory';
-import MerchantOrders from './merchant/pages/Orders';
-import MerchantWallet from './merchant/pages/Wallet';
-import CustomerDashboard from './customer/pages/CustomerDashboard';
-import MyOrders from './customer/pages/MyOrders';
-import AddressBook from './customer/pages/AddressBook';
-import RiderDashboard from './delivery/pages/RiderDashboard';
-import AvailableJobs from './delivery/pages/AvailableJobs';
-import RiderHistory from './delivery/pages/RiderHistory';
-import RiderEarnings from './delivery/pages/RiderEarnings';
-import OrderTracking from './pages/Dashboard/OrderTracking';
 import NotificationList from './components/notifications/NotificationList';
-import { DEV_USER } from './config/devUser';
+import { useCart } from './hooks/useCart';
+import ProtectedRoute from './auth/ProtectedRoute';
+import RoleRoute from './auth/RoleRoute';
+import { useAuth } from './auth/AuthContext';
+
+const Home = lazy(() => import('./pages/Home'));
+const BecomeSeller = lazy(() => import('./pages/BecomeSeller'));
+const Shop = lazy(() => import('./pages/Shop'));
+const ProductDetails = lazy(() => import('./pages/ProductDetails'));
+const FAQ = lazy(() => import('./pages/FAQ'));
+const ShippingPolicy = lazy(() => import('./pages/ShippingPolicy'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
+const Contact = lazy(() => import('./pages/Contact'));
+const HowItWorks = lazy(() => import('./pages/HowItWorks'));
+const Cart = lazy(() => import('./pages/Cart'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const About = lazy(() => import('./pages/About'));
+const Team = lazy(() => import('./pages/Team'));
+const Investors = lazy(() => import('./pages/Investors'));
+const PaymentProcessing = lazy(() => import('./pages/Payment/PaymentProcessing'));
+const PaymentSuccess = lazy(() => import('./pages/Payment/PaymentSuccess'));
+const PaymentFailure = lazy(() => import('./pages/Payment/PaymentFailure'));
+const AdminLayout = lazy(() => import('./admin/AdminLayout'));
+const DashboardOverview = lazy(() => import('./admin/pages/DashboardOverview'));
+const OrderManagement = lazy(() => import('./admin/pages/OrderManagement'));
+const ProductApprovals = lazy(() => import('./admin/pages/ProductApprovals'));
+const SellerApplications = lazy(() => import('./admin/pages/SellerApplications'));
+const RiderManagement = lazy(() => import('./admin/pages/RiderManagement'));
+const FinanceOverview = lazy(() => import('./admin/pages/FinanceOverview'));
+const AuditLogsPage = lazy(() => import('./admin/pages/AuditLogsPage'));
+const AdminSecurity = lazy(() => import('./admin/pages/AdminSecurity'));
+const AdminSettings = lazy(() => import('./admin/pages/AdminSettings'));
+const CustomerManagement = lazy(() => import('./admin/pages/CustomerManagement'));
+const InquiryManagement = lazy(() => import('./admin/pages/InquiryManagement'));
+const EmailLogsPage = lazy(() => import('./admin/pages/EmailLogsPage'));
+const MerchantDashboard = lazy(() => import('./pages/Dashboard/MerchantDashboard'));
+const MerchantInventory = lazy(() => import('./merchant/pages/Inventory'));
+const MerchantOrders = lazy(() => import('./merchant/pages/Orders'));
+const MerchantWallet = lazy(() => import('./merchant/pages/Wallet'));
+const MerchantSettings = lazy(() => import('./merchant/pages/Settings'));
+const CustomerDashboard = lazy(() => import('./customer/pages/CustomerDashboard'));
+const MyOrders = lazy(() => import('./customer/pages/MyOrders'));
+const AddressBook = lazy(() => import('./customer/pages/AddressBook'));
+const RiderDashboard = lazy(() => import('./delivery/pages/RiderDashboard'));
+const AvailableJobs = lazy(() => import('./delivery/pages/AvailableJobs'));
+const RiderHistory = lazy(() => import('./delivery/pages/RiderHistory'));
+const RiderEarnings = lazy(() => import('./delivery/pages/RiderEarnings'));
+const OrderTracking = lazy(() => import('./pages/Dashboard/OrderTracking'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/auth/Register'));
+const Unauthorized = lazy(() => import('./pages/auth/Unauthorized'));
+const AdminPortal = lazy(() => import('./pages/auth/AdminPortal'));
+const SellerPasswordReset = lazy(() => import('./pages/auth/SellerPasswordReset'));
+const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
+
+const RouteLoader = () => (
+  <div className="min-h-[40vh] flex items-center justify-center">
+    <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+  </div>
+);
+
+const withSuspense = (node: React.ReactNode) => (
+  <Suspense fallback={<RouteLoader />}>{node}</Suspense>
+);
+
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [pathname]);
+
+  return null;
+};
+
+const BackToTop = () => {
+  const [isVisible, setIsVisible] = React.useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      setIsVisible(window.scrollY > 420);
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+    };
+  }, []);
+
+  if (!isVisible) {
+    return null;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      className="fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-gray-900 text-white shadow-2xl hover:bg-orange-500 transition-all flex items-center justify-center"
+      aria-label="Back to top"
+    >
+      <ChevronUp size={20} />
+    </button>
+  );
+};
 
 const App: React.FC = () => {
+  const { itemCount, addItem, detailedItems, subtotal, updateQuantity, removeItem, clearCart } = useCart();
+  const { user, logout } = useAuth();
+
   return (
-    <Router>
-      <div className="min-h-screen flex flex-col">
-        <Routes>
+    <LanguageProvider>
+      <Router>
+        <ScrollToTop />
+        <BackToTop />
+        <div className="min-h-screen flex flex-col">
+          <Routes>
+          <Route path="/login" element={withSuspense(<Login />)} />
+          <Route path="/forgot-password" element={withSuspense(<ForgotPassword />)} />
+          <Route path="/reset-password" element={withSuspense(<ResetPassword />)} />
+          <Route path="/register" element={withSuspense(<Register />)} />
+          <Route path="/admin" element={withSuspense(<AdminPortal />)} />
+          <Route path="/unauthorized" element={withSuspense(<Unauthorized />)} />
+
           {/* Public Wrapper with Nav/Footer */}
-          <Route element={<><Navbar cartCount={2} /><PublicOutlet /><Footer /></>}>
-            <Route path="/" element={<Home />} />
-            <Route path="/shop" element={<Shop />} />
-            <Route path="/product/:id" element={<ProductDetails />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/team" element={<Team />} />
-            <Route path="/investors" element={<Investors />} />
-            <Route path="/faq" element={<FAQ />} />
-            <Route path="/shipping" element={<ShippingPolicy />} />
-            <Route path="/terms" element={<TermsOfService />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/how-it-works" element={<HowItWorks />} />
-            <Route path="/become-seller" element={<BecomeSeller />} />
-            <Route path="/cart" element={<Cart />} />
-            
-            <Route path="/payment/processing" element={<PaymentProcessing />} />
-            <Route path="/payment/success" element={<PaymentSuccess />} />
-            <Route path="/payment/failure" element={<PaymentFailure />} />
-            <Route path="/checkout" element={<Checkout />} />
+          <Route element={<><Navbar cartCount={itemCount} /><PublicOutlet /><Footer /></>}>
+            <Route path="/" element={withSuspense(<Home onAddToCart={addItem} />)} />
+            <Route path="/shop" element={withSuspense(<Shop onAddToCart={addItem} />)} />
+            <Route path="/product/:id" element={withSuspense(<ProductDetails onAddToCart={addItem} />)} />
+            <Route path="/about" element={withSuspense(<About />)} />
+            <Route path="/team" element={withSuspense(<Team />)} />
+            <Route path="/investors" element={withSuspense(<Investors />)} />
+            <Route path="/faq" element={withSuspense(<FAQ />)} />
+            <Route path="/shipping" element={withSuspense(<ShippingPolicy />)} />
+            <Route path="/terms" element={withSuspense(<TermsOfService />)} />
+            <Route path="/contact" element={withSuspense(<Contact />)} />
+            <Route path="/how-it-works" element={withSuspense(<HowItWorks />)} />
+            <Route path="/become-seller" element={withSuspense(<BecomeSeller />)} />
+            <Route path="/payment/processing" element={withSuspense(<PaymentProcessing />)} />
+            <Route path="/payment/success" element={withSuspense(<PaymentSuccess />)} />
+            <Route path="/payment/failure" element={withSuspense(<PaymentFailure />)} />
+            <Route path="/checkout" element={withSuspense(<Checkout cartItems={detailedItems} subtotal={subtotal} clearCart={clearCart} />)} />
+            <Route
+              path="/cart"
+              element={withSuspense(
+                <Cart
+                  cartItems={detailedItems}
+                  subtotal={subtotal}
+                  onUpdateQuantity={updateQuantity}
+                  onRemoveItem={removeItem}
+                />
+              )}
+            />
           </Route>
 
           {/* Direct Admin Access */}
-          <Route path="/admin/*" element={
-            <AdminLayout>
-              <Routes>
-                <Route index element={<DashboardOverview />} />
-                <Route path="orders" element={<OrderManagement />} />
-                <Route path="notifications" element={<NotificationList userId={DEV_USER.id} role={UserRole.ADMIN} />} />
-                <Route path="sellers" element={<Placeholder title="Merchants" />} />
-                <Route path="*" element={<Navigate to="/admin" />} />
-              </Routes>
-            </AdminLayout>
+          <Route path="/admin/dashboard/*" element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={[UserRole.ADMIN]}>
+                {withSuspense(<AdminLayout>
+                  <Routes>
+                    <Route index element={withSuspense(<DashboardOverview />)} />
+                    <Route path="orders" element={withSuspense(<OrderManagement />)} />
+                    <Route path="products" element={withSuspense(<ProductApprovals />)} />
+                    <Route path="notifications" element={user ? <NotificationList userId={user.id} role={UserRole.ADMIN} /> : <RouteLoader />} />
+                    <Route path="sellers" element={withSuspense(<SellerApplications />)} />
+                    <Route path="users" element={withSuspense(<CustomerManagement />)} />
+                    <Route path="inquiries" element={withSuspense(<InquiryManagement />)} />
+                    <Route path="emails" element={withSuspense(<EmailLogsPage />)} />
+                    <Route path="logistics" element={withSuspense(<RiderManagement />)} />
+                    <Route path="finance" element={withSuspense(<FinanceOverview />)} />
+                    <Route path="logs" element={withSuspense(<AuditLogsPage />)} />
+                    <Route path="security" element={withSuspense(<AdminSecurity />)} />
+                    <Route path="settings" element={withSuspense(<AdminSettings />)} />
+                    <Route path="*" element={<Navigate to="/admin/dashboard" />} />
+                  </Routes>
+                </AdminLayout>)}
+              </RoleRoute>
+            </ProtectedRoute>
           } />
 
           {/* Direct Seller Access */}
           <Route path="/seller/*" element={
-            <div className="flex h-screen bg-gray-50">
-              <MerchantSidebar />
-              <div className="flex-grow p-4 md:p-8 overflow-y-auto no-scrollbar">
-                <Routes>
-                  <Route index element={<MerchantDashboard />} />
-                  <Route path="products" element={<MerchantInventory />} />
-                  <Route path="orders" element={<MerchantOrders />} />
-                  <Route path="orders/:id/track" element={<OrderTracking />} />
-                  <Route path="analytics" element={<MerchantWallet />} />
-                  <Route path="notifications" element={<NotificationList userId="MCH-05" role={UserRole.MERCHANT} />} />
-                </Routes>
-              </div>
-            </div>
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={[UserRole.MERCHANT]}>
+                <div className="flex h-screen bg-gray-50">
+                  <MerchantSidebar onLogout={logout} />
+                  <div className="flex-grow p-4 md:p-8 overflow-y-auto no-scrollbar">
+                    <Routes>
+                      <Route index element={withSuspense(<MerchantDashboard />)} />
+                      <Route path="change-password" element={withSuspense(<SellerPasswordReset />)} />
+                      <Route path="products" element={withSuspense(<MerchantInventory />)} />
+                      <Route path="orders" element={withSuspense(<MerchantOrders />)} />
+                      <Route path="orders/:id/track" element={withSuspense(<OrderTracking />)} />
+                      <Route path="analytics" element={withSuspense(<MerchantWallet />)} />
+                      <Route path="settings" element={withSuspense(<MerchantSettings />)} />
+                      <Route path="notifications" element={user ? <NotificationList userId={user.id} role={UserRole.MERCHANT} /> : <RouteLoader />} />
+                    </Routes>
+                  </div>
+                </div>
+              </RoleRoute>
+            </ProtectedRoute>
           } />
 
           {/* Direct Buyer Access */}
           <Route path="/buyer/*" element={
-            <div className="flex h-screen bg-gray-50">
-              <CustomerSidebar />
-              <div className="flex-grow p-4 md:p-8 overflow-y-auto no-scrollbar">
-                <Routes>
-                  <Route index element={<CustomerDashboard />} />
-                  <Route path="orders" element={<MyOrders />} />
-                  <Route path="orders/:id/track" element={<OrderTracking />} />
-                  <Route path="settings" element={<AddressBook />} />
-                  <Route path="notifications" element={<NotificationList userId={DEV_USER.id} role={UserRole.CUSTOMER} />} />
-                </Routes>
-              </div>
-            </div>
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={[UserRole.CUSTOMER]}>
+                <div className="flex h-screen bg-gray-50">
+                  <CustomerSidebar onLogout={logout} />
+                  <div className="flex-grow p-4 md:p-8 overflow-y-auto no-scrollbar">
+                    <Routes>
+                      <Route index element={withSuspense(<CustomerDashboard />)} />
+                      <Route path="orders" element={withSuspense(<MyOrders />)} />
+                      <Route path="orders/:id/track" element={withSuspense(<OrderTracking />)} />
+                      <Route path="settings" element={withSuspense(<AddressBook />)} />
+                      <Route path="notifications" element={user ? <NotificationList userId={user.id} role={UserRole.CUSTOMER} /> : <RouteLoader />} />
+                    </Routes>
+                  </div>
+                </div>
+              </RoleRoute>
+            </ProtectedRoute>
           } />
 
           {/* Direct Rider Access */}
           <Route path="/rider/*" element={
-            <div className="flex min-h-screen bg-gray-100 max-w-xl mx-auto border-x shadow-2xl">
-              <div className="flex-grow p-4 pb-24 overflow-y-auto no-scrollbar">
-                <div className="mb-6 p-4 bg-emerald-500 text-white rounded-2xl text-center md:hidden">
-                   <p className="text-xs font-black uppercase tracking-widest">Rider Mobile Hub</p>
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={[UserRole.DELIVERY]}>
+                <div className="flex min-h-screen bg-gray-100 max-w-xl mx-auto border-x shadow-2xl">
+                  <div className="flex-grow p-4 pb-24 overflow-y-auto no-scrollbar">
+                    <div className="mb-6 p-4 bg-emerald-500 text-white rounded-2xl text-center md:hidden">
+                       <p className="text-xs font-black uppercase tracking-widest">Rider Mobile Hub</p>
+                    </div>
+                    <Routes>
+                      <Route index element={withSuspense(<RiderDashboard />)} />
+                      <Route path="available" element={withSuspense(<AvailableJobs />)} />
+                      <Route path="history" element={withSuspense(<RiderHistory />)} />
+                      <Route path="earnings" element={withSuspense(<RiderEarnings />)} />
+                      <Route path="orders/:id/track" element={withSuspense(<OrderTracking />)} />
+                      <Route path="notifications" element={user ? <NotificationList userId={user.id} role={UserRole.DELIVERY} /> : <RouteLoader />} />
+                    </Routes>
+                  </div>
+                  <RiderBottomNav onLogout={logout} />
                 </div>
-                <Routes>
-                  <Route index element={<RiderDashboard />} />
-                  <Route path="available" element={<AvailableJobs />} />
-                  <Route path="history" element={<RiderHistory />} />
-                  <Route path="earnings" element={<RiderEarnings />} />
-                  <Route path="orders/:id/track" element={<OrderTracking />} />
-                  <Route path="notifications" element={<NotificationList userId="RID-001" role={UserRole.DELIVERY} />} />
-                </Routes>
-              </div>
-              <RiderBottomNav />
-            </div>
+              </RoleRoute>
+            </ProtectedRoute>
           } />
 
-          <Route path="/dashboard/*" element={<Navigate to="/buyer" replace />} />
-        </Routes>
-      </div>
-    </Router>
+          <Route
+            path="/dashboard/*"
+            element={
+              !user ? <Navigate to="/login" replace /> :
+              user.role === UserRole.ADMIN ? <Navigate to="/admin/dashboard" replace /> :
+              user?.role === UserRole.MERCHANT ? <Navigate to="/seller" replace /> :
+              user?.role === UserRole.DELIVERY ? <Navigate to="/rider" replace /> :
+              <Navigate to="/buyer" replace />
+            }
+          />
+          </Routes>
+        </div>
+      </Router>
+    </LanguageProvider>
   );
 };
 
 const PublicOutlet = () => <div className="flex-grow"><Outlet /></div>;
 
-const Placeholder = ({ title }: { title: string }) => (
-  <div className="p-10 bg-white rounded-3xl border border-gray-100 text-center">
-    <h2 className="text-2xl font-black">{title}</h2>
-    <p className="text-gray-400 mt-2">Section under development in Dev Mode.</p>
-  </div>
-);
-
-const MerchantSidebar = () => (
+const MerchantSidebar = ({ onLogout }: { onLogout: () => void }) => (
   <aside className="w-72 bg-white border-r p-8 hidden md:flex flex-col shrink-0 h-full">
     <div className="flex items-center space-x-3 mb-12">
       <div className="w-10 h-10 bg-orange-500 rounded-2xl shadow-lg shadow-orange-100 flex items-center justify-center text-white text-lg">
@@ -203,6 +326,10 @@ const MerchantSidebar = () => (
         <Wallet size={20} className="group-hover:scale-110 transition-transform" />
         <span>Wallet</span>
       </Link>
+      <Link to="/seller/settings" className="flex items-center space-x-3 p-4 hover:bg-orange-50 rounded-2xl font-bold text-gray-600 hover:text-orange-600 transition-all group">
+        <Settings size={20} className="group-hover:scale-110 transition-transform" />
+        <span>Settings</span>
+      </Link>
     </nav>
 
     <div className="pt-8 mt-8 border-t border-gray-50 space-y-4">
@@ -213,11 +340,19 @@ const MerchantSidebar = () => (
         <HomeIcon size={18} className="group-hover:-translate-y-0.5 transition-transform" />
         <span>Back to Home</span>
       </Link>
+      <Link
+        to="/login"
+        onClick={onLogout}
+        className="flex items-center space-x-3 p-4 border border-red-100 text-red-500 rounded-2xl font-black text-sm hover:bg-red-50 transition-all group active:scale-95"
+      >
+        <LogOut size={18} />
+        <span>Logout</span>
+      </Link>
     </div>
   </aside>
 );
 
-const CustomerSidebar = () => (
+const CustomerSidebar = ({ onLogout }: { onLogout: () => void }) => (
   <aside className="w-72 bg-white border-r p-8 hidden md:flex flex-col shrink-0 h-full">
     <div className="flex items-center space-x-3 mb-12">
       <div className="w-10 h-10 bg-blue-600 rounded-2xl shadow-lg shadow-blue-100 flex items-center justify-center text-white">
@@ -257,11 +392,19 @@ const CustomerSidebar = () => (
         <HomeIcon size={18} className="group-hover:-translate-y-0.5 transition-transform" />
         <span>Back to Shop</span>
       </Link>
+      <Link
+        to="/login"
+        onClick={onLogout}
+        className="flex items-center space-x-3 p-4 border border-red-100 text-red-500 rounded-2xl font-black text-sm hover:bg-red-50 transition-all group active:scale-95"
+      >
+        <LogOut size={18} />
+        <span>Logout</span>
+      </Link>
     </div>
   </aside>
 );
 
-const RiderBottomNav = () => {
+const RiderBottomNav = ({ onLogout }: { onLogout: () => void }) => {
   const NavItem = ({ to, icon, label }: any) => (
     <Link to={to} className="flex flex-col items-center space-y-1 group">
       <div className="p-1 rounded-lg group-active:scale-90 transition-transform">
@@ -286,6 +429,14 @@ const RiderBottomNav = () => {
       </div>
       <NavItem to="/rider/history" icon={<History size={22} />} label="Log" />
       <NavItem to="/rider/earnings" icon={<Wallet size={22} />} label="Wallet" />
+      <button onClick={onLogout} className="flex flex-col items-center space-y-1 group">
+        <div className="p-1 rounded-lg group-active:scale-90 transition-transform">
+          <LogOut size={22} className="text-red-500" />
+        </div>
+        <span className="text-[9px] font-black uppercase tracking-widest text-red-500">
+          Logout
+        </span>
+      </button>
     </div>
   );
 };

@@ -7,24 +7,26 @@ export const useNotifications = (userId: string, role?: UserRole) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const load = useCallback(() => {
-    const data = NotificationService.getUserNotifications(userId, role);
+  const load = useCallback(async () => {
+    const data = await NotificationService.getUserNotifications(userId, role);
     setNotifications(data);
-    setUnreadCount(NotificationService.getUnreadCount(userId, role));
+    setUnreadCount(await NotificationService.getUnreadCount(userId, role));
   }, [userId, role]);
 
   useEffect(() => {
     load();
 
     // Listen for the custom event dispatched by NotificationService
-    const handleUpdate = () => load();
+    const handleUpdate = () => {
+      void load();
+    };
     window.addEventListener('emalla_notifications_updated', handleUpdate);
     
     return () => window.removeEventListener('emalla_notifications_updated', handleUpdate);
   }, [load]);
 
   const markRead = (id: string) => NotificationService.markAsRead(id);
-  const markAllRead = () => NotificationService.markAllAsRead(userId);
+  const markAllRead = () => NotificationService.markAllAsRead();
   const remove = (id: string) => NotificationService.deleteNotification(id);
 
   return {

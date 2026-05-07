@@ -7,34 +7,195 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { OrderService } from '../../services/orderService';
-import { Order, OrderStatus, PaymentStatus } from '../../types';
+import { Order, OrderStatus, PaymentMethod, PaymentStatus } from '../../types';
+import { useAuth } from '../../auth/AuthContext';
+import { html, printPdfDocument, renderTableRows } from '../../lib/documentExport';
 
 const MerchantOrders: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState<OrderStatus | 'all'>('all');
+  const [paymentFilter, setPaymentFilter] = useState<'all' | 'cod'>('all');
   const [stats, setStats] = useState({ new: 0, preparing: 0, completed: 0 });
 
   useEffect(() => {
-    loadOrders();
-  }, []);
+    if (user?.id) {
+      loadOrders(user.id);
+    }
+  }, [user]);
 
-  const loadOrders = async () => {
-    const data = await OrderService.getAllOrders(); // In reality: getOrdersByMerchant('MCH-05')
+  const loadOrders = async (merchantId: string) => {
+    const data = await OrderService.getOrdersByMerchant(merchantId);
     setOrders(data);
     setStats({
-      new: data.filter(o => o.status === OrderStatus.PAID).length,
-      preparing: data.filter(o => o.status === OrderStatus.PREPARING).length,
-      completed: data.filter(o => o.status === OrderStatus.DELIVERED).length
+      new: data.filter(o => [OrderStatus.PAID, OrderStatus.CONFIRMED].includes(o.status)).length,
+      preparing: data.filter(o => [OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP].includes(o.status)).length,
+      completed: data.filter(o => [OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(o.status)).length
     });
   };
 
   const handleUpdateStatus = async (orderId: string, status: OrderStatus) => {
     await OrderService.updateOrderStatus(orderId, status);
-    loadOrders();
+    if (user?.id) {
+      loadOrders(user.id);
+    }
   };
 
-  const filteredOrders = activeTab === 'all' ? orders : orders.filter(o => o.status === activeTab);
+  const handlePrintDeliveryNote = (order: Order) => {
+    const bodyHtml = `
+      <div class="page">
+        <div class="header">
+          <div>
+            <div class="brand">E-<span>Malla</span> Rwanda</div>
+            <div class="subtitle">Seller delivery note and dispatch manifest</div>
+          </div>
+          <div class="meta">
+            <div><strong>Order:</strong> ${html.escape(order.orderNumber)}</div>
+            <div><strong>Created:</strong> ${html.escape(new Date(order.createdAt).toLocaleString())}</div>
+            <div><strong>Status:</strong> <span class="pill">${html.escape(order.status)}</span></div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <div class="card-label">Customer</div>
+            <div class="card-value">${html.escape(order.customerName)}</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Payment</div>
+            <div class="card-value">${html.escape(order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY ? 'Cash on Delivery' : 'Paid Online')}</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Merchant Payout</div>
+            <div class="card-value">RWF ${html.escape(Math.max(order.totalAmount - order.deliveryFee, 0).toLocaleString())}</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Manifest Items</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Variant</th>
+                <th>Qty</th>
+                <th>Unit Price</th>
+                <th>Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${renderTableRows(order.items.map((item) => [
+                item.productName,
+                item.variant || 'Standard',
+                item.quantity,
+                `RWF ${Number(item.price || 0).toLocaleString()}`,
+                `RWF ${Number(item.subtotal || 0).toLocaleString()}`
+              ]))}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Delivery Details</h2>
+          <table>
+            <tbody>
+              ${renderTableRows([
+                ['Customer Phone', order.phone],
+                ['Delivery Address', order.address],
+                ['Delivery Fee', `RWF ${Number(order.deliveryFee || 0).toLocaleString()}`],
+                ['Payment Status', order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY ? 'Pending on delivery' : order.paymentStatus],
+                ['Transaction Reference', order.tx_ref || 'Pending'],
+                ['Order Notes', order.notes || 'No notes provided']
+              ])}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="footer">
+          This delivery note was generated from the live seller fulfillment queue in E-Malla Rwanda.
+        </div>
+      </div>
+    `;
+
+    printPdfDocument(`Delivery Note - ${order.orderNumber}`, bodyHtml);
+  };
+
+  const handlePrintDailyReport = () => {
+    const reportOrders = filteredOrders.slice().sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+    const totalRevenue = reportOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
+    const totalDeliveryFees = reportOrders.reduce((sum, order) => sum + Number(order.deliveryFee || 0), 0);
+    const totalPayout = reportOrders.reduce((sum, order) => sum + Math.max(Number(order.totalAmount || 0) - Number(order.deliveryFee || 0), 0), 0);
+
+    const bodyHtml = `
+      <div class="page">
+        <div class="header">
+          <div>
+            <div class="brand">E-<span>Malla</span> Rwanda</div>
+            <div class="subtitle">Seller fulfillment daily report</div>
+          </div>
+          <div class="meta">
+            <div><strong>Generated:</strong> ${html.escape(new Date().toLocaleString())}</div>
+            <div><strong>Orders in View:</strong> ${html.escape(reportOrders.length)}</div>
+            <div><strong>Filter:</strong> ${html.escape(`${activeTab} / ${paymentFilter}`)}</div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <div class="card-label">Gross Revenue</div>
+            <div class="card-value">RWF ${html.escape(totalRevenue.toLocaleString())}</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Delivery Fees</div>
+            <div class="card-value">RWF ${html.escape(totalDeliveryFees.toLocaleString())}</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Merchant Payout Value</div>
+            <div class="card-value">RWF ${html.escape(totalPayout.toLocaleString())}</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Order Summary</h2>
+          ${
+            reportOrders.length > 0
+              ? `<table>
+                  <thead>
+                    <tr>
+                      <th>Order</th>
+                      <th>Customer</th>
+                      <th>Status</th>
+                      <th>Payment</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>${renderTableRows(reportOrders.map((order) => [
+                    order.orderNumber,
+                    order.customerName,
+                    order.status,
+                    order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY ? 'Cash on Delivery' : 'Paid Online',
+                    `RWF ${Number(order.totalAmount || 0).toLocaleString()}`
+                  ]))}</tbody>
+                </table>`
+              : '<div class="card muted">No orders match the current seller filters.</div>'
+          }
+        </div>
+
+        <div class="footer">
+          This report was generated from the live seller fulfillment list currently visible in E-Malla Rwanda.
+        </div>
+      </div>
+    `;
+
+    printPdfDocument(`Daily Report - ${new Date().toISOString().slice(0, 10)}`, bodyHtml);
+  };
+
+  const filteredOrders = orders.filter((order) => {
+    const matchesStatus = activeTab === 'all' || order.status === activeTab;
+    const matchesPayment = paymentFilter === 'all' || order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY;
+    return matchesStatus && matchesPayment;
+  });
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -44,10 +205,20 @@ const MerchantOrders: React.FC = () => {
           <p className="text-gray-500 text-sm font-medium">Process your incoming orders and manage stock dispatch.</p>
         </div>
         <div className="flex space-x-3 w-full lg:w-auto">
-          <button className="flex-1 lg:flex-none p-3 bg-white border border-gray-200 rounded-2xl text-gray-500 hover:bg-gray-50 transition-all shadow-sm flex items-center justify-center">
+          <button
+            onClick={() => {
+              if (filteredOrders[0]) {
+                handlePrintDeliveryNote(filteredOrders[0]);
+              }
+            }}
+            className="flex-1 lg:flex-none p-3 bg-white border border-gray-200 rounded-2xl text-gray-500 hover:bg-gray-50 transition-all shadow-sm flex items-center justify-center"
+          >
             <Printer size={20} className="mr-2" /> Manifest
           </button>
-          <button className="flex-1 lg:flex-none bg-black text-white px-8 py-3 rounded-2xl font-black text-sm shadow-xl shadow-black/10 hover:bg-orange-500 transition-all">
+          <button
+            onClick={handlePrintDailyReport}
+            className="flex-1 lg:flex-none bg-black text-white px-8 py-3 rounded-2xl font-black text-sm shadow-xl shadow-black/10 hover:bg-orange-500 transition-all"
+          >
             Daily Report
           </button>
         </div>
@@ -100,6 +271,23 @@ const MerchantOrders: React.FC = () => {
         ))}
       </div>
 
+      <div className="flex items-center gap-3 overflow-x-auto no-scrollbar">
+        {[
+          { id: 'all', label: 'All Payments' },
+          { id: 'cod', label: 'COD Only' }
+        ].map((filter) => (
+          <button
+            key={filter.id}
+            onClick={() => setPaymentFilter(filter.id as 'all' | 'cod')}
+            className={`px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+              paymentFilter === filter.id ? 'bg-orange-500 text-white' : 'bg-white border border-gray-100 text-gray-500 hover:border-orange-200'
+            }`}
+          >
+            {filter.label}
+          </button>
+        ))}
+      </div>
+
       {/* Orders List */}
       <div className="grid gap-6">
         {filteredOrders.map((order) => (
@@ -110,15 +298,18 @@ const MerchantOrders: React.FC = () => {
                   <div className="p-5 bg-orange-50 text-orange-500 rounded-[28px] group-hover:bg-orange-500 group-hover:text-white transition-all duration-500">
                     <Package size={32} />
                   </div>
-                  <div>
-                    <div className="flex items-center space-x-3">
+                    <div>
+                      <div className="flex items-center space-x-3">
                        <h3 className="font-black text-2xl text-gray-900">{order.orderNumber}</h3>
                        {order.paymentStatus === PaymentStatus.SUCCESS && (
                          <span className="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase border border-emerald-100">Paid</span>
                        )}
-                    </div>
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1 flex items-center">
-                      <Clock size={12} className="mr-1.5" /> Placed {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                       {order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY && (
+                         <span className="bg-orange-50 text-orange-600 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase border border-orange-100">COD</span>
+                       )}
+                      </div>
+                      <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1 flex items-center">
+                        <Clock size={12} className="mr-1.5" /> Placed {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                 </div>
@@ -148,7 +339,10 @@ const MerchantOrders: React.FC = () => {
                   )}
 
                   <div className="h-10 w-px bg-gray-100 mx-2 hidden lg:block"></div>
-                  <button className="p-3 bg-gray-50 text-gray-400 rounded-2xl hover:bg-gray-100 transition-all">
+                  <button
+                    onClick={() => handlePrintDeliveryNote(order)}
+                    className="p-3 bg-gray-50 text-gray-400 rounded-2xl hover:bg-gray-100 transition-all"
+                  >
                     <Printer size={20} />
                   </button>
                 </div>
@@ -177,6 +371,12 @@ const MerchantOrders: React.FC = () => {
                 <div className="space-y-4">
                    <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Manifest Items</p>
                    <div className="bg-gray-50 p-4 rounded-3xl space-y-3">
+                      <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest">
+                        <span className="text-gray-400">Payment</span>
+                        <span className={order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY ? 'text-orange-600' : 'text-emerald-600'}>
+                          {order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY ? 'Cash on Delivery' : 'Paid Online'}
+                        </span>
+                      </div>
                       {order.items.map((item, i) => (
                         <div key={i} className="flex justify-between items-center text-sm">
                           <span className="font-bold text-gray-900">{item.quantity}x {item.productName}</span>

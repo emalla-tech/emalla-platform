@@ -1,129 +1,261 @@
+import { Order, OrderStatus, Product, Merchant, Rider, RiderApplication } from '../types';
+import { apiClient } from './apiClient';
+import { OrderService } from './orderService';
 
-import { Order, OrderStatus, Product, User, Merchant, Rider, Transaction, PaymentMethod, PaymentStatus } from '../types';
+type DashboardStatsResponse = {
+  stats: {
+    totalSales: number;
+    totalOrders: number;
+    activeUsers: number;
+    pendingOrders: number;
+    pendingSellers: number;
+    suspiciousSessions: number;
+    revenueGrowth: number;
+    salesGrowth: number;
+    systemLoad: number;
+  };
+  chart: Array<{ name: string; revenue: number; orders: number }>;
+  audit: Array<{
+    id: string;
+    event: string;
+    actor: string;
+    status: string;
+    time: string;
+    category?: string;
+    metadata?: Record<string, unknown>;
+  }>;
+};
+
+type AdminSettingsResponse = {
+  settings: {
+    preferences?: Record<string, boolean>;
+    categoryCommissionRates?: Record<string, number>;
+    updatedAt?: string;
+    updatedBy?: string;
+  };
+};
+
+type AdminFinanceResponse = {
+  overview: {
+    grossRevenue: number;
+    onlineRevenue: number;
+    pendingCodValue: number;
+    deliveryFeesCollected: number;
+    totalCommissionEarned: number;
+    merchantNetRevenue: number;
+    platformNetRevenue: number;
+    completedPayouts: number;
+    pendingPayouts: number;
+    successfulOrders: number;
+  };
+  categoryCommission: Array<{
+    categoryId: string;
+    categoryName: string;
+    rate: number;
+    grossSales: number;
+    commissionEarned: number;
+    merchantNet: number;
+    successfulOrders: number;
+  }>;
+  paymentBreakdown: Array<{
+    label: string;
+    method: string;
+    count: number;
+    value: number;
+  }>;
+  payoutSummary: {
+    totalRequests: number;
+    completedCount: number;
+    pendingCount: number;
+    rejectedCount: number;
+  };
+};
+
+type AdminPayout = {
+  id: string;
+  userId: string;
+  amount: number;
+  status: 'pending' | 'success' | 'failed';
+  method: string;
+  tx_ref: string;
+  timestamp: string;
+  merchantName: string;
+  merchantEmail: string;
+  payoutMethod: string;
+  payoutDestination: string;
+};
+
+type AdminEmailLog = {
+  id: string;
+  to: string | string[];
+  subject: string;
+  template?: string;
+  body?: string;
+  html?: string;
+  sentAt: string;
+  status: 'queued' | 'logged' | 'sent' | 'failed' | 'skipped';
+  provider?: string;
+  providerMessageId?: string | null;
+  error?: string | null;
+  note?: string | null;
+};
+
+type AdminEmailStatus = {
+  provider: string;
+  liveDeliveryReady: boolean;
+  fromEmail: string;
+  fromName: string;
+  adminAlertEmail: string;
+  issues: string[];
+};
+
+type AdminSession = {
+  id: string;
+  userId: string;
+  userName: string;
+  email: string;
+  role: string;
+  createdAt: string;
+  lastSeenAt: string;
+  userAgent?: string;
+  isSuspicious: boolean;
+  reasons: string[];
+};
 
 /**
- * AdminService handles all platform management logic.
+ * AdminService handles platform management APIs.
  */
 export const AdminService = {
-  // --- ANALYTICS ---
-  getDashboardStats: async () => {
+  getDashboardStats: async (): Promise<DashboardStatsResponse> => {
+    const response = await apiClient.getAdminStats();
     return {
-      totalSales: 45200000, // RWF
-      totalOrders: 1240,
-      activeUsers: 8500,
-      pendingOrders: 42,
-      pendingSellers: 12,
-      revenueGrowth: 15.4,
-      salesGrowth: 8.2
+      stats: response.stats,
+      chart: response.chart || [],
+      audit: response.audit || []
     };
   },
 
-  // --- ORDER MANAGEMENT ---
-  getOrders: async (filters?: any): Promise<Order[]> => {
-    return [
-      {
-        id: 'ORD-892',
-        orderNumber: 'EM-2024-892',
-        customerId: 'USR-01',
-        customerName: 'Mugisha Jean',
-        merchantId: 'MCH-05',
-        merchantName: 'Inyange Fashion',
-        // Added subtotal property to OrderItem
-        items: [{ productId: 'p1', productName: 'Smart Watch', quantity: 1, price: 120000, subtotal: 120000 }],
-        // Fixed: Use correct enum value for PROCESSING
-        status: OrderStatus.PROCESSING,
-        paymentStatus: PaymentStatus.SUCCESS,
-        tx_ref: 'REF-892',
-        totalAmount: 120000,
-        deliveryFee: 0,
-        address: 'Kigali, Gasabo, KG 123 St',
-        phone: '0788000000',
-        paymentMethod: PaymentMethod.MOMO,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        id: 'ORD-893',
-        orderNumber: 'EM-2024-893',
-        customerId: 'USR-02',
-        customerName: 'Uwase Aline',
-        merchantId: 'MCH-12',
-        merchantName: 'Kigali Tech Hub',
-        // Added subtotal property to OrderItem
-        items: [{ productId: 'p2', productName: 'Headphones', quantity: 1, price: 85000, subtotal: 85000 }],
-        // Fixed: Use correct enum value for PENDING
-        status: OrderStatus.PENDING,
-        paymentStatus: PaymentStatus.PENDING,
-        tx_ref: 'REF-893',
-        totalAmount: 85000,
-        deliveryFee: 0,
-        address: 'Huye, Taba, Street 4',
-        phone: '0788000001',
-        paymentMethod: PaymentMethod.CARD,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    ];
+  getSettings: async (): Promise<AdminSettingsResponse['settings']> => {
+    const response = await apiClient.getAdminSettings();
+    return response.settings || {};
+  },
+
+  getFinanceSummary: async (): Promise<AdminFinanceResponse> => {
+    return apiClient.getAdminFinance();
+  },
+
+  getPayouts: async (): Promise<AdminPayout[]> => {
+    const response = await apiClient.getAdminPayouts();
+    return response.payouts || [];
+  },
+
+  updatePayoutStatus: async (payoutId: string, status: 'success' | 'failed') => {
+    const response = await apiClient.updateAdminPayoutStatus(payoutId, status);
+    return response.payout;
+  },
+
+  updateSettings: async (params: { preferences?: Record<string, boolean>; categoryCommissionRates?: Record<string, number> }) => {
+    const response = await apiClient.updateAdminSettings(params);
+    return response.settings || {};
+  },
+
+  getOrders: async (): Promise<Order[]> => {
+    return OrderService.getAllOrders();
   },
 
   updateOrderStatus: async (orderId: string, status: OrderStatus) => {
-    console.log(`Updating ${orderId} to ${status}`);
+    await OrderService.updateOrderStatus(orderId, status);
     return true;
   },
 
-  assignRider: async (orderId: string, riderId: string) => {
-    console.log(`Assigning rider ${riderId} to order ${orderId}`);
+  assignRider: async (orderId: string, riderId: string, riderName: string) => {
+    await OrderService.assignRider(orderId, riderId, riderName);
     return true;
   },
 
-  // --- SELLER MANAGEMENT ---
   getSellers: async (): Promise<Merchant[]> => {
-    return [
-      {
-        id: 'MCH-05',
-        businessName: 'Inyange Fashion',
-        email: 'contact@inyange.rw',
-        phone: '0788123456',
-        status: 'active',
-        commissionRate: 10,
-        totalSales: 12500000,
-        balance: 450000,
-        joinedAt: '2023-10-12',
-        documentsVerified: true
-      },
-      {
-        id: 'MCH-06',
-        businessName: 'Kigali Crafts',
-        email: 'info@kigalicrafts.rw',
-        phone: '0788654321',
-        status: 'pending',
-        commissionRate: 12,
-        totalSales: 0,
-        balance: 0,
-        joinedAt: '2024-05-15',
-        documentsVerified: false
-      }
-    ];
+    const response = await apiClient.getAdminSellers();
+    return response.sellers || [];
+  },
+
+  getUsers: async (status: string = 'all'): Promise<any[]> => {
+    const response = await apiClient.getAdminUsers(status);
+    return response.users || [];
+  },
+
+  getInquiries: async (type: string = 'all'): Promise<any[]> => {
+    const response = await apiClient.getAdminInquiries(type);
+    return response.inquiries || [];
+  },
+
+  getEmailLogs: async (status: string = 'all'): Promise<AdminEmailLog[]> => {
+    const response = await apiClient.getAdminEmailLogs(status);
+    return response.emailLogs || [];
+  },
+
+  getEmailStatus: async (): Promise<AdminEmailStatus> => {
+    const response = await apiClient.getAdminEmailStatus();
+    return response.email;
+  },
+
+  updateInquiryStatus: async (inquiryId: string, status: 'new' | 'replied' | 'resolved') => {
+    const response = await apiClient.updateAdminInquiryStatus(inquiryId, status);
+    return response.inquiry;
+  },
+
+  updateInquiry: async (
+    inquiryId: string,
+    params: { status?: 'new' | 'replied' | 'resolved'; internalNotes?: string; assignToSelf?: boolean }
+  ) => {
+    const response = await apiClient.updateAdminInquiry(inquiryId, params);
+    return response.inquiry;
   },
 
   approveSeller: async (sellerId: string) => {
-    console.log(`Seller ${sellerId} approved.`);
+    await apiClient.updateAdminSellerStatus(sellerId, 'active');
     return true;
   },
 
-  // --- LOGISTICS ---
-  getRiders: async (): Promise<Rider[]> => {
-    return [
-      { id: 'RID-01', name: 'Nizeyimana Eric', phone: '078111222', status: 'available', vehicleNumber: 'RE 123 A', rating: 4.8, totalDeliveries: 450, earnings: 1200000 },
-      { id: 'RID-02', name: 'Kamanzi Paul', phone: '078333444', status: 'busy', vehicleNumber: 'RA 987 B', rating: 4.5, totalDeliveries: 312, earnings: 850000 }
-    ];
+  getRiders: async (status: string = 'all'): Promise<any[]> => {
+    const response = await apiClient.getAdminRiders(status);
+    return response.riders || [];
   },
 
-  // --- PRODUCT MANAGEMENT ---
+  getRiderApplications: async (status: string = 'all'): Promise<RiderApplication[]> => {
+    const response = await apiClient.getAdminRiderApplications(status);
+    return response.applications || [];
+  },
+
+  approveRiderApplication: async (applicationId: string) => {
+    const response = await apiClient.approveAdminRiderApplication(applicationId);
+    return response.application;
+  },
+
+  rejectRiderApplication: async (applicationId: string, reason: string) => {
+    const response = await apiClient.rejectAdminRiderApplication(applicationId, reason);
+    return response.application;
+  },
+
+  updateRiderStatus: async (riderId: string, status: 'active' | 'offline' | 'suspended') => {
+    await apiClient.updateAdminRiderStatus(riderId, status);
+    return true;
+  },
+
   getProducts: async (): Promise<Product[]> => {
-    return [
-      { id: 'p1', name: 'Smart Watch Series 7', price: 120000, description: '...', category: 'Electronics', image: 'https://picsum.photos/id/175/400/400', merchantId: 'MCH-05', merchantName: 'Inyange Fashion', stock: 15, status: 'active', rating: 4.8, reviewsCount: 124 },
-      { id: 'p14', name: 'Woven Basket', price: 12000, description: '...', category: 'Home', image: 'https://picsum.photos/id/475/400/400', merchantId: 'MCH-06', merchantName: 'Kigali Crafts', stock: 5, status: 'pending', rating: 5.0, reviewsCount: 12 }
-    ];
+    const response = await apiClient.getAdminProducts();
+    return response.products || [];
+  },
+
+  getSessions: async (role: string = 'all', suspiciousOnly: boolean = false): Promise<AdminSession[]> => {
+    const response = await apiClient.getAdminSessions(role, suspiciousOnly);
+    return response.sessions || [];
+  },
+
+  revokeSession: async (sessionId: string) => {
+    return apiClient.revokeAdminSession(sessionId);
+  },
+
+  revokeUserSessions: async (userId: string) => {
+    return apiClient.revokeAdminUserSessions(userId);
   }
 };

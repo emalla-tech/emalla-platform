@@ -18,7 +18,8 @@ export enum PaymentMethod {
   MOMO = 'MOMO',
   AIRTEL = 'AIRTEL',
   CARD = 'CARD',
-  BANK_TRANSFER = 'BANK_TRANSFER'
+  BANK_TRANSFER = 'BANK_TRANSFER',
+  CASH_ON_DELIVERY = 'CASH_ON_DELIVERY'
 }
 
 export enum OrderStatus {
@@ -62,12 +63,24 @@ export interface Notification {
 export interface User {
   id: string;
   name: string;
+  username?: string;
   email: string;
   phone?: string;
   role: UserRole;
   status: 'active' | 'suspended' | 'banned';
   createdAt: string;
   orderCount: number;
+  mustChangePassword?: boolean;
+}
+
+export interface Address {
+  id: string;
+  userId: string;
+  name: string;
+  district: string;
+  sector: string;
+  street: string;
+  isDefault: boolean;
 }
 
 export interface OrderItem {
@@ -117,11 +130,24 @@ export interface Product {
   stock: number;
   rating: number;
   description?: string;
+  specifications?: string;
   merchantId?: string;
   merchantName?: string;
   status?: string;
+  featured?: boolean;
   reviewsCount?: number;
   variants?: ProductVariant;
+}
+
+export interface ProductReview {
+  id: string;
+  productId: string;
+  userId: string;
+  userName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+  verifiedPurchase?: boolean;
 }
 
 export interface Merchant {
@@ -133,8 +159,13 @@ export interface Merchant {
   status?: 'active' | 'pending' | 'suspended';
   commissionRate?: number;
   totalSales?: number;
+  grossSales?: number;
+  commissionAmount?: number;
   joinedAt?: string;
   documentsVerified?: boolean;
+  supportEmail?: string;
+  logoUrl?: string;
+  coverUrl?: string;
 }
 
 export interface Rider {
@@ -146,6 +177,23 @@ export interface Rider {
   rating: number;
   totalDeliveries: number;
   earnings: number;
+  mobileMoneyNumber?: string;
+  emergencyContact?: string;
+}
+
+export interface RiderApplication {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  vehicleNumber: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  rejectedReason?: string;
+  temporaryUsername?: string;
+  temporaryPassword?: string;
 }
 
 export interface Transaction {
@@ -157,4 +205,13 @@ export interface Transaction {
   method: string;
   tx_ref: string;
   timestamp: string;
+}
+
+export interface PaymentVerificationResult {
+  status: PaymentStatus;
+  amount?: number;
+  currency?: string;
+  id?: string;
+  tx_ref?: string;
+  orderId?: string;
 }

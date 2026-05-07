@@ -15,8 +15,11 @@ import {
   X, 
   Bell,
   Search,
-  FileText
+  FileText,
+  Mail,
+  Shield
 } from 'lucide-react';
+import { useAuth } from '../auth/AuthContext';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -26,17 +29,21 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const NAV_ITEMS = [
-    { name: 'Dashboard', path: '/admin', icon: <LayoutDashboard size={20} /> },
-    { name: 'Orders', path: '/admin/orders', icon: <ShoppingBag size={20} /> },
-    { name: 'Merchants', path: '/admin/sellers', icon: <Store size={20} /> },
-    { name: 'Products', path: '/admin/products', icon: <FileText size={20} /> },
-    { name: 'Customers', path: '/admin/users', icon: <Users size={20} /> },
-    { name: 'Logistics', path: '/admin/logistics', icon: <Truck size={20} /> },
-    { name: 'Finance', path: '/admin/finance', icon: <DollarSign size={20} /> },
-    { name: 'Audit Logs', path: '/admin/logs', icon: <ShieldAlert size={20} /> },
-    { name: 'Settings', path: '/admin/settings', icon: <Settings size={20} /> },
+    { name: 'Dashboard', path: '/admin/dashboard', icon: <LayoutDashboard size={20} /> },
+    { name: 'Orders', path: '/admin/dashboard/orders', icon: <ShoppingBag size={20} /> },
+    { name: 'Merchants', path: '/admin/dashboard/sellers', icon: <Store size={20} /> },
+    { name: 'Products', path: '/admin/dashboard/products', icon: <FileText size={20} /> },
+    { name: 'Customers', path: '/admin/dashboard/users', icon: <Users size={20} /> },
+    { name: 'Inquiries', path: '/admin/dashboard/inquiries', icon: <Mail size={20} /> },
+    { name: 'Emails', path: '/admin/dashboard/emails', icon: <Mail size={20} /> },
+    { name: 'Logistics', path: '/admin/dashboard/logistics', icon: <Truck size={20} /> },
+    { name: 'Finance', path: '/admin/dashboard/finance', icon: <DollarSign size={20} /> },
+    { name: 'Audit Logs', path: '/admin/dashboard/logs', icon: <ShieldAlert size={20} /> },
+    { name: 'Security', path: '/admin/dashboard/security', icon: <Shield size={20} /> },
+    { name: 'Settings', path: '/admin/dashboard/settings', icon: <Settings size={20} /> },
   ];
 
   return (
@@ -64,7 +71,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               key={item.path}
               to={item.path}
               className={`flex items-center space-x-3 p-3 rounded-xl transition-all group ${
-                location.pathname === item.path 
+                location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
                 ? 'bg-orange-500 text-white shadow-lg shadow-orange-100' 
                 : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
               }`}
@@ -79,7 +86,10 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
         <div className="p-4 border-t border-gray-100">
           <button 
-            onClick={() => navigate('/login')}
+            onClick={() => {
+              logout();
+              navigate('/admin', { replace: true });
+            }}
             className="w-full flex items-center space-x-3 p-3 text-red-500 hover:bg-red-50 rounded-xl transition-all"
           >
             <LogOut size={20} />

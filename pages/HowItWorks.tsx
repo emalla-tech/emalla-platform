@@ -15,9 +15,17 @@ import {
 } from 'lucide-react';
 // Corrected import from react-router-dom to resolve named export issues
 import { Link } from 'react-router-dom';
+import { useLanguage } from '../i18n/LanguageContext';
 
 const HowItWorks: React.FC = () => {
+  const { t } = useLanguage();
   const [activeRole, setActiveRole] = useState<'customer' | 'merchant' | 'delivery'>('customer');
+  const getStartedPath =
+    activeRole === 'merchant'
+      ? '/become-seller'
+      : activeRole === 'delivery'
+        ? '/register?role=rider'
+        : '/shop';
 
   const content = {
     customer: {
@@ -42,7 +50,7 @@ const HowItWorks: React.FC = () => {
         {
           icon: <Truck className="text-orange-500" size={32} />,
           title: "Fast Delivery",
-          desc: "Track your order in real-time as our logistics partners bring it to you. Most Kigali deliveries happen within 6 hours!"
+          desc: "Track your order in real-time as our logistics partners bring it to you. Most Kigali deliveries happen within 1 hour!"
         }
       ]
     },
@@ -53,7 +61,7 @@ const HowItWorks: React.FC = () => {
         {
           icon: <UserPlus className="text-orange-500" size={32} />,
           title: "Register as a Seller",
-          desc: "Sign up with your business details and get verified by our success team within 24-48 hours."
+          desc: "Sign up with your business details and get verified by our success team within 12-24 hours."
         },
         {
           icon: <Store className="text-orange-500" size={32} />,
@@ -107,13 +115,13 @@ const HowItWorks: React.FC = () => {
         <div className="absolute inset-0 imigongo-bg opacity-10"></div>
         <div className="max-w-4xl mx-auto px-4 relative z-10">
           <span className="text-orange-500 font-black tracking-widest uppercase text-xs mb-4 inline-block">
-            Our Ecosystem
+            {t.howItWorks.badge}
           </span>
           <h1 className="text-4xl md:text-6xl font-black text-white mb-6 leading-tight">
-            How E-Malla <span className="text-orange-500">Works</span>
+            {t.howItWorks.title}
           </h1>
           <p className="text-gray-400 text-lg md:text-xl max-w-2xl mx-auto">
-            A three-way marketplace designed to empower youth, small businesses, and customers across Rwanda.
+            {t.howItWorks.subtitle}
           </p>
         </div>
       </section>
@@ -122,9 +130,9 @@ const HowItWorks: React.FC = () => {
       <section className="py-20 max-w-7xl mx-auto px-4">
         <div className="flex flex-wrap justify-center gap-4 mb-20">
           {[
-            { id: 'customer', name: 'For Customers', icon: <ShoppingBag size={18} /> },
-            { id: 'merchant', name: 'For Merchants', icon: <Store size={18} /> },
-            { id: 'delivery', name: 'For Delivery Staff', icon: <Truck size={18} /> }
+            { id: 'customer', name: t.howItWorks.forCustomers, icon: <ShoppingBag size={18} /> },
+            { id: 'merchant', name: t.howItWorks.forMerchants, icon: <Store size={18} /> },
+            { id: 'delivery', name: t.howItWorks.forDelivery, icon: <Truck size={18} /> }
           ].map((role) => (
             <button
               key={role.id}
@@ -146,7 +154,7 @@ const HowItWorks: React.FC = () => {
           <div className="space-y-8">
             <div className="inline-flex items-center space-x-2 text-orange-500 bg-orange-50 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
               <CheckCircle size={14} />
-              <span>Step-by-step Guide</span>
+              <span>{t.howItWorks.guide}</span>
             </div>
             <h2 className="text-4xl md:text-5xl font-black text-gray-900 leading-tight">
               {content[activeRole].title}
@@ -180,8 +188,10 @@ const HowItWorks: React.FC = () => {
           <div className="relative">
              <div className="aspect-[4/5] bg-gray-50 rounded-[60px] overflow-hidden border-8 border-white shadow-2xl relative group">
                 <img 
-                  src={`https://picsum.photos/id/${activeRole === 'customer' ? '20' : activeRole === 'merchant' ? '180' : '370'}/800/1000`} 
+                  src={activeRole === 'customer' ? '/brand/how-customer.svg' : activeRole === 'merchant' ? '/brand/how-merchant.svg' : '/brand/how-delivery.svg'} 
                   alt="Process illustration" 
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
@@ -195,7 +205,7 @@ const HowItWorks: React.FC = () => {
                       ? "98% of our customers in Kigali receive their orders the same day." 
                       : activeRole === 'merchant'
                       ? "Average merchants increase their reach by 400% in the first month."
-                      : "Top delivery partners earn up to RWF 250,000 per month."}
+                      : "Top delivery partners earn up to RWF 450,000 per month."}
                   </p>
                 </div>
              </div>
@@ -220,17 +230,17 @@ const HowItWorks: React.FC = () => {
            <div className="absolute inset-0 imigongo-bg opacity-10"></div>
            <div className="relative z-10 max-w-xl text-center md:text-left">
               <h2 className="text-3xl md:text-5xl font-black mb-6 leading-tight">
-                Ready to take the <br/><span className="text-black">next step?</span>
+                {t.howItWorks.ready}
               </h2>
               <p className="text-orange-100 text-lg mb-10">
-                Join the E-Malla ecosystem today and be part of Rwanda's digital commerce revolution.
+                {t.howItWorks.readyText}
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                 <Link to={activeRole === 'merchant' ? '/become-seller' : '/shop'} className="bg-black text-white px-10 py-5 rounded-2xl font-black text-lg hover:bg-gray-900 transition-all flex items-center justify-center">
-                   Get Started <ArrowRight size={20} className="ml-3" />
+                 <Link to={getStartedPath} className="bg-black text-white px-10 py-5 rounded-2xl font-black text-lg hover:bg-gray-900 transition-all flex items-center justify-center">
+                   {t.howItWorks.getStarted} <ArrowRight size={20} className="ml-3" />
                  </Link>
                  <Link to="/contact" className="bg-white/20 backdrop-blur-md text-white border border-white/20 px-10 py-5 rounded-2xl font-black text-lg hover:bg-white/30 transition-all flex items-center justify-center">
-                   Speak to Us
+                   {t.howItWorks.speak}
                  </Link>
               </div>
            </div>

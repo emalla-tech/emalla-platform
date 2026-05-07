@@ -1,0 +1,18 @@
+<svg width="900" height="1100" viewBox="0 0 900 1100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="900" height="1100" rx="52" fill="#FFF7ED"/>
+  <circle cx="700" cy="180" r="180" fill="#F97316" fill-opacity="0.16"/>
+  <rect x="114" y="130" width="672" height="840" rx="40" fill="#fff" stroke="#FED7AA" stroke-width="6"/>
+  <rect x="170" y="210" width="560" height="110" rx="28" fill="#FFEDD5"/>
+  <rect x="170" y="356" width="250" height="240" rx="32" fill="#F97316" fill-opacity="0.13"/>
+  <rect x="450" y="356" width="280" height="240" rx="32" fill="#111827"/>
+  <rect x="170" y="632" width="560" height="120" rx="28" fill="#ECFDF5"/>
+  <rect x="170" y="786" width="560" height="92" rx="28" fill="#111827"/>
+  <text x="188" y="275" fill="#9A3412" font-family="Arial, sans-serif" font-size="34" font-weight="700">Customer journey</text>
+  <text x="196" y="430" fill="#C2410C" font-family="Arial, sans-serif" font-size="28" font-weight="700">Browse products</text>
+  <text x="196" y="470" fill="#9A3412" font-family="Arial, sans-serif" font-size="22">Shop pages, details, cart</text>
+  <text x="486" y="430" fill="#fff" font-family="Arial, sans-serif" font-size="28" font-weight="700">Checkout</text>
+  <text x="486" y="470" fill="#D1D5DB" font-family="Arial, sans-serif" font-size="22">Online or COD</text>
+  <text x="196" y="700" fill="#065F46" font-family="Arial, sans-serif" font-size="28" font-weight="700">Track order status</text>
+  <text x="196" y="740" fill="#065F46" font-family="Arial, sans-serif" font-size="22">Real buyer dashboard updates</text>
+  <text x="196" y="842" fill="#fff" font-family="Arial, sans-serif" font-size="30" font-weight="700">E-Malla buyer experience</text>
+</svg>

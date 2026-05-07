@@ -1,29 +1,16 @@
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useDeferredValue } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CATEGORIES } from '../constants';
 import { ShoppingBag, Search, Filter, Star, ChevronRight, Check, Clock, X, TrendingUp, Heart } from 'lucide-react';
-
-// Mock product data covering all categories
-const MOCK_PRODUCTS = [
-  { id: 'p1', name: 'Smart Watch Series 7', price: 120000, category: '1', rating: 4.8, reviews: 124, image: 'https://picsum.photos/id/175/400/400' },
-  { id: 'p2', name: 'Wireless Noise Cancelling Headphones', price: 85000, category: '1', rating: 4.5, reviews: 89, image: 'https://picsum.photos/id/211/400/400' },
-  { id: 'p3', name: 'Cotton Linen Summer Shirt', price: 15000, category: '2', rating: 4.2, reviews: 45, image: 'https://picsum.photos/id/338/400/400' },
-  { id: 'p4', name: 'Leather Weekend Bag', price: 45000, category: '2', rating: 4.9, reviews: 32, image: 'https://picsum.photos/id/353/400/400' },
-  { id: 'p5', name: 'Modern Ceramic Vase', price: 22000, category: '3', rating: 4.7, reviews: 12, image: 'https://picsum.photos/id/401/400/400' },
-  { id: 'p6', name: 'Smart LED Light Bulb', price: 8000, category: '3', rating: 4.4, reviews: 67, image: 'https://picsum.photos/id/445/400/400' },
-  { id: 'p7', name: 'Organic Arabica Coffee (500g)', price: 12000, category: '4', rating: 5.0, reviews: 210, image: 'https://picsum.photos/id/425/400/400' },
-  { id: 'p8', name: 'Fresh Rwandan Tea Leaves', price: 5000, category: '4', rating: 4.8, reviews: 156, image: 'https://picsum.photos/id/429/400/400' },
-  { id: 'p9', name: 'Moisturizing Face Cream', price: 18000, category: '5', rating: 4.3, reviews: 28, image: 'https://picsum.photos/id/449/400/400' },
-  { id: 'p10', name: 'Sandalwood Fragrance Oil', price: 25000, category: '5', rating: 4.6, reviews: 19, image: 'https://picsum.photos/id/450/400/400' },
-  { id: 'p11', name: 'History of Rwanda: A Journey', price: 15000, category: '6', rating: 4.9, reviews: 54, image: 'https://picsum.photos/id/460/400/400' },
-  { id: 'p12', name: 'African Contemporary Art Guide', price: 35000, category: '6', rating: 4.7, reviews: 8, image: 'https://picsum.photos/id/461/400/400' },
-  { id: 'p13', name: 'Ultra-slim Laptop Pro', price: 850000, category: '1', rating: 4.9, reviews: 42, image: 'https://picsum.photos/id/180/400/400' },
-  { id: 'p14', name: 'Handcrafted Woven Basket', price: 12000, category: '3', rating: 5.0, reviews: 112, image: 'https://picsum.photos/id/475/400/400' },
-];
+import { useProducts } from '../hooks/useProducts';
+import { useAuth } from '../auth/AuthContext';
+import { CustomerService } from '../services/customerService';
+import { getProductPrimaryImage, handleProductImageError } from '../lib/productImages';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface ShopProps {
-  onAddToCart?: () => void;
+  onAddToCart?: (item: { productId: string; quantity: number }) => void;
 }
 
 interface Particle {
@@ -36,15 +23,20 @@ const RECENT_SEARCHES_KEY = 'emalla_recent_searches';
 
 const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { t } = useLanguage();
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const products = useProducts();
   const [searchParams, setSearchParamsSetter] = useSearchParams();
   const currentCategory = searchParams.get('category') || 'all';
   const urlSearch = searchParams.get('search') || '';
   
   const [searchTerm, setSearchTerm] = useState(urlSearch);
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
+  const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [particles, setParticles] = useState<Particle[]>([]);
 
   useEffect(() => {
@@ -62,26 +54,40 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const loadWishlist = async () => {
+      if (user?.role !== 'CUSTOMER') {
+        setWishlistIds(new Set());
+        return;
+      }
+
+      const productIds = await CustomerService.getWishlistProductIds();
+      setWishlistIds(new Set(productIds));
+    };
+
+    loadWishlist();
+  }, [user]);
+
   // Update local search term if URL changes
   useEffect(() => {
     setSearchTerm(urlSearch);
   }, [urlSearch]);
 
   const filteredProducts = useMemo(() => {
-    return MOCK_PRODUCTS.filter(product => {
+    return products.filter(product => {
       const matchesCategory = currentCategory === 'all' || product.category === currentCategory;
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = product.name.toLowerCase().includes(deferredSearchTerm.toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [currentCategory, searchTerm]);
+  }, [currentCategory, products, deferredSearchTerm]);
 
   const searchSuggestions = useMemo(() => {
-    if (!searchTerm.trim()) return [];
-    return MOCK_PRODUCTS
-      .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    if (!deferredSearchTerm.trim()) return [];
+    return products
+      .filter(p => p.name.toLowerCase().includes(deferredSearchTerm.toLowerCase()))
       .slice(0, 5)
       .map(p => p.name);
-  }, [searchTerm]);
+  }, [products, deferredSearchTerm]);
 
   const addToRecentSearches = (term: string) => {
     if (!term.trim()) return;
@@ -122,7 +128,7 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
 
   const handleAddToCart = (e: React.MouseEvent, productId: string) => {
     e.stopPropagation();
-    if (onAddToCart) onAddToCart();
+    if (onAddToCart) onAddToCart({ productId, quantity: 1 });
     setAddedItems(prev => new Set(prev).add(productId));
     
     const rect = e.currentTarget.getBoundingClientRect();
@@ -137,8 +143,21 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
     }), 2000);
   };
 
-  const handleToggleWishlist = (e: React.MouseEvent) => {
+  const handleToggleWishlist = async (e: React.MouseEvent, productId: string) => {
     e.stopPropagation();
+    if (user?.role !== 'CUSTOMER') {
+      navigate('/login');
+      return;
+    }
+
+    const isWishlisted = wishlistIds.has(productId);
+    await CustomerService.toggleWishlist(productId, isWishlisted);
+    setWishlistIds((current) => {
+      const next = new Set(current);
+      if (isWishlisted) next.delete(productId);
+      else next.add(productId);
+      return next;
+    });
   };
 
   return (
@@ -163,14 +182,14 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
       {/* Header / Search Area */}
       <div className="bg-white border-b sticky top-20 z-40 py-6 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-          <h1 className="text-2xl font-black text-gray-900">Marketplace</h1>
+          <h1 className="text-2xl font-black text-gray-900">{t.shop.title}</h1>
           
           <div className="relative w-full md:w-[500px]" ref={searchContainerRef}>
             <div className={`relative flex items-center transition-all duration-300 ${isSearchFocused ? 'scale-[1.02]' : ''}`}>
               <Search className={`absolute left-4 transition-colors duration-300 ${isSearchFocused ? 'text-orange-500' : 'text-gray-400'}`} size={20} />
               <input 
                 type="text" 
-                placeholder="Search products, brands..." 
+                placeholder={t.shop.searchPlaceholder}
                 value={searchTerm}
                 onFocus={() => setIsSearchFocused(true)}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -195,7 +214,7 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                     <div className="mb-4">
                       <div className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
                         <TrendingUp size={14} className="mr-2" />
-                        Suggestions
+                        {t.shop.suggestions}
                       </div>
                       <div className="space-y-1">
                         {searchSuggestions.map((s, i) => (
@@ -215,8 +234,8 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                   {recentSearches.length > 0 && (
                     <div>
                       <div className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest flex justify-between items-center">
-                        <span className="flex items-center"><Clock size={14} className="mr-2" /> Recent Searches</span>
-                        <button onClick={clearRecentSearches} className="text-orange-500 hover:underline">Clear History</button>
+                        <span className="flex items-center"><Clock size={14} className="mr-2" /> {t.shop.recentSearches}</span>
+                        <button onClick={clearRecentSearches} className="text-orange-500 hover:underline">{t.shop.clearHistory}</button>
                       </div>
                       <div className="space-y-1">
                         {recentSearches.map((s, i) => (
@@ -236,7 +255,7 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                   {!searchTerm.trim() && recentSearches.length === 0 && (
                     <div className="p-8 text-center">
                       <Search size={32} className="mx-auto text-gray-100 mb-4" />
-                      <p className="text-sm font-bold text-gray-400">Search for watches, coffee, crafts...</p>
+                      <p className="text-sm font-bold text-gray-400">{t.shop.emptySearch}</p>
                     </div>
                   )}
                 </div>
@@ -253,14 +272,14 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
             <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 sticky top-44">
               <div className="flex items-center space-x-2 mb-6">
                 <Filter size={18} className="text-orange-500" />
-                <h3 className="font-black text-gray-900 text-sm uppercase tracking-wider">Categories</h3>
+                <h3 className="font-black text-gray-900 text-sm uppercase tracking-wider">{t.shop.categories}</h3>
               </div>
               <div className="space-y-2">
                 <button 
                   onClick={() => handleCategoryClick('all')}
                   className={`w-full text-left px-4 py-3 rounded-2xl text-sm font-bold transition-all ${currentCategory === 'all' ? 'bg-orange-500 text-white shadow-xl shadow-orange-200' : 'text-gray-600 hover:bg-orange-50 hover:text-orange-500'}`}
                 >
-                  All Products
+                  {t.shop.allProducts}
                 </button>
                 {CATEGORIES.map(cat => (
                   <button 
@@ -283,10 +302,10 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
           <div className="flex-grow">
             <div className="flex justify-between items-center mb-10">
               <div className="flex flex-col gap-1">
-                <p className="text-gray-500 font-medium">Found <span className="font-black text-gray-900">{filteredProducts.length}</span> results</p>
+                <p className="text-gray-500 font-medium">{t.shop.found} <span className="font-black text-gray-900">{filteredProducts.length}</span> {t.shop.results}</p>
                 {urlSearch && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">Searching for:</span>
+                    <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">{t.shop.searchingFor}</span>
                     <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-lg text-xs font-black flex items-center">
                       {urlSearch}
                       <button onClick={() => handleSearchSubmit('')} className="ml-2 hover:text-orange-900">
@@ -297,10 +316,10 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                 )}
               </div>
               <select className="bg-white border-2 border-gray-100 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:border-orange-500 transition-colors">
-                <option>Sort: Relevant</option>
-                <option>Price: Low to High</option>
-                <option>Price: High to Low</option>
-                <option>Newest First</option>
+                <option>{t.shop.sortRelevant}</option>
+                <option>{t.shop.sortLowHigh}</option>
+                <option>{t.shop.sortHighLow}</option>
+                <option>{t.shop.sortNewest}</option>
               </select>
             </div>
 
@@ -310,14 +329,23 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                   <div key={product.id} onClick={() => navigate(`/product/${product.id}`)} className="bg-white rounded-[40px] overflow-hidden shadow-sm hover:shadow-2xl transition-all group border border-gray-100 flex flex-col cursor-pointer">
                     <div className="h-72 relative overflow-hidden bg-gray-50 p-4">
                       <div className="w-full h-full rounded-[32px] overflow-hidden">
-                        <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                        <img
+                          src={getProductPrimaryImage(product)}
+                          alt={product.name}
+                          onError={(event) => handleProductImageError(event, product.category)}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        />
                       </div>
                       <div className="absolute top-8 left-8 flex flex-col space-y-3">
                          <button 
-                           onClick={handleToggleWishlist}
-                           className="p-3 bg-white/90 backdrop-blur-md rounded-2xl text-gray-400 hover:text-red-500 shadow-xl transition-all hover:scale-110 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0"
+                           onClick={(e) => handleToggleWishlist(e, product.id)}
+                           className={`p-3 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl transition-all hover:scale-110 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 ${
+                             wishlistIds.has(product.id) ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
+                           }`}
                          >
-                           <Heart size={18} />
+                           <Heart size={18} className={wishlistIds.has(product.id) ? 'fill-red-500' : ''} />
                          </button>
                       </div>
                       <div className="absolute bottom-8 right-8 p-3 bg-orange-500 text-white rounded-2xl shadow-xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">

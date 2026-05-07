@@ -1,25 +1,69 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
-  Package, Search, Filter, ChevronRight, 
-  MapPin, Printer, RefreshCcw, Star, Truck,
-  Clock, CheckCircle2, XCircle, AlertCircle,
-  FileText, ArrowRight
+  Package, ChevronRight, 
+  MapPin, Printer,
+  Clock, CheckCircle2,
+  FileText
 } from 'lucide-react';
 import { OrderService } from '../../services/orderService';
-import { Order, OrderStatus } from '../../types';
+import { Order, OrderStatus, PaymentMethod } from '../../types';
 import { Link, useNavigate } from 'react-router-dom';
-import { DEV_USER } from '../../config/devUser';
+import { useAuth } from '../../auth/AuthContext';
+import { useProducts } from '../../hooks/useProducts';
+import { html, printPdfDocument, renderTableRows } from '../../lib/documentExport';
+import { getCategoryFallbackImage, handleProductImageError } from '../../lib/productImages';
 
 const MyOrders: React.FC = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeFilter, setActiveFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const products = useProducts();
 
   useEffect(() => {
-    OrderService.getOrdersByCustomer(DEV_USER.id).then(setOrders);
-  }, []);
+    if (!user) return;
+    OrderService.getOrdersByCustomer(user.id).then((data) => {
+      setOrders(data);
+      setSelectedOrder(data[0] || null);
+    });
+  }, [user]);
+
+  const filteredOrders = orders.filter((order) => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'active') {
+      return ![OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.CANCELLED].includes(order.status);
+    }
+    return [OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(order.status);
+  });
+
+  const productImageById = useMemo(() => {
+    return new Map(products.map((product) => [product.id, product.image]));
+  }, [products]);
+
+  const getTimelineSteps = (order: Order) => {
+    const isPaid = order.paymentStatus === 'SUCCESS';
+    const isSellerConfirmed = ![OrderStatus.PENDING, OrderStatus.PENDING_PAYMENT, OrderStatus.PAID].includes(order.status);
+    const isReadyForDispatch = [
+      OrderStatus.READY_FOR_PICKUP,
+      OrderStatus.ASSIGNED,
+      OrderStatus.PICKED_UP,
+      OrderStatus.ON_THE_WAY,
+      OrderStatus.OUT_FOR_DELIVERY,
+      OrderStatus.DELIVERED,
+      OrderStatus.COMPLETED
+    ].includes(order.status);
+    const isDelivered = [OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(order.status);
+
+    return [
+      { label: 'Order Placed', done: true, time: new Date(order.createdAt).toLocaleString() },
+      { label: 'Payment Verified', done: isPaid, time: isPaid ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
+      { label: 'Seller Confirmed', done: isSellerConfirmed, time: isSellerConfirmed ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
+      { label: 'Ready for Dispatch', done: isReadyForDispatch, time: isReadyForDispatch ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
+      { label: 'Delivered', done: isDelivered, time: isDelivered ? new Date(order.updatedAt).toLocaleString() : 'Pending' }
+    ];
+  };
 
   const getStatusBadge = (status: OrderStatus) => {
     const config = {
@@ -40,13 +84,120 @@ const MyOrders: React.FC = () => {
     );
   };
 
+  const getPaymentBadge = (order: Order) => {
+    if (order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY) {
+      return (
+        <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700">
+          COD
+        </span>
+      );
+    }
+
+    return (
+      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+        order.paymentStatus === 'SUCCESS' ? 'bg-blue-50 text-blue-600' : 'bg-yellow-50 text-yellow-700'
+      }`}>
+        {order.paymentStatus === 'SUCCESS' ? 'Paid' : 'Pending'}
+      </span>
+    );
+  };
+
   const handleCancel = async (orderId: string) => {
     if (confirm("Are you sure you want to cancel this order?")) {
       await OrderService.cancelOrder(orderId);
-      const updated = await OrderService.getOrdersByCustomer(DEV_USER.id);
+      const updated = await OrderService.getOrdersByCustomer(user?.id || '');
       setOrders(updated);
       setSelectedOrder(null);
     }
+  };
+
+  const handleDownloadInvoice = (order: Order) => {
+    const itemRows = order.items.map((item) => [
+      item.productName,
+      item.variant || 'Standard',
+      item.quantity,
+      `RWF ${Number(item.price || 0).toLocaleString()}`,
+      `RWF ${Number(item.subtotal || 0).toLocaleString()}`
+    ]);
+
+    const paymentLabel =
+      order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY
+        ? 'Cash on Delivery'
+        : order.paymentMethod.replaceAll('_', ' ');
+
+    const paymentState =
+      order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY
+        ? 'Pending on delivery'
+        : order.paymentStatus;
+
+    const bodyHtml = `
+      <div class="page">
+        <div class="header">
+          <div>
+            <div class="brand">E-<span>Malla</span> Rwanda</div>
+            <div class="subtitle">Customer order invoice</div>
+          </div>
+          <div class="meta">
+            <div><strong>Invoice:</strong> ${html.escape(order.orderNumber)}</div>
+            <div><strong>Placed:</strong> ${html.escape(new Date(order.createdAt).toLocaleString())}</div>
+            <div><strong>Status:</strong> <span class="pill">${html.escape(order.status)}</span></div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <div class="card-label">Merchant</div>
+            <div class="card-value">${html.escape(order.merchantName)}</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Payment</div>
+            <div class="card-value">${html.escape(paymentLabel)}</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Total</div>
+            <div class="card-value">RWF ${html.escape(Number(order.totalAmount || 0).toLocaleString())}</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Order Items</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Variant</th>
+                <th>Qty</th>
+                <th>Unit Price</th>
+                <th>Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>${renderTableRows(itemRows)}</tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Delivery and Payment Details</h2>
+          <table>
+            <tbody>
+              ${renderTableRows([
+                ['Delivery Address', order.address],
+                ['Phone Number', order.phone],
+                ['Delivery Fee', `RWF ${Number(order.deliveryFee || 0).toLocaleString()}`],
+                ['Payment Status', paymentState],
+                ['Transaction Reference', order.tx_ref || 'Pending'],
+                ['Customer Notes', order.notes || 'No notes provided']
+              ])}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="footer">
+          This invoice was generated from your live order record in E-Malla Rwanda.
+        </div>
+      </div>
+    `;
+
+    printPdfDocument(`Invoice - ${order.orderNumber}`, bodyHtml);
   };
 
   return (
@@ -74,7 +225,7 @@ const MyOrders: React.FC = () => {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
         {/* Orders List */}
         <div className="xl:col-span-2 space-y-6">
-          {orders.map((order) => (
+          {filteredOrders.map((order) => (
             <div 
               key={order.id} 
               onClick={() => setSelectedOrder(order)}
@@ -94,6 +245,7 @@ const MyOrders: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex items-center space-x-4">
+                    {getPaymentBadge(order)}
                     {getStatusBadge(order.status)}
                     <ChevronRight size={20} className={`text-gray-300 transition-transform ${selectedOrder?.id === order.id ? 'rotate-90 text-orange-500' : ''}`} />
                   </div>
@@ -103,7 +255,20 @@ const MyOrders: React.FC = () => {
                   <div className="flex -space-x-3 overflow-hidden">
                     {order.items.slice(0, 3).map((item, i) => (
                       <div key={i} className="w-12 h-12 rounded-xl border-4 border-white bg-gray-100 overflow-hidden shadow-sm">
-                         <img src={`https://picsum.photos/id/${100 + i}/100/100`} className="w-full h-full object-cover" />
+                         {productImageById.get(item.productId) ? (
+                           <img
+                             src={productImageById.get(item.productId)}
+                             alt={item.productName}
+                             onError={(event) => handleProductImageError(event)}
+                             className="w-full h-full object-cover"
+                           />
+                         ) : (
+                           <img
+                             src={getCategoryFallbackImage()}
+                             alt={item.productName}
+                             className="w-full h-full object-cover"
+                           />
+                         )}
                       </div>
                     ))}
                     {order.items.length > 3 && (
@@ -113,7 +278,9 @@ const MyOrders: React.FC = () => {
                     )}
                   </div>
                   <div className="text-right">
-                     <p className="text-[10px] text-gray-400 font-black uppercase mb-1">Total Paid</p>
+                     <p className="text-[10px] text-gray-400 font-black uppercase mb-1">
+                       {order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY ? 'Order Total' : 'Total Paid'}
+                     </p>
                      <p className="text-xl font-black text-gray-900">RWF {order.totalAmount.toLocaleString()}</p>
                   </div>
                 </div>
@@ -121,7 +288,7 @@ const MyOrders: React.FC = () => {
             </div>
           ))}
 
-          {orders.length === 0 && (
+          {filteredOrders.length === 0 && (
             <div className="bg-white rounded-[40px] p-24 text-center border-2 border-dashed border-gray-100 shadow-sm">
               <Package size={64} className="mx-auto text-gray-200 mb-8" />
               <h2 className="text-3xl font-black text-gray-900 mb-3">No orders yet</h2>
@@ -139,32 +306,38 @@ const MyOrders: React.FC = () => {
                   <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500 rounded-full blur-[60px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
                   <h4 className="text-xs font-black text-orange-500 uppercase tracking-[4px] mb-2">Order Details</h4>
                   <p className="text-3xl font-black">{selectedOrder.orderNumber}</p>
-                  <p className="text-gray-400 text-xs mt-4 flex items-center"><Clock size={14} className="mr-2" /> Last update: Just now</p>
+                  <p className="text-gray-400 text-xs mt-4 flex items-center"><Clock size={14} className="mr-2" /> Last update: {new Date(selectedOrder.updatedAt).toLocaleString()}</p>
                </div>
                
                <div className="p-10 space-y-10">
+                  <div className="flex items-center gap-3">
+                    {getPaymentBadge(selectedOrder)}
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                      {selectedOrder.paymentMethod === PaymentMethod.CASH_ON_DELIVERY ? 'Pay on delivery' : selectedOrder.paymentMethod.replace(/_/g, ' ')}
+                    </span>
+                  </div>
                   {/* Timeline View */}
                   <div className="space-y-8">
                      <div className="flex items-center justify-between">
                         <h5 className="text-sm font-black text-gray-900 uppercase tracking-widest">Tracking Status</h5>
-                        <button className="text-orange-500 text-[10px] font-black uppercase hover:underline">Live Map</button>
+                        <button
+                          onClick={() => navigate(`/buyer/orders/${selectedOrder.id}/track`)}
+                          className="text-orange-500 text-[10px] font-black uppercase hover:underline"
+                        >
+                          Open Tracking
+                        </button>
                      </div>
                      <div className="space-y-6">
-                        {[
-                           { status: 'Order Placed', time: '10:00 AM', done: true },
-                           { status: 'Payment Verified', time: '10:05 AM', done: selectedOrder.paymentStatus === 'SUCCESS' },
-                           { status: 'Seller Confirmed', time: 'Pending', done: selectedOrder.status !== 'pending_payment' && selectedOrder.status !== 'paid' },
-                           { status: 'Out for Delivery', time: 'Pending', done: selectedOrder.status === 'on_the_way' || selectedOrder.status === 'delivered' }
-                        ].map((step, i) => (
+                        {getTimelineSteps(selectedOrder).map((step, i, steps) => (
                            <div key={i} className="flex items-start space-x-4">
                               <div className="flex flex-col items-center">
                                  <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${step.done ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-300'}`}>
                                     {step.done ? <CheckCircle2 size={12} /> : <div className="w-1.5 h-1.5 rounded-full bg-current" />}
                                  </div>
-                                 {i < 3 && <div className={`w-0.5 h-10 mt-2 ${step.done ? 'bg-emerald-100' : 'bg-gray-50'}`}></div>}
+                                 {i < steps.length - 1 && <div className={`w-0.5 h-10 mt-2 ${step.done ? 'bg-emerald-100' : 'bg-gray-50'}`}></div>}
                               </div>
                               <div>
-                                 <p className={`text-sm font-bold ${step.done ? 'text-gray-900' : 'text-gray-300'}`}>{step.status}</p>
+                                 <p className={`text-sm font-bold ${step.done ? 'text-gray-900' : 'text-gray-300'}`}>{step.label}</p>
                                  <p className="text-[10px] font-black text-gray-400 uppercase">{step.time}</p>
                               </div>
                            </div>
@@ -181,7 +354,10 @@ const MyOrders: React.FC = () => {
                   </div>
 
                   <div className="pt-6 border-t border-gray-100 space-y-3">
-                    <button className="w-full py-4 bg-black text-white rounded-2xl font-black text-sm flex items-center justify-center space-x-2 hover:bg-orange-500 transition-all">
+                    <button
+                      onClick={() => handleDownloadInvoice(selectedOrder)}
+                      className="w-full py-4 bg-black text-white rounded-2xl font-black text-sm flex items-center justify-center space-x-2 hover:bg-orange-500 transition-all"
+                    >
                        <Printer size={18} />
                        <span>Download Invoice PDF</span>
                     </button>

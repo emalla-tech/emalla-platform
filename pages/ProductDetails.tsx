@@ -16,171 +16,31 @@ import {
   MessageSquare,
   CheckCircle2,
   ArrowRight,
-  Check,
-  X
+  Check
 } from 'lucide-react';
 import { CATEGORIES } from '../constants';
+import { useProducts } from '../hooks/useProducts';
+import { CustomerService } from '../services/customerService';
 import { geminiService } from '../services/geminiService';
-import { Product } from '../types';
+import { Product, ProductReview } from '../types';
+import { useAuth } from '../auth/AuthContext';
+import { getProductGalleryImages, getProductPrimaryImage, handleProductImageError } from '../lib/productImages';
 
-// Expanded Mock products database with variants
-const MOCK_PRODUCTS: Product[] = [
-  { 
-    id: 'p1', 
-    name: 'Smart Watch Series 7', 
-    price: 120000, 
-    category: '1', 
-    rating: 4.8, 
-    stock: 15,
-    image: 'https://picsum.photos/id/175/800/800', 
-    images: [
-      'https://picsum.photos/id/175/800/800',
-      'https://picsum.photos/id/176/800/800',
-      'https://picsum.photos/id/177/800/800',
-      'https://picsum.photos/id/178/800/800'
-    ],
-    description: "Experience the next level of connectivity with the Smart Watch Series 7. Features always-on retina display, advanced health sensors, and nationwide sync for Rwandan cellular networks.",
-    variants: {
-      colors: [
-        { name: 'Midnight', hex: '#1d212a' },
-        { name: 'Starlight', hex: '#faf0e6' },
-        { name: 'Blue', hex: '#203c56' }
-      ]
-    }
-  },
-  { 
-    id: 'p2', 
-    name: 'Wireless Noise Cancelling Headphones', 
-    price: 85000, 
-    category: '1', 
-    rating: 4.5, 
-    stock: 22,
-    image: 'https://picsum.photos/id/211/800/800', 
-    images: [
-      'https://picsum.photos/id/211/800/800',
-      'https://picsum.photos/id/212/800/800'
-    ],
-    description: "Immerse yourself in music without distractions. Perfect for busy Kigali commutes or quiet study sessions.",
-    variants: {
-      colors: [
-        { name: 'Silver', hex: '#c0c0c0' },
-        { name: 'Black', hex: '#000000' }
-      ]
-    }
-  },
-  { 
-    id: 'p3', 
-    name: 'Cotton Linen Summer Shirt', 
-    price: 15000, 
-    category: '2', 
-    rating: 4.2, 
-    stock: 45,
-    image: 'https://picsum.photos/id/338/800/800', 
-    images: [
-      'https://picsum.photos/id/338/800/800',
-      'https://picsum.photos/id/340/800/800',
-      'https://picsum.photos/id/341/800/800'
-    ],
-    description: "Breathable, lightweight cotton linen fabric perfect for the Rwandan climate. Stay stylish and cool.",
-    variants: {
-      sizes: ['S', 'M', 'L', 'XL'],
-      colors: [
-        { name: 'White', hex: '#ffffff' },
-        { name: 'Beige', hex: '#f5f5dc' },
-        { name: 'Sage', hex: '#9caf88' }
-      ]
-    }
-  },
-  { 
-    id: 'p4', 
-    name: 'Leather Weekend Bag', 
-    price: 45000, 
-    category: '2', 
-    rating: 4.9, 
-    stock: 8,
-    image: 'https://picsum.photos/id/353/800/800', 
-    description: "Premium handcrafted leather bag. Durable, spacious, and perfect for your weekend getaways to Rubavu.",
-    variants: {
-      colors: [
-        { name: 'Tan', hex: '#d2b48c' },
-        { name: 'Chocolate', hex: '#3d1e1e' }
-      ]
-    }
-  },
-  { 
-    id: 'p5', 
-    name: 'Ultra-slim Laptop Pro', 
-    price: 850000, 
-    category: '1', 
-    rating: 4.9, 
-    stock: 5,
-    image: 'https://picsum.photos/id/180/800/800', 
-    description: "Powerful performance in a sleek chassis. Ideal for Rwandan tech professionals and creatives on the move." 
-  },
-  { 
-    id: 'p6', 
-    name: 'Smart LED Home Hub', 
-    price: 55000, 
-    category: '1', 
-    rating: 4.7, 
-    stock: 12,
-    image: 'https://picsum.photos/id/201/800/800', 
-    description: "Control your entire home with your voice. Fully localized support for smart home devices." 
-  },
-  { 
-    id: 'p7', 
-    name: 'Organic Arabica Coffee (500g)', 
-    price: 12000, 
-    category: '4', 
-    rating: 5.0, 
-    stock: 100,
-    image: 'https://picsum.photos/id/425/800/800', 
-    description: "Freshly roasted specialty coffee from the hills of Karongi. Rich aroma with notes of berry and chocolate." 
-  },
-  { 
-    id: 'p8', 
-    name: 'Fine Rwandan Silk Scarf', 
-    price: 28000, 
-    category: '2', 
-    rating: 4.8, 
-    stock: 14,
-    image: 'https://picsum.photos/id/342/800/800', 
-    description: "Hand-finished silk scarf with traditional motifs. A touch of elegance for any occasion." 
-  },
-  { 
-    id: 'p9', 
-    name: 'Moisturizing Face Cream', 
-    price: 18000, 
-    category: '5', 
-    rating: 4.3, 
-    stock: 30,
-    image: 'https://picsum.photos/id/449/800/800' 
-  },
-  { 
-    id: 'p10', 
-    name: 'Sandalwood Fragrance Oil', 
-    price: 25000, 
-    category: '5', 
-    rating: 4.6, 
-    stock: 20,
-    image: 'https://picsum.photos/id/450/800/800' 
-  },
-  { 
-    id: 'p14', 
-    name: 'Handcrafted Woven Basket', 
-    price: 12000, 
-    category: '3', 
-    rating: 5.0, 
-    stock: 30,
-    image: 'https://picsum.photos/id/475/800/800', 
-    description: "Traditional Rwandan Agaseke basket, meticulously hand-woven by local artisans. A symbol of peace and prosperity." 
-  },
-];
+interface ProductDetailsProps {
+  onAddToCart: (item: {
+    productId: string;
+    quantity: number;
+    selectedSize?: string | null;
+    selectedColor?: string | null;
+  }) => void;
+}
 
-const ProductDetails: React.FC = () => {
+const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const carouselRef = useRef<HTMLDivElement>(null);
+  const products = useProducts();
   const [product, setProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
@@ -188,33 +48,80 @@ const ProductDetails: React.FC = () => {
   const [isAdded, setIsAdded] = useState(false);
   const [aiDescription, setAiDescription] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [activeTab, setActiveTab] = useState<'description' | 'reviews' | 'shipping'>('description');
+  const [activeTab, setActiveTab] = useState<'description' | 'specifications' | 'reviews' | 'shipping'>('description');
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewMessage, setReviewMessage] = useState<string | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
   
   // Gallery State
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   useEffect(() => {
-    const found = MOCK_PRODUCTS.find(p => p.id === id) || MOCK_PRODUCTS[0];
+    if (products.length === 0) {
+      return;
+    }
+
+    const found = products.find(p => p.id === id) || null;
     setProduct(found);
     setQuantity(1);
     setAiDescription(null);
     setIsAdded(false);
     setActiveImageIndex(0);
+    setReviewMessage(null);
+    setReviewError(null);
     
     // Set default variants if available
-    if (found.variants?.sizes?.length) setSelectedSize(found.variants.sizes[0]);
+    if (found?.variants?.sizes?.length) setSelectedSize(found.variants.sizes[0]);
     else setSelectedSize(null);
     
-    if (found.variants?.colors?.length) setSelectedColor(found.variants.colors[0].name);
+    if (found?.variants?.colors?.length) setSelectedColor(found.variants.colors[0].name);
     else setSelectedColor(null);
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [id]);
+  }, [id, products]);
+
+  useEffect(() => {
+    if (!product) {
+      setReviews([]);
+      return;
+    }
+
+    const loadReviews = async () => {
+      setReviewsLoading(true);
+      try {
+        const nextReviews = await CustomerService.getProductReviews(product.id);
+        setReviews(nextReviews);
+      } catch {
+        setReviews([]);
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+
+    loadReviews();
+  }, [product]);
+
+  useEffect(() => {
+    const loadWishlistState = async () => {
+      if (!product || user?.role !== 'CUSTOMER') {
+        setIsWishlisted(false);
+        return;
+      }
+
+      const productIds = await CustomerService.getWishlistProductIds();
+      setIsWishlisted(productIds.includes(product.id));
+    };
+
+    loadWishlistState();
+  }, [product, user]);
 
   const productImages = useMemo(() => {
-    if (!product) return [];
-    if (product.images && product.images.length > 0) return product.images;
-    return [product.image];
+    return getProductGalleryImages(product || undefined);
   }, [product]);
 
   const nextImage = () => {
@@ -227,10 +134,51 @@ const ProductDetails: React.FC = () => {
 
   const relatedProducts = useMemo(() => {
     if (!product) return [];
-    return MOCK_PRODUCTS
+    return products
       .filter(p => p.category === product.category && p.id !== product.id)
       .slice(0, 8); // Slice more for carousel
-  }, [product]);
+  }, [product, products]);
+
+  const specificationItems = useMemo(() => {
+    if (!product) {
+      return [];
+    }
+
+    const manualSpecifications = String(product.specifications || '')
+      .split('\n')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    if (manualSpecifications.length > 0) {
+      return manualSpecifications.map((line) => {
+        const separatorIndex = line.indexOf(':');
+        if (separatorIndex === -1) {
+          return { label: 'Detail', value: line };
+        }
+
+        return {
+          label: line.slice(0, separatorIndex).trim(),
+          value: line.slice(separatorIndex + 1).trim()
+        };
+      });
+    }
+
+    const sizes = product.variants?.sizes?.join(', ');
+    const colors = product.variants?.colors?.map((color) => color.name).join(', ');
+
+    return [
+      { label: 'Category', value: CATEGORIES.find((category) => category.id === product.category)?.name || 'General' },
+      { label: 'Seller', value: product.merchantName || 'E-Malla Merchant' },
+      { label: 'Price', value: `RWF ${product.price.toLocaleString()}` },
+      { label: 'Availability', value: product.stock > 0 ? `${product.stock} units in stock` : 'Out of stock' },
+      { label: 'Customer Rating', value: `${product.rating} / 5.0` },
+      { label: 'Review Count', value: `${reviews.length || product.reviewsCount || 0} review(s)` },
+      sizes ? { label: 'Sizes', value: sizes } : null,
+      colors ? { label: 'Colors', value: colors } : null,
+      { label: 'Listing Status', value: product.status ? product.status.replace(/_/g, ' ') : 'Active' },
+      { label: 'Featured', value: product.featured ? 'Yes' : 'No' }
+    ].filter(Boolean);
+  }, [product, reviews.length]);
 
   const generateAIDescription = async () => {
     if (!product) return;
@@ -242,15 +190,55 @@ const ProductDetails: React.FC = () => {
   };
 
   const handleAddToCart = () => {
+    onAddToCart({
+      productId: product!.id,
+      quantity,
+      selectedSize,
+      selectedColor
+    });
     setIsAdded(true);
     setTimeout(() => setIsAdded(false), 2000);
-    console.log("Adding to cart:", {
-      product: product?.name,
-      quantity,
-      size: selectedSize,
-      color: selectedColor
-    });
   };
+
+  const handleToggleWishlist = async () => {
+    if (!product) return;
+    if (user?.role !== 'CUSTOMER') {
+      navigate('/login');
+      return;
+    }
+
+    await CustomerService.toggleWishlist(product.id, isWishlisted);
+    setIsWishlisted((current) => !current);
+  };
+
+  const handleSubmitReview = async () => {
+    if (!product) return;
+
+    setReviewSubmitting(true);
+    setReviewError(null);
+    setReviewMessage(null);
+
+    try {
+      const review = await CustomerService.submitReview(product.id, reviewRating, reviewComment.trim());
+      const nextReviews = [review, ...reviews.filter((entry) => entry.userId !== review.userId)];
+      setReviews(nextReviews);
+      const nextAverage = nextReviews.reduce((sum, entry) => sum + entry.rating, 0) / nextReviews.length;
+      setProduct({
+        ...product,
+        reviewsCount: nextReviews.length,
+        rating: Number(nextAverage.toFixed(1))
+      });
+      setReviewComment('');
+      setReviewMessage('Review submitted successfully.');
+    } catch (error) {
+      setReviewError(error instanceof Error ? error.message : 'Failed to submit review.');
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const formatReviewDate = (value: string) =>
+    new Date(value).toLocaleDateString('en-RW', { year: 'numeric', month: 'short', day: 'numeric' });
 
   const scrollCarousel = (direction: 'left' | 'right') => {
     if (carouselRef.current) {
@@ -262,7 +250,8 @@ const ProductDetails: React.FC = () => {
     }
   };
 
-  if (!product) return <div className="p-20 text-center">Loading product...</div>;
+  if (products.length === 0) return <div className="p-20 text-center">Loading product...</div>;
+  if (!product) return <div className="p-20 text-center">Product not found.</div>;
 
   return (
     <div className="bg-white min-h-screen">
@@ -282,8 +271,12 @@ const ProductDetails: React.FC = () => {
           <div className="space-y-6">
             <div className="aspect-square bg-gray-50 rounded-[40px] overflow-hidden border border-gray-100 shadow-sm relative group">
               <img 
-                src={productImages[activeImageIndex]} 
+                src={productImages[activeImageIndex] || getProductPrimaryImage(product)} 
                 alt={product.name} 
+                onError={(event) => handleProductImageError(event, product.category)}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
                 className="w-full h-full object-cover transition-all duration-700"
               />
               
@@ -332,7 +325,14 @@ const ProductDetails: React.FC = () => {
                   onClick={() => setActiveImageIndex(i)}
                   className={`aspect-square w-24 rounded-2xl overflow-hidden border-2 flex-shrink-0 transition-all ${activeImageIndex === i ? 'border-orange-500 shadow-md scale-105' : 'border-gray-100 hover:border-orange-200 opacity-70 hover:opacity-100'}`}
                 >
-                  <img src={img} className="w-full h-full object-cover" alt={`Gallery view ${i + 1}`} />
+                  <img
+                    src={img}
+                    onError={(event) => handleProductImageError(event, product.category)}
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full h-full object-cover"
+                    alt={`Gallery view ${i + 1}`}
+                  />
                 </button>
               ))}
             </div>
@@ -354,7 +354,7 @@ const ProductDetails: React.FC = () => {
                   onClick={() => setActiveTab('reviews')}
                   className="text-orange-500 font-semibold text-sm hover:underline"
                 >
-                  {product.reviewsCount || 0} customer reviews
+                  {reviews.length || product.reviewsCount || 0} customer reviews
                 </button>
               </div>
             </div>
@@ -470,17 +470,23 @@ const ProductDetails: React.FC = () => {
                       )}
                       <span className="text-lg">{isAdded ? 'Added to Cart' : 'Add to Cart'}</span>
                     </button>
-                    <button className="p-5 border-2 border-gray-100 rounded-2xl text-gray-400 hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all group active:scale-95 shadow-sm">
-                      <Heart size={20} className="group-hover:fill-red-500" />
+                    <button
+                      onClick={handleToggleWishlist}
+                      className={`p-5 border-2 rounded-2xl transition-all group active:scale-95 shadow-sm ${
+                        isWishlisted
+                          ? 'border-red-100 bg-red-50 text-red-500'
+                          : 'border-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500 hover:border-red-100'
+                      }`}
+                    >
+                      <Heart size={20} className={isWishlisted ? 'fill-red-500' : 'group-hover:fill-red-500'} />
                     </button>
                   </div>
                 </div>
               </div>
               
-              {/* Promo Footer in Card */}
               <div className="bg-orange-50/50 p-4 border-t border-orange-100 flex items-center justify-center space-x-2">
                 <Zap size={14} className="text-orange-500" />
-                <span className="text-xs font-bold text-orange-700">Earn 500 E-Malla points with this purchase</span>
+                <span className="text-xs font-bold text-orange-700">Secure checkout with live pricing and seller stock validation.</span>
               </div>
             </div>
 
@@ -542,7 +548,8 @@ const ProductDetails: React.FC = () => {
         <div className="mt-20">
           <div className="flex border-b border-gray-100 overflow-x-auto no-scrollbar scroll-smooth space-x-8 md:space-x-12">
             {[
-              { id: 'description', name: 'Product Details', icon: <ChevronRight size={16} /> },
+              { id: 'description', name: 'Description', icon: <ChevronRight size={16} /> },
+              { id: 'specifications', name: 'Specifications', icon: <CheckCircle2 size={16} /> },
               { id: 'reviews', name: 'User Reviews', icon: <MessageSquare size={16} /> },
               { id: 'shipping', name: 'Delivery Info', icon: <Truck size={16} /> }
             ].map((tab) => (
@@ -562,9 +569,9 @@ const ProductDetails: React.FC = () => {
               <div className="max-w-4xl animate-in fade-in slide-in-from-bottom-2 duration-500">
                 <div className="grid md:grid-cols-2 gap-12">
                   <div className="prose prose-orange">
-                    <h3 className="text-2xl font-bold mb-4 text-gray-900">Overview</h3>
+                    <h3 className="text-2xl font-bold mb-4 text-gray-900">Description</h3>
                     <p className="text-gray-600 leading-relaxed text-lg mb-6">
-                      {product.description}
+                      {product.description || 'No detailed product description has been added yet.'}
                     </p>
                   </div>
                   <div className="bg-gray-50 p-8 rounded-3xl border border-gray-100">
@@ -586,49 +593,110 @@ const ProductDetails: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {activeTab === 'specifications' && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                <div className="max-w-4xl bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-6">Specifications</h3>
+                  <div className="space-y-4">
+                    {specificationItems.map((item) => (
+                      <div
+                        key={`${item.label}-${item.value}`}
+                        className="flex items-start gap-3 text-gray-700 border-b border-gray-50 pb-4 last:border-b-0 last:pb-0"
+                      >
+                        <CheckCircle2 size={18} className="text-orange-500 mt-1 flex-shrink-0" />
+                        <div>
+                          <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{item.label}</p>
+                          <p className="mt-1 text-sm md:text-base font-medium leading-relaxed text-gray-900">{item.value}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
             
             {activeTab === 'reviews' && (
               <div className="space-y-8 animate-in fade-in duration-500">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
                   <div>
                     <h3 className="text-2xl font-bold text-gray-900">Customer Feedback</h3>
-                    <p className="text-gray-500">Real opinions from verified buyers</p>
+                    <p className="text-gray-500">Reviews stored from real buyer accounts on this platform.</p>
                   </div>
-                  <button className="bg-black text-white px-8 py-3 rounded-xl font-bold text-sm hover:bg-orange-500 transition-all shadow-md">
-                    Write a Review
+                </div>
+
+                <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-5">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                      <h4 className="text-lg font-bold text-gray-900">Write a Review</h4>
+                      <p className="text-sm text-gray-500">Only verified buyers of this product can submit a review.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {[1, 2, 3, 4, 5].map((value) => (
+                        <button
+                          key={value}
+                          onClick={() => setReviewRating(value)}
+                          className="text-yellow-500 transition-transform hover:scale-110"
+                          aria-label={`Rate ${value} stars`}
+                        >
+                          <Star size={20} fill={value <= reviewRating ? 'currentColor' : 'none'} className={value <= reviewRating ? '' : 'text-gray-300'} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <textarea
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    placeholder="Share your real experience with this product..."
+                    rows={4}
+                    className="w-full rounded-2xl border border-gray-200 px-5 py-4 outline-none focus:border-orange-500"
+                  />
+                  {reviewMessage && <p className="text-sm font-semibold text-emerald-600">{reviewMessage}</p>}
+                  {reviewError && <p className="text-sm font-semibold text-red-600">{reviewError}</p>}
+                  <button
+                    onClick={handleSubmitReview}
+                    disabled={reviewSubmitting || reviewComment.trim().length < 8}
+                    className="bg-black text-white px-8 py-3 rounded-xl font-bold text-sm hover:bg-orange-500 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {reviewSubmitting ? 'Submitting...' : 'Submit Review'}
                   </button>
                 </div>
-                
-                <div className="grid md:grid-cols-2 gap-8">
-                  {[
-                    { name: 'Kabeza M.', rating: 5, date: '2 days ago', text: 'Excellent product! The delivery was extremely fast, arrived in Gisenyi in less than 24 hours. The packaging was very secure and I am really happy with the build quality.' },
-                    { name: 'Sonia U.', rating: 4, date: '1 week ago', text: 'Very good quality for the price. I wish there were more color options available for this specific model, but the one I got looks elegant enough for office use.' },
-                  ].map((review, i) => (
-                    <div key={i} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm flex flex-col hover:shadow-md transition-shadow">
+
+                {reviewsLoading ? (
+                  <div className="p-10 text-center text-gray-500">Loading reviews...</div>
+                ) : reviews.length === 0 ? (
+                  <div className="bg-gray-50 border border-gray-100 rounded-3xl p-10 text-center text-gray-500">
+                    No verified reviews yet for this product.
+                  </div>
+                ) : (
+                  <div className="grid md:grid-cols-2 gap-8">
+                    {reviews.map((review) => (
+                    <div key={review.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm flex flex-col hover:shadow-md transition-shadow">
                       <div className="flex justify-between items-start mb-6">
                         <div className="flex items-center space-x-4">
                           <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-black text-lg">
-                            {review.name[0]}
+                            {review.userName[0]}
                           </div>
                           <div>
-                            <h4 className="font-bold text-gray-900">{review.name}</h4>
+                            <h4 className="font-bold text-gray-900">{review.userName}</h4>
                             <div className="flex text-yellow-500 mt-1">
                               {[...Array(5)].map((_, j) => <Star key={j} size={14} fill={j < review.rating ? 'currentColor' : 'none'} className={j < review.rating ? '' : 'text-gray-200'} />)}
                             </div>
                           </div>
                         </div>
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{review.date}</span>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{formatReviewDate(review.createdAt)}</span>
                       </div>
-                      <p className="text-gray-600 text-sm leading-relaxed flex-grow italic">"{review.text}"</p>
+                      <p className="text-gray-600 text-sm leading-relaxed flex-grow italic">"{review.comment}"</p>
                       <div className="mt-6 pt-4 border-t border-gray-50 flex items-center space-x-2">
                         <div className="w-4 h-4 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center">
                           <CheckCircle2 size={10} />
                         </div>
-                        <span className="text-[10px] font-bold text-emerald-600 uppercase">Verified Purchase</span>
+                        <span className="text-[10px] font-bold text-emerald-600 uppercase">{review.verifiedPurchase ? 'Verified Purchase' : 'Community Review'}</span>
                       </div>
                     </div>
                   ))}
-                </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -640,9 +708,8 @@ const ProductDetails: React.FC = () => {
                   </div>
                   <h4 className="text-lg font-bold text-gray-900">Doorstep Delivery</h4>
                   <p className="text-sm text-gray-600 leading-relaxed">
-                    Kigali: 2-6 hours<br />
-                    Secondary Cities: 1-2 days<br />
-                    Remote areas: 3-4 days
+                    Estimated dispatch depends on seller confirmation and stock availability.<br />
+                    In-stock items are prioritized for same-day or next-day handling.
                   </p>
                 </div>
                 <div className="bg-orange-50/50 p-8 rounded-3xl border border-orange-100 flex flex-col space-y-4">
@@ -651,16 +718,18 @@ const ProductDetails: React.FC = () => {
                   </div>
                   <h4 className="text-lg font-bold text-gray-900">Hub Pickup</h4>
                   <p className="text-sm text-gray-600 leading-relaxed">
-                    Available at E-Malla hubs in Kigali (Downtown), Musanze, and Huye within 1 hour of confirmation.
+                    Pickup timing is shared after checkout confirmation and depends on the assigned seller or hub.
                   </p>
                 </div>
                 <div className="bg-emerald-50/50 p-8 rounded-3xl border border-emerald-100 flex flex-col space-y-4">
                   <div className="p-3 bg-emerald-600 text-white rounded-2xl w-fit shadow-lg shadow-emerald-200">
                     <ShieldCheck size={24} />
                   </div>
-                  <h4 className="text-lg font-bold text-gray-900">Package Safety</h4>
+                  <h4 className="text-lg font-bold text-gray-900">Order Fulfillment</h4>
                   <p className="text-sm text-gray-600 leading-relaxed">
-                    Our logistics team ensures all items are triple-checked and sealed with tamper-proof E-Malla tags.
+                    Seller: {product.merchantName || 'E-Malla Merchant'}<br />
+                    Stock status: {product.stock > 0 ? `${product.stock} units available` : 'Currently out of stock'}<br />
+                    Payment options are confirmed during checkout.
                   </p>
                 </div>
               </div>
@@ -711,8 +780,11 @@ const ProductDetails: React.FC = () => {
                   <div className="h-64 relative overflow-hidden bg-gray-50 p-4">
                     <div className="w-full h-full rounded-[32px] overflow-hidden">
                       <img 
-                        src={p.image} 
+                        src={getProductPrimaryImage(p)} 
                         alt={p.name} 
+                        onError={(event) => handleProductImageError(event, p.category)}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                       />
                     </div>

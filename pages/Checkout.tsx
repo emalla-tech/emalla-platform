@@ -1,28 +1,50 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
-  ShieldCheck, Truck, MapPin, CreditCard, ChevronRight, 
-  ArrowLeft, Lock, CheckCircle2, Clock, Calendar, Loader2
+  ShieldCheck,
+  ChevronRight,
+  ArrowLeft,
+  Lock,
+  Loader2
 } from 'lucide-react';
-import { PaymentMethod, OrderStatus, PaymentStatus } from '../types';
+import { PaymentMethod } from '../types';
 import { PaymentService } from '../services/paymentService';
 import { OrderService } from '../services/orderService';
 import PaymentMethodSelector from '../components/Payment/PaymentMethodSelector';
-import { DEV_USER } from '../config/devUser';
+import { useAuth } from '../auth/AuthContext';
 
 const DISTRICTS = [
   'Nyarugenge', 'Gasabo', 'Kicukiro', 
   'Musanze', 'Rubavu', 'Huye', 'Kayonza', 
-  'Rwamagana', 'Nyagatare', 'Rusizi', 'Karongi'
+  'Rwamagana', 'Nyagatare', 'Rusizi', 'Karongi','Nyamasheke', 'Rutsiro', 'Burera', 'Gicumbi',
 ];
 
-const Checkout: React.FC = () => {
+interface CheckoutProps {
+  cartItems: Array<{
+    productId: string;
+    quantity: number;
+    subtotal: number;
+    product: {
+      name: string;
+      price: number;
+      image: string;
+      merchantId?: string;
+      merchantName?: string;
+    };
+  }>;
+  subtotal: number;
+  clearCart: () => void;
+}
+
+const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    fullName: DEV_USER.name,
+    fullName: user?.name || '',
     phone: '0780000000',
     district: 'Gasabo',
     sector: 'Kimironko',
@@ -31,58 +53,90 @@ const Checkout: React.FC = () => {
     notes: ''
   });
 
-  const cartTotal = 205000;
-  const deliveryFee = 3500;
+  useEffect(() => {
+    if (user?.name) {
+      setFormData((current) => ({ ...current, fullName: user.name }));
+    }
+  }, [user]);
+
+  const deliveryFee = subtotal > 50000 ? 0 : 3500;
+  const cartTotal = subtotal;
   const finalTotal = cartTotal + deliveryFee;
 
   const handlePlaceOrder = async () => {
+    if (cartItems.length === 0) {
+      navigate('/shop');
+      return;
+    }
+
     setIsProcessing(true);
+    setErrorMessage(null);
     try {
-      // 1. Create the order record in OMS first
+      const primaryMerchant = cartItems[0]?.product;
       const order = await OrderService.createOrder({
-        customerId: DEV_USER.id,
+        customerId: user?.id || '',
         customerName: formData.fullName,
-        merchantId: 'MCH-05', // Mocking single merchant for demo
-        merchantName: 'Inyange Fashion',
-        items: [
-          { productId: 'p1', productName: 'Smart Watch S7', quantity: 1, price: 120000, subtotal: 120000 },
-          { productId: 'p2', productName: 'Wireless Headphones', quantity: 1, price: 85000, subtotal: 85000 }
-        ],
+        merchantId: primaryMerchant?.merchantId,
+        merchantName: primaryMerchant?.merchantName,
+        items: cartItems.map((item) => ({
+          productId: item.productId,
+          productName: item.product.name,
+          quantity: item.quantity,
+          price: item.product.price,
+          subtotal: item.subtotal
+        })),
         totalAmount: finalTotal,
-        deliveryFee: deliveryFee,
+        deliveryFee,
         address: `${formData.street}, ${formData.sector}, ${formData.district}`,
         phone: formData.phone,
         paymentMethod: formData.paymentMethod,
         notes: formData.notes
       });
 
-      // 2. Initialize Payment
       const paymentInit = await PaymentService.initializePayment({
         orderId: order.id,
         amount: finalTotal,
-        customerEmail: DEV_USER.email,
+        customerEmail: user?.email || '',
         customerName: formData.fullName,
         method: formData.paymentMethod
       });
 
-      // 3. Update order with payment tx_ref
-      // (In real app, orderService handles this update)
-
+      clearCart();
       setTimeout(() => {
-        // Redirect to processing which will verify status
+        if (formData.paymentMethod === PaymentMethod.CASH_ON_DELIVERY) {
+          navigate(`/payment/success?order_id=${order.id}&mode=cod`);
+          return;
+        }
+
         navigate(`/payment/processing?tx_ref=${paymentInit.tx_ref}&order_id=${order.id}`);
       }, 1000);
 
     } catch (err) {
-      alert("Checkout failed. Please try again.");
+      setErrorMessage(err instanceof Error ? err.message : 'Checkout failed. Please try again.');
       setIsProcessing(false);
     }
   };
 
+  if (cartItems.length === 0) {
+    return (
+      <div className="bg-gray-50 min-h-screen py-12">
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm p-10 md:p-16">
+            <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-4">No items to check out</h1>
+            <p className="text-gray-500 mb-8">Add products to your bag before continuing to payment.</p>
+            <Link to="/shop" className="inline-flex bg-orange-500 text-white px-8 py-4 rounded-2xl font-black hover:bg-orange-600 transition-all">
+              Return to Shop
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-gray-50 min-h-screen py-12">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="flex items-center justify-between mb-10">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 mb-10">
           <Link to="/cart" className="flex items-center text-gray-500 hover:text-orange-500 font-bold transition-colors">
             <ArrowLeft size={20} className="mr-2" /> Back to Bag
           </Link>
@@ -99,8 +153,8 @@ const Checkout: React.FC = () => {
           <div className="lg:col-span-2">
             <div className="bg-white rounded-[40px] shadow-xl border border-gray-100 overflow-hidden">
               {step === 1 ? (
-                <div className="p-8 md:p-12 animate-in fade-in slide-in-from-left duration-500">
-                  <h2 className="text-3xl font-black text-gray-900 mb-8">Delivery Information</h2>
+                <div className="p-6 md:p-12 animate-in fade-in slide-in-from-left duration-500">
+                  <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-8">Delivery Information</h2>
                   <div className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div className="space-y-2">
@@ -137,18 +191,24 @@ const Checkout: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right duration-500">
-                  <div className="mb-10 flex items-center justify-between">
+                <div className="p-6 md:p-12 animate-in fade-in slide-in-from-right duration-500">
+                  <div className="mb-10 flex items-start sm:items-center justify-between gap-4">
                     <div>
                       <button onClick={() => setStep(1)} className="text-xs font-black text-orange-500 uppercase tracking-widest flex items-center hover:underline mb-2">
                         <ArrowLeft size={14} className="mr-1" /> Delivery Info
                       </button>
-                      <h2 className="text-3xl font-black text-gray-900">Secure Payment</h2>
+                      <h2 className="text-2xl md:text-3xl font-black text-gray-900">Secure Payment</h2>
                     </div>
                     <div className="hidden sm:block p-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100">
                       <ShieldCheck size={28} />
                     </div>
                   </div>
+
+                  {errorMessage && (
+                    <div className="mb-6 rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm font-bold text-red-600">
+                      {errorMessage}
+                    </div>
+                  )}
 
                   <PaymentMethodSelector 
                     selected={formData.paymentMethod} 
@@ -165,7 +225,11 @@ const Checkout: React.FC = () => {
                     ) : (
                       <>
                         <Lock size={20} className="group-hover:scale-110 transition-transform" />
-                        <span>Confirm & Pay RWF {finalTotal.toLocaleString()}</span>
+                        <span>
+                          {formData.paymentMethod === PaymentMethod.CASH_ON_DELIVERY
+                            ? `Confirm Order RWF ${finalTotal.toLocaleString()}`
+                            : `Confirm & Pay RWF ${finalTotal.toLocaleString()}`}
+                        </span>
                       </>
                     )}
                   </button>
@@ -175,34 +239,24 @@ const Checkout: React.FC = () => {
           </div>
 
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-[40px] shadow-xl border border-gray-100 p-8 sticky top-32">
-              <h3 className="text-2xl font-black text-gray-900 mb-8">Order Summary</h3>
+            <div className="bg-white rounded-[40px] shadow-xl border border-gray-100 p-6 md:p-8 lg:sticky lg:top-32">
+              <h3 className="text-xl md:text-2xl font-black text-gray-900 mb-8">Order Summary</h3>
               <div className="space-y-6">
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-gray-50 rounded-xl overflow-hidden border border-gray-100">
-                        <img src="https://picsum.photos/id/175/100/100" className="w-full h-full object-cover" alt="Product" />
+                  {cartItems.map((item) => (
+                    <div key={item.productId} className="flex items-start justify-between gap-4">
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <div className="w-12 h-12 bg-gray-50 rounded-xl overflow-hidden border border-gray-100">
+                          <img src={item.product.image} className="w-full h-full object-cover" alt={item.product.name} loading="lazy" decoding="async" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-gray-900 break-words">{item.product.name}</p>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase">Qty: {item.quantity}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-bold text-gray-900">Smart Watch S7</p>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase">Qty: 1</p>
-                      </div>
+                      <span className="text-sm font-black text-gray-900 text-right shrink-0">RWF {item.subtotal.toLocaleString()}</span>
                     </div>
-                    <span className="text-sm font-black text-gray-900">RWF 120,000</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-gray-50 rounded-xl overflow-hidden border border-gray-100">
-                        <img src="https://picsum.photos/id/211/100/100" className="w-full h-full object-cover" alt="Product" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-gray-900">Wireless Headphones</p>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase">Qty: 1</p>
-                      </div>
-                    </div>
-                    <span className="text-sm font-black text-gray-900">RWF 85,000</span>
-                  </div>
+                  ))}
                 </div>
 
                 <div className="pt-6 border-t border-gray-50 space-y-3">

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { CreditCard, Smartphone, CheckCircle2 } from 'lucide-react';
+import { CreditCard, Smartphone, CheckCircle2, Banknote } from 'lucide-react';
 import { PaymentMethod } from '../../types';
 
 interface PaymentMethodSelectorProps {
@@ -36,6 +36,15 @@ const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({ selected,
       color: 'border-blue-100 bg-blue-50/30',
       activeColor: 'border-blue-500 bg-blue-50 ring-blue-100',
       badge: 'International'
+    },
+    {
+      id: PaymentMethod.CASH_ON_DELIVERY,
+      name: 'Cash on Delivery',
+      desc: 'Pay with cash when your order arrives',
+      icon: <Banknote className="text-emerald-600" />,
+      color: 'border-emerald-100 bg-emerald-50/30',
+      activeColor: 'border-emerald-500 bg-emerald-50 ring-emerald-100',
+      badge: 'COD'
     }
   ];
 

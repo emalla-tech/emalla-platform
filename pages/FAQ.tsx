@@ -1,6 +1,8 @@
 
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { HelpCircle, ChevronDown, ChevronUp, Search, MessageCircle, Phone, Mail } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface FAQItemProps {
   question: string;
@@ -33,6 +35,7 @@ const FAQItem: React.FC<FAQItemProps> = ({ question, answer, isOpen, onClick }) 
 };
 
 const FAQ: React.FC = () => {
+  const { t } = useLanguage();
   const [openIndex, setOpenIndex] = useState<number | null>(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'general' | 'customer' | 'merchant'>('general');
@@ -94,18 +97,18 @@ const FAQ: React.FC = () => {
         <div className="absolute top-0 right-0 w-1/3 h-full bg-orange-500/10 skew-x-12 transform translate-x-1/2"></div>
         <div className="max-w-7xl mx-auto px-4 relative z-10 text-center">
           <span className="bg-orange-500 text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest mb-4 inline-block">
-            Support Center
+            {t.faq.badge}
           </span>
-          <h1 className="text-4xl md:text-6xl font-extrabold mb-6">How can we help you?</h1>
+          <h1 className="text-4xl md:text-6xl font-extrabold mb-6">{t.faq.title}</h1>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto mb-10">
-            Find answers to common questions about shopping, selling, and delivery on E-Malla Rwanda.
+            {t.faq.subtitle}
           </p>
           
           <div className="max-w-xl mx-auto relative group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-orange-500 transition-colors" size={22} />
             <input 
               type="text" 
-              placeholder="Search for answers..." 
+              placeholder={t.faq.searchPlaceholder} 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-14 pr-6 py-5 bg-white text-gray-900 rounded-2xl shadow-2xl focus:ring-4 focus:ring-orange-500/20 outline-none transition-all text-lg"
@@ -119,9 +122,9 @@ const FAQ: React.FC = () => {
         {/* Category Tabs */}
         <div className="flex flex-wrap justify-center gap-4 mb-16">
           {[
-            { id: 'general', name: 'General Information' },
-            { id: 'customer', name: 'For Customers' },
-            { id: 'merchant', name: 'For Merchants' }
+            { id: 'general', name: t.faq.general },
+            { id: 'customer', name: t.faq.customer },
+            { id: 'merchant', name: t.faq.merchant }
           ].map((tab) => (
             <button 
               key={tab.id}
@@ -152,8 +155,8 @@ const FAQ: React.FC = () => {
               <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
                 <Search size={32} />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">No results found</h3>
-              <p className="text-gray-500">Try searching for different keywords or check another category.</p>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">{t.faq.noResults}</h3>
+              <p className="text-gray-500">{t.faq.noResultsText}</p>
             </div>
           )}
         </div>
@@ -163,8 +166,8 @@ const FAQ: React.FC = () => {
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Still have questions?</h2>
-            <p className="text-gray-500">Our support team is always ready to assist you.</p>
+            <h2 className="text-3xl font-bold mb-4">{t.faq.stillQuestions}</h2>
+            <p className="text-gray-500">{t.faq.stillQuestionsText}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -172,17 +175,17 @@ const FAQ: React.FC = () => {
               <div className="w-14 h-14 bg-orange-50 text-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:bg-orange-500 group-hover:text-white transition-all">
                 <MessageCircle size={28} />
               </div>
-              <h4 className="text-xl font-bold mb-2">Live Chat</h4>
-              <p className="text-gray-500 text-sm mb-6">Talk to our friendly support agents in real-time.</p>
-              <button className="text-orange-500 font-bold hover:underline">Start Chatting</button>
+              <h4 className="text-xl font-bold mb-2">{t.faq.liveChat}</h4>
+              <p className="text-gray-500 text-sm mb-6">{t.faq.liveChatText}</p>
+              <Link to="/contact" className="text-orange-500 font-bold hover:underline">{t.faq.startChat}</Link>
             </div>
 
             <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm text-center group hover:border-orange-200 transition-all">
               <div className="w-14 h-14 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:bg-blue-500 group-hover:text-white transition-all">
                 <Phone size={28} />
               </div>
-              <h4 className="text-xl font-bold mb-2">Call Us</h4>
-              <p className="text-gray-500 text-sm mb-6">Available Mon-Sat, 8am to 6pm for direct support.</p>
+              <h4 className="text-xl font-bold mb-2">{t.faq.callUs}</h4>
+              <p className="text-gray-500 text-sm mb-6">{t.faq.callText}</p>
               <a href="tel:+250788000000" className="text-blue-500 font-bold hover:underline">+250 788 000 000</a>
             </div>
 
@@ -190,8 +193,8 @@ const FAQ: React.FC = () => {
               <div className="w-14 h-14 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:bg-emerald-500 group-hover:text-white transition-all">
                 <Mail size={28} />
               </div>
-              <h4 className="text-xl font-bold mb-2">Email Support</h4>
-              <p className="text-gray-500 text-sm mb-6">Send us your detailed inquiry anytime.</p>
+              <h4 className="text-xl font-bold mb-2">{t.faq.emailSupport}</h4>
+              <p className="text-gray-500 text-sm mb-6">{t.faq.emailText}</p>
               <a href="mailto:support@emallarwanda.com" className="text-emerald-500 font-bold hover:underline">support@emallarwanda.com</a>
             </div>
           </div>

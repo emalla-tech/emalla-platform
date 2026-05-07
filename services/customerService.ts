@@ -1,93 +1,110 @@
-
-import { Order, OrderStatus, Product, User, Transaction, PaymentMethod, PaymentStatus } from '../types';
+import { Address, Order, OrderStatus, Product, ProductReview } from '../types';
+import { OrderService } from './orderService';
+import { apiClient } from './apiClient';
+import { ProductService } from './productService';
 
 /**
  * CustomerService handles all buyer-centric data operations.
  */
 export const CustomerService = {
-  // --- DASHBOARD & STATS ---
   getDashboardSummary: async () => {
+    const rawUser = localStorage.getItem('emalla_user');
+    const user = rawUser ? JSON.parse(rawUser) : null;
+    const liveOrders = user ? await OrderService.getOrdersByCustomer(user.id) : [];
+    const activeOrders = liveOrders.filter(
+      (order) => ![OrderStatus.CANCELLED, OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(order.status)
+    );
+    const mostRecent = liveOrders[0];
+    const successfulOrders = liveOrders.filter((order) => order.paymentStatus === 'SUCCESS');
+    const pointsBalance = successfulOrders.reduce(
+      (sum, order) => sum + Math.floor((order.totalAmount || 0) / 1000),
+      0
+    );
+    const getEta = () => {
+      if (!mostRecent) return 'No active delivery';
+      if ([OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(mostRecent.status)) return 'Delivered';
+      if (mostRecent.status === OrderStatus.ON_THE_WAY) return 'En route';
+      if (mostRecent.status === OrderStatus.PREPARING) return 'Preparing order';
+      if (mostRecent.status === OrderStatus.PENDING_PAYMENT) return 'Waiting for payment';
+      return 'Processing';
+    };
+
     return {
-      totalOrders: 12,
-      pendingDeliveries: 1,
-      wishlistCount: 5,
-      pointsBalance: 1250,
+      totalOrders: liveOrders.length,
+      pendingDeliveries: activeOrders.length,
+      wishlistCount: (await apiClient.getWishlist()).wishlist?.length || 0,
+      pointsBalance,
       recentOrder: {
-        id: 'ORD-892',
-        // Fixed: OrderStatus.OUT_FOR_DELIVERY exists after update to types.ts
-        status: OrderStatus.OUT_FOR_DELIVERY,
-        eta: '7:00 PM Today'
+        id: mostRecent?.id || '',
+        orderNumber: mostRecent?.orderNumber || 'No recent order',
+        status: mostRecent?.status || null,
+        eta: getEta()
       }
     };
   },
 
-  // --- ADDRESS BOOK ---
-  getAddresses: async () => {
-    return [
-      { id: 'addr-1', name: 'Home', district: 'Gasabo', sector: 'Kimironko', street: 'KG 123 St, House 10', isDefault: true },
-      { id: 'addr-2', name: 'Work', district: 'Nyarugenge', sector: 'Kigali City Tower', street: 'KN 2 Rd, Level 5', isDefault: false }
-    ];
+  getAddresses: async (): Promise<Address[]> => {
+    const response = await apiClient.getAddresses();
+    return response.addresses || [];
   },
 
-  // --- ORDERS ---
-  getMyOrders: async (): Promise<Order[]> => {
-    return [
-      {
-        id: 'ORD-892',
-        orderNumber: 'EM-2024-892',
-        customerId: 'USR-01',
-        customerName: 'Mugisha Jean',
-        merchantId: 'MCH-05',
-        merchantName: 'Inyange Fashion',
-        // Added subtotal property to OrderItem
-        items: [{ productId: 'p1', productName: 'Smart Watch Series 7', quantity: 1, price: 120000, subtotal: 120000 }],
-        // Fixed: Use correct enum value
-        status: OrderStatus.OUT_FOR_DELIVERY,
-        paymentStatus: PaymentStatus.SUCCESS,
-        tx_ref: 'REF-892',
-        totalAmount: 123500, // Including delivery
-        deliveryFee: 3500,
-        // Corrected enum assignment
-        paymentMethod: PaymentMethod.MOMO,
-        address: 'Gasabo, Kimironko, KG 123 St',
-        phone: '0788000000',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        id: 'ORD-850',
-        orderNumber: 'EM-2024-850',
-        customerId: 'USR-01',
-        customerName: 'Mugisha Jean',
-        merchantId: 'MCH-12',
-        merchantName: 'Kigali Tech Hub',
-        // Added subtotal property to OrderItem
-        items: [{ productId: 'p2', productName: 'Wireless Headphones', quantity: 1, price: 85000, subtotal: 85000 }],
-        status: OrderStatus.DELIVERED,
-        paymentStatus: PaymentStatus.SUCCESS,
-        tx_ref: 'REF-850',
-        totalAmount: 88500,
-        deliveryFee: 3500,
-        // Corrected enum assignment
-        paymentMethod: PaymentMethod.CARD,
-        address: 'Gasabo, Kimironko, KG 123 St',
-        phone: '0788000000',
-        createdAt: '2024-05-10T14:30:00Z',
-        updatedAt: '2024-05-10T14:30:00Z'
-      }
-    ];
+  saveAddress: async (address: { name: string; district: string; sector: string; street: string }) => {
+    const response = await apiClient.createAddress(address);
+    return response.address as Address;
   },
 
-  // --- WISHLIST ---
-  getWishlist: async (): Promise<Product[]> => {
-    return [
-      { id: 'p7', name: 'Organic Arabica Coffee', price: 12000, description: '...', category: '4', image: 'https://picsum.photos/id/425/400/400', merchantId: 'MCH-咖啡', stock: 50, status: 'active', rating: 5.0, reviewsCount: 210 }
-    ];
+  updateAddress: async (addressId: string, address: { name: string; district: string; sector: string; street: string }) => {
+    const response = await apiClient.updateAddress(addressId, address);
+    return response.address as Address;
   },
 
-  // --- REVIEWS ---
-  submitReview: async (productId: string, rating: number, comment: string) => {
-    console.log(`Review submitted for ${productId}: ${rating} stars - ${comment}`);
+  deleteAddress: async (addressId: string) => {
+    await apiClient.deleteAddress(addressId);
     return true;
+  },
+
+  setDefaultAddress: async (addressId: string) => {
+    await apiClient.setDefaultAddress(addressId);
+    return true;
+  },
+
+  getMyOrders: async (): Promise<Order[]> => {
+    const rawUser = localStorage.getItem('emalla_user');
+    const user = rawUser ? JSON.parse(rawUser) : null;
+    return user ? OrderService.getOrdersByCustomer(user.id) : [];
+  },
+
+  getWishlist: async (): Promise<Product[]> => {
+    const [wishlistResponse, products] = await Promise.all([
+      apiClient.getWishlist(),
+      ProductService.getProducts()
+    ]);
+    const wishlistItems = wishlistResponse.wishlist || [];
+    const productIds = new Set(wishlistItems.map((entry: { productId: string }) => entry.productId));
+    return products.filter((product) => productIds.has(product.id));
+  },
+
+  toggleWishlist: async (productId: string, isWishlisted: boolean) => {
+    if (isWishlisted) {
+      await apiClient.removeFromWishlist(productId);
+    } else {
+      await apiClient.addToWishlist(productId);
+    }
+    return true;
+  },
+
+  getWishlistProductIds: async (): Promise<string[]> => {
+    const response = await apiClient.getWishlist();
+    return (response.wishlist || []).map((entry: { productId: string }) => entry.productId);
+  },
+
+  getProductReviews: async (productId: string): Promise<ProductReview[]> => {
+    const response = await apiClient.getProductReviews(productId);
+    return response.reviews || [];
+  },
+
+  submitReview: async (productId: string, rating: number, comment: string) => {
+    const response = await apiClient.submitProductReview(productId, rating, comment);
+    return response.review as ProductReview;
   }
 };

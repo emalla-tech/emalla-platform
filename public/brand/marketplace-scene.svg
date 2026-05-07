@@ -1,0 +1,23 @@
+<svg width="1200" height="800" viewBox="0 0 1200 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="800" rx="48" fill="#111827"/>
+  <circle cx="1030" cy="140" r="180" fill="#F97316" fill-opacity="0.18"/>
+  <circle cx="180" cy="670" r="220" fill="#0F766E" fill-opacity="0.16"/>
+  <rect x="94" y="108" width="1012" height="584" rx="36" fill="#1F2937" stroke="#374151"/>
+  <rect x="140" y="154" width="420" height="210" rx="28" fill="#F97316" fill-opacity="0.16"/>
+  <rect x="598" y="154" width="462" height="120" rx="24" fill="#fff"/>
+  <rect x="598" y="296" width="462" height="68" rx="24" fill="#fff" fill-opacity="0.08"/>
+  <rect x="140" y="400" width="920" height="228" rx="32" fill="#fff"/>
+  <rect x="178" y="438" width="250" height="152" rx="24" fill="#FFF7ED"/>
+  <rect x="448" y="438" width="250" height="152" rx="24" fill="#ECFDF5"/>
+  <rect x="718" y="438" width="304" height="152" rx="24" fill="#EFF6FF"/>
+  <text x="170" y="224" fill="#fff" font-family="Arial, sans-serif" font-size="54" font-weight="700">E-Malla Rwanda</text>
+  <text x="170" y="288" fill="#FDBA74" font-family="Arial, sans-serif" font-size="26">Marketplace • Logistics • Payments</text>
+  <text x="628" y="224" fill="#111827" font-family="Arial, sans-serif" font-size="32" font-weight="700">Nationwide digital commerce</text>
+  <text x="628" y="338" fill="#D1D5DB" font-family="Arial, sans-serif" font-size="24">Real platform operations, real seller growth, real delivery flow.</text>
+  <text x="210" y="520" fill="#9A3412" font-family="Arial, sans-serif" font-size="24" font-weight="700">Trusted merchants</text>
+  <text x="210" y="556" fill="#7C2D12" font-family="Arial, sans-serif" font-size="20">Verified catalog and approvals</text>
+  <text x="480" y="520" fill="#065F46" font-family="Arial, sans-serif" font-size="24" font-weight="700">Fast fulfillment</text>
+  <text x="480" y="556" fill="#065F46" font-family="Arial, sans-serif" font-size="20">Admin, seller, buyer, rider in sync</text>
+  <text x="754" y="520" fill="#1D4ED8" font-family="Arial, sans-serif" font-size="24" font-weight="700">Secure payments</text>
+  <text x="754" y="556" fill="#1D4ED8" font-family="Arial, sans-serif" font-size="20">MoMo, Airtel, bank, COD</text>
+</svg>

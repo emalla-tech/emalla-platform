@@ -7,9 +7,10 @@ interface TeamMemberProps {
   name: string;
   role: string;
   department: string;
+  linkedinUrl?: string;
 }
 
-const TeamMember: React.FC<TeamMemberProps> = ({ avatar, name, role, department }) => {
+const TeamMember: React.FC<TeamMemberProps> = ({ avatar, name, role, department, linkedinUrl }) => {
   return (
     <div className="flex flex-col items-center text-center group">
       <div className="w-32 h-32 md:w-40 md:h-40 rounded-[48px] overflow-hidden mb-6 relative border-4 border-white shadow-xl group-hover:rotate-2 transition-transform duration-500">
@@ -25,12 +26,16 @@ const TeamMember: React.FC<TeamMemberProps> = ({ avatar, name, role, department 
         <p className="text-orange-500 text-xs font-black uppercase tracking-widest">{role}</p>
         <p className="text-gray-400 text-[10px] font-bold uppercase tracking-tighter">{department}</p>
       </div>
-      <a 
-        href="#" 
-        className="mt-4 p-2 bg-gray-50 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-      >
-        <Linkedin size={16} />
-      </a>
+      {linkedinUrl ? (
+        <a
+          href={linkedinUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 p-2 bg-gray-50 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+        >
+          <Linkedin size={16} />
+        </a>
+      ) : null}
     </div>
   );
 };

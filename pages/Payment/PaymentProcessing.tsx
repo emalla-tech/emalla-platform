@@ -9,6 +9,7 @@ const PaymentProcessing: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const tx_ref = searchParams.get('tx_ref');
+  const orderId = searchParams.get('order_id');
   const [status, setStatus] = useState<'verifying' | 'success' | 'failed'>('verifying');
 
   useEffect(() => {
@@ -21,17 +22,20 @@ const PaymentProcessing: React.FC = () => {
       try {
         const result = await PaymentService.verifyPayment(tx_ref);
         if (result.status === PaymentStatus.SUCCESS) {
-          setTimeout(() => navigate('/payment/success'), 1000);
+          setStatus('success');
+          setTimeout(() => navigate(`/payment/success?order_id=${result.orderId || orderId || ''}`), 1000);
         } else {
-          setTimeout(() => navigate('/payment/failure'), 1000);
+          setStatus('failed');
+          setTimeout(() => navigate(`/payment/failure?order_id=${orderId || ''}`), 1000);
         }
       } catch (err) {
-        navigate('/payment/failure');
+        setStatus('failed');
+        navigate(`/payment/failure?order_id=${orderId || ''}`);
       }
     };
 
     verify();
-  }, [tx_ref, navigate]);
+  }, [tx_ref, orderId, navigate]);
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
@@ -46,7 +50,11 @@ const PaymentProcessing: React.FC = () => {
         <div className="space-y-4">
           <h1 className="text-3xl font-black text-gray-900 tracking-tight">Verifying Payment...</h1>
           <p className="text-gray-500 font-medium">
-            Please do not refresh this page. We are confirming your transaction with <span className="text-orange-600 font-bold">MTN MoMo</span>.
+            {status === 'verifying'
+              ? <>Please do not refresh this page. We are confirming your transaction with <span className="text-orange-600 font-bold">MTN MoMo</span>.</>
+              : status === 'success'
+                ? 'Payment confirmed successfully. Redirecting you now.'
+                : 'Payment verification failed. Redirecting you back now.'}
           </p>
         </div>
 

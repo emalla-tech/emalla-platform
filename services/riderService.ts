@@ -1,95 +1,83 @@
+import { Order, OrderStatus, Rider, Transaction } from '../types';
+import { apiClient } from './apiClient';
+import { OrderService } from './orderService';
 
-import { Order, OrderStatus, Rider, Transaction, PaymentMethod, PaymentStatus } from '../types';
+const getStoredRiderId = () => {
+  try {
+    const rawUser = localStorage.getItem('emalla_user');
+    const user = rawUser ? JSON.parse(rawUser) : null;
+    return user?.role === 'DELIVERY' ? user.id : null;
+  } catch {
+    return null;
+  }
+};
 
-/**
- * RiderService handles the high-velocity logistics operations for delivery agents.
- */
 export const RiderService = {
-  // --- RIDER PROFILE & STATUS ---
   getProfile: async (): Promise<Rider> => {
+    const response = await apiClient.getRiderProfile();
+    return response.rider;
+  },
+
+  registerApplication: async (params: {
+    name: string;
+    email: string;
+    phone: string;
+    vehicleNumber: string;
+  }) => {
+    const response = await apiClient.createRiderApplication(params);
     return {
-      id: 'RID-01',
-      name: 'Nizeyimana Eric',
-      phone: '078111222',
-      status: 'available',
-      vehicleNumber: 'RE 123 A',
-      rating: 4.8,
-      totalDeliveries: 450,
-      earnings: 1200000
+      success: true,
+      applicationId: response.application?.id || '',
+      status: response.application?.status || 'pending',
+      action: response.action || 'submitted'
     };
+  },
+
+  checkApplicationStatus: async (params: { email: string; phone: string }) => {
+    const response = await apiClient.checkRiderApplicationStatus(params);
+    return response.application || null;
+  },
+
+  updateProfile: async (params: {
+    phone: string;
+    mobileMoneyNumber?: string;
+    vehicleNumber?: string;
+    emergencyContact?: string;
+  }): Promise<Rider> => {
+    const response = await apiClient.updateRiderProfile(params);
+    if (response.user) {
+      localStorage.setItem('emalla_user', JSON.stringify(response.user));
+    }
+    return response.rider;
   },
 
   toggleStatus: async (isOnline: boolean) => {
-    console.log(`Rider status set to: ${isOnline ? 'online' : 'offline'}`);
+    await apiClient.updateRiderStatus(isOnline);
     return true;
   },
 
-  // --- DELIVERY OPERATIONS ---
   getAssignedDeliveries: async (): Promise<Order[]> => {
-    return [
-      {
-        id: 'ORD-892',
-        orderNumber: 'EM-2024-892',
-        customerId: 'USR-01',
-        customerName: 'Mugisha Jean',
-        merchantId: 'MCH-05',
-        merchantName: 'Inyange Fashion',
-        // Added subtotal property to OrderItem
-        items: [{ productId: 'p1', productName: 'Smart Watch', quantity: 1, price: 120000, subtotal: 120000 }],
-        // Fixed: Use correct enum value for PROCESSING
-        status: OrderStatus.PROCESSING,
-        paymentStatus: PaymentStatus.SUCCESS,
-        tx_ref: 'REF-892',
-        totalAmount: 120000,
-        deliveryFee: 1500,
-        address: 'Gasabo, Kimironko, KG 123 St',
-        phone: '0788000000',
-        // Corrected enum assignment
-        paymentMethod: PaymentMethod.MOMO,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    ];
+    const riderId = getStoredRiderId();
+    if (!riderId) return [];
+    return OrderService.getOrdersByRider(riderId);
   },
 
   getAvailablePool: async (): Promise<Order[]> => {
-    return [
-      {
-        id: 'ORD-901',
-        orderNumber: 'EM-2024-901',
-        customerId: 'USR-55',
-        customerName: 'Mutoni Alice',
-        merchantId: 'MCH-10',
-        merchantName: 'Kigali Grocery',
-        // Added subtotal property to OrderItem
-        items: [{ productId: 'p8', productName: 'Fresh Groceries', quantity: 1, price: 15000, subtotal: 15000 }],
-        status: OrderStatus.PAID,
-        paymentStatus: PaymentStatus.SUCCESS,
-        tx_ref: 'REF-901',
-        totalAmount: 15000,
-        deliveryFee: 1500,
-        address: 'Nyarugenge, KN 2 Rd',
-        phone: '0788000002',
-        // Corrected enum assignment
-        paymentMethod: PaymentMethod.MOMO,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    ];
+    return OrderService.getOrderPool();
   },
 
   updateDeliveryStatus: async (orderId: string, status: OrderStatus) => {
-    console.log(`Order ${orderId} moved to ${status}`);
+    await OrderService.updateOrderStatus(orderId, status);
     return true;
   },
 
-  // --- WALLET ---
   getEarningsSummary: async () => {
-    return {
-      today: 8500,
-      week: 45000,
-      walletBalance: 125000,
-      pendingClearance: 12000
-    };
+    const response = await apiClient.getRiderWallet();
+    return response.summary;
+  },
+
+  getTransactions: async (): Promise<Transaction[]> => {
+    const response = await apiClient.getRiderWallet();
+    return response.transactions || [];
   }
 };

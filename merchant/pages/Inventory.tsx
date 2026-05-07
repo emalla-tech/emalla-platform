@@ -1,31 +1,110 @@
-
+﻿
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Plus, Search, Filter, Edit3, Trash2, ExternalLink, 
-  AlertTriangle, CheckCircle, Package, MoreVertical, X, Sparkles, Loader2,
-  Upload, Image as ImageIcon, Sparkle
+  AlertTriangle, CheckCircle, Package, X, Sparkles, Loader2, Star
 } from 'lucide-react';
 import { MerchantService } from '../../services/merchantService';
 import { geminiService } from '../../services/geminiService';
+import { uploadService } from '../../services/uploadService';
 import { Product } from '../../types';
 import { CATEGORIES } from '../../constants';
+import { getProductPrimaryImage, handleProductImageError } from '../../lib/productImages';
+
+const SPECIFICATION_FIELDS = [
+  { key: 'material', label: 'Material', placeholder: 'e.g. Genuine leather' },
+  { key: 'dimensions', label: 'Dimensions', placeholder: 'e.g. 40 x 30 x 12 cm' },
+  { key: 'weight', label: 'Weight', placeholder: 'e.g. 1.2 kg' },
+  { key: 'warranty', label: 'Warranty', placeholder: 'e.g. 12 months' },
+  { key: 'color', label: 'Color', placeholder: 'e.g. Black, Brown' },
+  { key: 'size', label: 'Size', placeholder: 'e.g. S, M, L or Standard' }
+] as const;
+
+type SpecificationFieldKey = (typeof SPECIFICATION_FIELDS)[number]['key'];
+type StructuredSpecifications = Record<SpecificationFieldKey, string> & { additional: string };
+
+const createEmptySpecifications = (): StructuredSpecifications => ({
+  material: '',
+  dimensions: '',
+  weight: '',
+  warranty: '',
+  color: '',
+  size: '',
+  additional: ''
+});
+
+const parseSpecifications = (raw: string | undefined): StructuredSpecifications => {
+  const parsed = createEmptySpecifications();
+  const remaining: string[] = [];
+  const labelMap = Object.fromEntries(SPECIFICATION_FIELDS.map((field) => [field.label.toLowerCase(), field.key])) as Record<string, SpecificationFieldKey>;
+
+  String(raw || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .forEach((line) => {
+      const separatorIndex = line.indexOf(':');
+      if (separatorIndex === -1) {
+        remaining.push(line);
+        return;
+      }
+
+      const label = line.slice(0, separatorIndex).trim().toLowerCase();
+      const value = line.slice(separatorIndex + 1).trim();
+      const key = labelMap[label];
+
+      if (key) {
+        parsed[key] = value;
+      } else if (value) {
+        remaining.push(line);
+      }
+    });
+
+  parsed.additional = remaining.join('\n');
+  return parsed;
+};
+
+const buildSpecifications = (specifications: StructuredSpecifications) => {
+  const lines = SPECIFICATION_FIELDS.map((field) => {
+    const value = specifications[field.key].trim();
+    return value ? `${field.label}: ${value}` : '';
+  }).filter(Boolean);
+
+  const additionalLines = specifications.additional
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return [...lines, ...additionalLines].join('\n');
+};
 
 const Inventory: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
+  const [structuredSpecifications, setStructuredSpecifications] = useState<StructuredSpecifications>(createEmptySpecifications());
   
   const [newProduct, setNewProduct] = useState<Partial<Product>>({
     name: '',
     price: 0,
     category: '1',
     description: '',
+    specifications: '',
     stock: 0,
     image: '',
-    images: []
+    images: [],
+    status: 'pending',
+    featured: true
   });
 
   useEffect(() => {
@@ -39,7 +118,8 @@ const Inventory: React.FC = () => {
 
   const handleAiGenerate = async () => {
     if (!newProduct.name) {
-      alert("Please enter a product name first to help the AI.");
+      setToast('Please enter a product name first to help the AI.');
+      setTimeout(() => setToast(null), 3000);
       return;
     }
     setIsGenerating(true);
@@ -49,25 +129,66 @@ const Inventory: React.FC = () => {
     setIsGenerating(false);
   };
 
-  // Fixed: Explicitly typed 'file' as 'File' to resolve 'unknown' to 'Blob' assignment error on reader.readAsDataURL.
-  const handleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const processSelectedFiles = async (files: File[]) => {
+    if (files.length === 0) return;
+
+    setIsUploadingImages(true);
+    try {
+      const uploadedImages = await Promise.all(
+        files.map((file) => uploadService.uploadProductImage(file))
+      );
+
+      setNewProduct((prev) => {
+        const currentImages = prev.images || [];
+        const nextUrls = uploadedImages.map((entry) => entry.url);
+        const updatedImages = [...currentImages, ...nextUrls];
+        return {
+          ...prev,
+          images: updatedImages,
+          image: prev.image || updatedImages[0] || ''
+        };
+      });
+
+      const usedFallback = uploadedImages.some((entry) => entry.provider !== 'cloudinary');
+      setToast(usedFallback ? 'Images uploaded locally. Add storage credentials for cloud delivery.' : 'Images uploaded successfully.');
+      setTimeout(() => setToast(null), 3000);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : 'Image upload failed.');
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setIsUploadingImages(false);
+    }
+  };
+
+  const handleImagesChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    files.forEach((file: File) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        setNewProduct(prev => {
-          const currentImages = prev.images || [];
-          const updatedImages = [...currentImages, base64];
-          return { 
-            ...prev, 
-            images: updatedImages,
-            image: prev.image || base64 // Set first uploaded as primary
-          };
-        });
+    await processSelectedFiles(files);
+    e.target.value = '';
+  };
+
+  const moveImage = (fromIndex: number, toIndex: number) => {
+    setNewProduct((prev) => {
+      const images = [...(prev.images || [])];
+      if (fromIndex < 0 || toIndex < 0 || fromIndex >= images.length || toIndex >= images.length) {
+        return prev;
+      }
+
+      const [moved] = images.splice(fromIndex, 1);
+      images.splice(toIndex, 0, moved);
+
+      return {
+        ...prev,
+        images,
+        image: images[0] || ''
       };
-      reader.readAsDataURL(file);
     });
+  };
+
+  const handleDropUpload = async (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    setIsDragActive(false);
+    const files = Array.from(e.dataTransfer.files || []).filter((file) => file.type.startsWith('image/'));
+    await processSelectedFiles(files);
   };
 
   const removeImage = (index: number) => {
@@ -85,24 +206,40 @@ const Inventory: React.FC = () => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const createdProduct = await MerchantService.saveProduct(newProduct);
+      const productPayload = {
+        ...newProduct,
+        specifications: buildSpecifications(structuredSpecifications)
+      };
+
+      const savedProduct = editingProductId
+        ? await MerchantService.updateProduct(editingProductId, productPayload)
+        : await MerchantService.saveProduct(productPayload);
       
       const updatedProducts = await MerchantService.getProducts();
       setProducts(updatedProducts);
       
-      setJustAddedId(createdProduct.id);
+      if (savedProduct?.id) {
+        setJustAddedId(savedProduct.id);
+      }
       setTimeout(() => setJustAddedId(null), 3000);
+      setToast(editingProductId ? 'Product updated successfully.' : 'Product added successfully.');
+      setTimeout(() => setToast(null), 3000);
 
       setIsModalOpen(false);
+      setEditingProductId(null);
       setNewProduct({
         name: '',
         price: 0,
         category: '1',
         description: '',
+        specifications: '',
         stock: 0,
         image: '',
-        images: []
+        images: [],
+        status: 'pending',
+        featured: true
       });
+      setStructuredSpecifications(createEmptySpecifications());
     } catch (err) {
       console.error(err);
     } finally {
@@ -110,15 +247,82 @@ const Inventory: React.FC = () => {
     }
   };
 
+  const handleDeleteProduct = async (productId: string) => {
+    const confirmed = window.confirm('Remove this product from your inventory?');
+    if (!confirmed) return;
+
+    await MerchantService.deleteProduct(productId);
+    loadProducts();
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProductId(product.id);
+    setNewProduct({
+      ...product,
+      images: product.images || (product.image ? [product.image] : []),
+      status: product.status || 'pending',
+      featured: product.featured ?? false
+    });
+    setStructuredSpecifications(parseSpecifications(product.specifications));
+    setIsModalOpen(true);
+  };
+
+  const handleStatusChange = async (productId: string, status: string) => {
+    await MerchantService.updateProduct(productId, { status });
+    loadProducts();
+  };
+
+  const handleFeaturedToggle = async (product: Product) => {
+    await MerchantService.updateProduct(product.id, { featured: !product.featured });
+    loadProducts();
+  };
+
+  const resetForm = () => {
+    setEditingProductId(null);
+      setNewProduct({
+        name: '',
+        price: 0,
+        category: '1',
+        description: '',
+        specifications: '',
+        stock: 0,
+        image: '',
+        images: [],
+      status: 'pending',
+      featured: true
+    });
+    setStructuredSpecifications(createEmptySpecifications());
+  };
+
+  const visibleProducts = products.filter((product) => {
+    const matchesSearch =
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (CATEGORIES.find((category) => category.id === product.category)?.name || '')
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
+
+    if (!matchesSearch) return false;
+    if (showLowStockOnly && product.stock >= 5) return false;
+    return true;
+  });
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      {toast && (
+        <div className="fixed top-24 right-6 z-[120] bg-emerald-500 text-white px-5 py-4 rounded-2xl shadow-2xl font-black text-sm">
+          {toast}
+        </div>
+      )}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-black text-gray-900">Inventory Management</h1>
           <p className="text-gray-500 text-sm">Manage your catalog, prices, and stock levels.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            resetForm();
+            setIsModalOpen(true);
+          }}
           className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-2xl font-black text-sm flex items-center shadow-lg shadow-orange-200 transition-all active:scale-95"
         >
           <Plus size={18} className="mr-2" /> Add New Product
@@ -140,7 +344,12 @@ const Inventory: React.FC = () => {
            <button className="px-4 py-3 bg-gray-50 rounded-2xl text-xs font-black text-gray-500 hover:bg-gray-100 flex items-center">
              <Filter size={14} className="mr-2" /> Categories
            </button>
-           <button className="px-4 py-3 bg-gray-50 rounded-2xl text-xs font-black text-gray-500 hover:bg-gray-100 flex items-center">
+           <button
+             onClick={() => setShowLowStockOnly((current) => !current)}
+             className={`px-4 py-3 rounded-2xl text-xs font-black flex items-center transition-all ${
+               showLowStockOnly ? 'bg-red-50 text-red-500' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+             }`}
+           >
              <AlertTriangle size={14} className="mr-2" /> Low Stock
            </button>
         </div>
@@ -161,17 +370,25 @@ const Inventory: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map((p) => (
+              {visibleProducts.map((p) => (
                 <tr key={p.id} className={`group hover:bg-gray-50/50 transition-colors ${justAddedId === p.id ? 'bg-emerald-50/50 animate-pulse' : ''}`}>
                   <td className="px-8 py-6">
                     <div className="flex items-center space-x-4">
                       <div className="w-14 h-14 bg-gray-100 rounded-2xl overflow-hidden border border-gray-50 flex-shrink-0">
-                        <img src={p.image} className="w-full h-full object-cover" alt={p.name} />
+                        <img
+                          src={getProductPrimaryImage(p)}
+                          onError={(event) => handleProductImageError(event, p.category)}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover"
+                          alt={p.name}
+                        />
                       </div>
                       <div>
                         <div className="flex items-center space-x-2">
                            <p className="font-bold text-gray-900 group-hover:text-orange-600 transition-colors">{p.name}</p>
                            {justAddedId === p.id && <span className="bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase">New</span>}
+                           {p.featured && <span className="bg-yellow-100 text-yellow-700 text-[8px] font-black px-1.5 py-0.5 rounded uppercase">Featured</span>}
                         </div>
                         <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">SKU: EM-{p.id.toUpperCase()}</p>
                       </div>
@@ -188,15 +405,29 @@ const Inventory: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-8 py-6">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">
-                      <CheckCircle size={10} className="mr-1.5" /> {p.status || 'Active'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        p.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : p.status === 'draft' ? 'bg-gray-100 text-gray-600' : 'bg-yellow-50 text-yellow-700'
+                      }`}>
+                        <CheckCircle size={10} className="mr-1.5" /> {p.status || 'pending'}
+                      </span>
+                      <select
+                        value={p.status || 'pending'}
+                        onChange={(e) => handleStatusChange(p.id, e.target.value)}
+                        className="bg-gray-50 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest outline-none"
+                      >
+                        <option value="draft">Draft</option>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                      </select>
+                    </div>
                   </td>
                   <td className="px-8 py-6 text-right">
                     <div className="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-all">
-                      <button className="p-2 bg-gray-100 text-gray-500 rounded-xl hover:bg-black hover:text-white transition-all"><Edit3 size={16} /></button>
-                      <button className="p-2 bg-gray-100 text-gray-500 rounded-xl hover:bg-black hover:text-white transition-all"><ExternalLink size={16} /></button>
-                      <button className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={16} /></button>
+                      <button onClick={() => handleFeaturedToggle(p)} className={`p-2 rounded-xl transition-all ${p.featured ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500 hover:bg-yellow-100 hover:text-yellow-700'}`}><Star size={16} /></button>
+                      <button onClick={() => handleEditProduct(p)} className="p-2 bg-gray-100 text-gray-500 rounded-xl hover:bg-black hover:text-white transition-all"><Edit3 size={16} /></button>
+                      <Link to={`/product/${p.id}`} className="p-2 bg-gray-100 text-gray-500 rounded-xl hover:bg-black hover:text-white transition-all"><ExternalLink size={16} /></Link>
+                      <button onClick={() => handleDeleteProduct(p.id)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={16} /></button>
                     </div>
                   </td>
                 </tr>
@@ -205,9 +436,11 @@ const Inventory: React.FC = () => {
           </table>
         </div>
         <div className="px-8 py-6 bg-gray-50/50 border-t border-gray-100 flex justify-between items-center">
-          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Total: {products.length} Products</p>
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Visible: {visibleProducts.length} of {products.length} Products</p>
           <div className="flex space-x-2">
-             <button className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-xs font-black hover:bg-gray-50 transition-all">Next Page</button>
+             <span className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-xs font-black text-gray-400">
+               All products loaded
+             </span>
           </div>
         </div>
       </div>
@@ -221,23 +454,46 @@ const Inventory: React.FC = () => {
           ></div>
           <div className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in slide-in-from-bottom-4 duration-300">
             <div className="flex justify-between items-center p-8 border-b border-gray-100">
-              <h2 className="text-2xl font-black text-gray-900">List New Product</h2>
+              <h2 className="text-2xl font-black text-gray-900">{editingProductId ? 'Edit Product' : 'List New Product'}</h2>
               <button 
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => {
+                  setIsModalOpen(false);
+                  resetForm();
+                }}
                 className="p-2 hover:bg-gray-100 rounded-full text-gray-400 transition-colors"
               >
                 <X size={24} />
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto no-scrollbar">
+            <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6 max-h-[85vh] overflow-y-auto no-scrollbar">
               {/* Image Upload Field */}
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Product Media (Multiple Allowed)</label>
                 <div className="flex flex-wrap gap-4">
                   {(newProduct.images || []).map((img, index) => (
-                    <div key={index} className="w-24 h-24 rounded-2xl bg-gray-50 border border-gray-100 relative group overflow-hidden shadow-sm">
-                      <img src={img} className="w-full h-full object-cover" alt={`Preview ${index}`} />
+                    <div
+                      key={index}
+                      draggable
+                      onDragStart={() => setDraggedImageIndex(index)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (draggedImageIndex === null || draggedImageIndex === index) return;
+                        moveImage(draggedImageIndex, index);
+                        setDraggedImageIndex(null);
+                      }}
+                      onDragEnd={() => setDraggedImageIndex(null)}
+                      className="w-24 h-24 rounded-2xl bg-gray-50 border border-gray-100 relative group overflow-hidden shadow-sm"
+                    >
+                      <img
+                        src={img}
+                        onError={(event) => handleProductImageError(event, newProduct.category)}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-cover"
+                        alt={`Preview ${index}`}
+                      />
                       <button 
                         type="button"
                         onClick={() => removeImage(index)}
@@ -245,6 +501,24 @@ const Inventory: React.FC = () => {
                       >
                         <X size={12} />
                       </button>
+                      <div className="absolute left-1 top-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={() => moveImage(index, Math.max(0, index - 1))}
+                          disabled={index === 0}
+                          className="bg-white/90 text-gray-700 px-1.5 py-0.5 rounded text-[9px] font-black disabled:opacity-40"
+                        >
+                          Prev
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveImage(index, Math.min((newProduct.images || []).length - 1, index + 1))}
+                          disabled={index === (newProduct.images || []).length - 1}
+                          className="bg-white/90 text-gray-700 px-1.5 py-0.5 rounded text-[9px] font-black disabled:opacity-40"
+                        >
+                          Next
+                        </button>
+                      </div>
                       {index === 0 && (
                         <div className="absolute bottom-0 left-0 right-0 bg-orange-500 text-white text-[8px] font-black py-0.5 text-center uppercase tracking-tighter">
                           Primary
@@ -253,20 +527,37 @@ const Inventory: React.FC = () => {
                     </div>
                   ))}
                   
-                  <label className="w-24 h-24 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center hover:border-orange-500 cursor-pointer transition-all bg-gray-50/50 group">
-                    <Plus className="text-gray-300 group-hover:text-orange-500" size={24} />
-                    <span className="text-[8px] font-black text-gray-400 uppercase mt-1">Add Image</span>
+                  <label
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDragActive(true);
+                    }}
+                    onDragLeave={() => setIsDragActive(false)}
+                    onDrop={handleDropUpload}
+                    className={`w-24 h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center hover:border-orange-500 cursor-pointer transition-all group ${
+                      isDragActive ? 'border-orange-500 bg-orange-50' : 'border-gray-200 bg-gray-50/50'
+                    }`}
+                  >
+                    {isUploadingImages ? (
+                      <Loader2 className="text-orange-500 animate-spin" size={24} />
+                    ) : (
+                      <Plus className="text-gray-300 group-hover:text-orange-500" size={24} />
+                    )}
+                    <span className="text-[8px] font-black text-gray-400 uppercase mt-1">
+                      {isUploadingImages ? 'Uploading' : isDragActive ? 'Drop Here' : 'Add Image'}
+                    </span>
                     <input 
                       type="file" 
                       multiple
                       accept="image/*"
                       onChange={handleImagesChange}
+                      disabled={isUploadingImages}
                       className="hidden"
                     />
                   </label>
                 </div>
                 <p className="text-[10px] text-gray-400 font-medium italic">
-                  Tip: The first image will be used as the main thumbnail. Upload clear, bright photos.
+                  Tip: Drag images into the upload box, then reorder thumbnails. The first image stays the main thumbnail.
                 </p>
               </div>
 
@@ -318,6 +609,34 @@ const Inventory: React.FC = () => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Approval Status</label>
+                  <select
+                    value={newProduct.status || 'pending'}
+                    onChange={e => setNewProduct({ ...newProduct, status: e.target.value })}
+                    className="w-full px-6 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 rounded-2xl outline-none font-bold text-gray-900 appearance-none"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="pending">Pending Review</option>
+                    <option value="approved">Approved</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Home Placement</label>
+                  <button
+                    type="button"
+                    onClick={() => setNewProduct({ ...newProduct, featured: !(newProduct.featured ?? false) })}
+                    className={`w-full px-6 py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center ${
+                      newProduct.featured ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-50 text-gray-500'
+                    }`}
+                  >
+                    <Star size={16} className="mr-2" />
+                    {newProduct.featured ? 'Featured on Home' : 'Standard Listing'}
+                  </button>
+                </div>
+              </div>
+
               <div className="space-y-2 relative">
                 <div className="flex justify-between items-end">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Description</label>
@@ -340,6 +659,42 @@ const Inventory: React.FC = () => {
                 ></textarea>
               </div>
 
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Specifications</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {SPECIFICATION_FIELDS.map((field) => (
+                    <input
+                      key={field.key}
+                      type="text"
+                      value={structuredSpecifications[field.key]}
+                      onChange={(e) =>
+                        setStructuredSpecifications((current) => ({
+                          ...current,
+                          [field.key]: e.target.value
+                        }))
+                      }
+                      placeholder={field.placeholder}
+                      className="w-full px-6 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 rounded-2xl outline-none font-bold text-gray-900 transition-all"
+                    />
+                  ))}
+                </div>
+                <textarea
+                  rows={3}
+                  value={structuredSpecifications.additional}
+                  onChange={(e) =>
+                    setStructuredSpecifications((current) => ({
+                      ...current,
+                      additional: e.target.value
+                    }))
+                  }
+                  placeholder="Additional specifications, one detail per line..."
+                  className="w-full px-6 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 rounded-2xl outline-none font-bold text-gray-900 transition-all resize-none"
+                ></textarea>
+                <p className="text-[10px] text-gray-400 font-medium italic">
+                  Structured fields make the product page cleaner, while extra lines can go in additional specifications.
+                </p>
+              </div>
+
               <div className="pt-4">
                 <button 
                   type="submit"
@@ -351,7 +706,7 @@ const Inventory: React.FC = () => {
                   ) : (
                     <>
                       <Package size={22} />
-                      <span>Confirm & List Product</span>
+                      <span>{editingProductId ? 'Save Product Changes' : 'Confirm & List Product'}</span>
                     </>
                   )}
                 </button>
@@ -365,3 +720,4 @@ const Inventory: React.FC = () => {
 };
 
 export default Inventory;
+

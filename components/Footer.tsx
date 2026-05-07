@@ -1,9 +1,30 @@
 
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin, ArrowRight } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 const Footer: React.FC = () => {
+  const location = useLocation();
+  const { t } = useLanguage();
+  const socialLinks = [
+    { icon: Facebook, to: '/about', label: t.footer.about },
+    { icon: Twitter, to: '/how-it-works', label: t.footer.howItWorks },
+    { icon: Instagram, to: '/shop', label: t.footer.allProducts },
+    { icon: Linkedin, to: '/investors', label: t.footer.investors }
+  ];
+
+  const isActiveLink = (path: string) => {
+    if (path === '/') {
+      return location.pathname === '/';
+    }
+
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  };
+
+  const linkClass = (path: string, accent = false) =>
+    `${isActiveLink(path) ? 'text-white' : accent ? 'text-orange-400 hover:text-white' : 'hover:text-white'} transition-colors flex items-center group`;
+
   return (
     <footer className="bg-black text-white pt-20 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -15,82 +36,82 @@ const Footer: React.FC = () => {
               <span className="text-2xl font-black text-white">E-Malla <span className="font-light opacity-70">Rwanda</span></span>
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed mb-8 max-w-xs">
-              Empowering local commerce across the Land of a Thousand Hills. Fast delivery, secure payments, and authentic Rwandan products.
+              {t.footer.tagline}
             </p>
             <div className="flex space-x-4">
-              {[Facebook, Twitter, Instagram, Linkedin].map((Icon, i) => (
-                <a key={i} href="#" className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-orange-500 hover:text-white transition-all text-gray-400">
+              {socialLinks.map(({ icon: Icon, to, label }) => (
+                <Link key={to} to={to} aria-label={label} className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-orange-500 hover:text-white transition-all text-gray-400">
                   <Icon size={18} />
-                </a>
+                </Link>
               ))}
             </div>
           </div>
 
           {/* Marketplace Column */}
           <div>
-            <h4 className="text-sm font-black uppercase tracking-[3px] text-orange-500 mb-8">Marketplace</h4>
+            <h4 className="text-sm font-black uppercase tracking-[3px] text-orange-500 mb-8">{t.footer.marketplace}</h4>
             <ul className="space-y-4 text-gray-400 text-sm font-medium">
-              <li><Link to="/shop" className="hover:text-white transition-colors flex items-center group">
+              <li><Link to="/shop" className={linkClass('/shop')}>
                 <ArrowRight size={12} className="mr-2 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-orange-500" />
-                All Products
+                {t.footer.allProducts}
               </Link></li>
-              <li><Link to="/shop?category=1" className="hover:text-white transition-colors flex items-center group">
+              <li><Link to="/shop?category=1" className={linkClass('/shop')}>
                 <ArrowRight size={12} className="mr-2 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-orange-500" />
-                Electronics
+                {t.footer.electronics}
               </Link></li>
-              <li><Link to="/shop?category=2" className="hover:text-white transition-colors flex items-center group">
+              <li><Link to="/shop?category=2" className={linkClass('/shop')}>
                 <ArrowRight size={12} className="mr-2 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-orange-500" />
-                Fashion & Style
+                {t.footer.fashion}
               </Link></li>
-              <li><Link to="/become-seller" className="hover:text-white transition-colors flex items-center group text-orange-400">
+              <li><Link to="/become-seller" className={linkClass('/become-seller', true)}>
                 <ArrowRight size={12} className="mr-2 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-orange-500" />
-                Sell on E-Malla
+                {t.footer.sellOnEmalla}
               </Link></li>
             </ul>
           </div>
 
           {/* Help & Support Column */}
           <div>
-            <h4 className="text-sm font-black uppercase tracking-[3px] text-orange-500 mb-8">Help & Support</h4>
+            <h4 className="text-sm font-black uppercase tracking-[3px] text-orange-500 mb-8">{t.footer.helpSupport}</h4>
             <ul className="space-y-4 text-gray-400 text-sm font-medium">
-              <li><Link to="/faq" className="hover:text-white transition-colors flex items-center group">
+              <li><Link to="/faq" className={linkClass('/faq')}>
                 <ArrowRight size={12} className="mr-2 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-orange-500" />
-                FAQs
+                {t.footer.faqs}
               </Link></li>
-              <li><Link to="/shipping" className="hover:text-white transition-colors flex items-center group">
+              <li><Link to="/shipping" className={linkClass('/shipping')}>
                 <ArrowRight size={12} className="mr-2 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-orange-500" />
-                Shipping Policy
+                {t.footer.shippingPolicy}
               </Link></li>
-              <li><Link to="/contact" className="hover:text-white transition-colors flex items-center group">
+              <li><Link to="/contact" className={linkClass('/contact')}>
                 <ArrowRight size={12} className="mr-2 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-orange-500" />
-                Contact Us
+                {t.footer.contactUs}
               </Link></li>
-              <li><Link to="/how-it-works" className="hover:text-white transition-colors flex items-center group">
+              <li><Link to="/how-it-works" className={linkClass('/how-it-works')}>
                 <ArrowRight size={12} className="mr-2 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-orange-500" />
-                How It Works
+                {t.footer.howItWorks}
               </Link></li>
             </ul>
           </div>
 
           {/* Company Column */}
           <div>
-            <h4 className="text-sm font-black uppercase tracking-[3px] text-orange-500 mb-8">Company</h4>
+            <h4 className="text-sm font-black uppercase tracking-[3px] text-orange-500 mb-8">{t.footer.company}</h4>
             <ul className="space-y-4 text-gray-400 text-sm font-medium">
-              <li><Link to="/about" className="hover:text-white transition-colors flex items-center group">
+              <li><Link to="/about" className={linkClass('/about')}>
                 <ArrowRight size={12} className="mr-2 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-orange-500" />
-                About E-Malla
+                {t.footer.about}
               </Link></li>
-              <li><Link to="/investors" className="hover:text-white transition-colors flex items-center group">
+              <li><Link to="/investors" className={linkClass('/investors')}>
                 <ArrowRight size={12} className="mr-2 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-orange-500" />
-                Investor Relations
+                {t.footer.investors}
               </Link></li>
-              <li><Link to="/team" className="hover:text-white transition-colors flex items-center group">
+              <li><Link to="/team" className={linkClass('/team')}>
                 <ArrowRight size={12} className="mr-2 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-orange-500" />
-                Operations Team
+                {t.footer.team}
               </Link></li>
-              <li><Link to="/terms" className="hover:text-white transition-colors flex items-center group">
+              <li><Link to="/terms" className={linkClass('/terms')}>
                 <ArrowRight size={12} className="mr-2 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-orange-500" />
-                Terms of Service
+                {t.footer.terms}
               </Link></li>
             </ul>
           </div>
@@ -104,12 +125,12 @@ const Footer: React.FC = () => {
             </div>
             <div className="flex items-center space-x-2">
               <Phone size={14} className="text-orange-500" />
-              <span>+250 788 000 000</span>
+              <span>+250 784352174</span>
             </div>
           </div>
           
           <p className="text-gray-600 text-[10px] font-black uppercase tracking-[3px]">
-            &copy; {new Date().getFullYear()} E-Malla Rwanda. Digital Hub for Local Trade.
+            &copy; {new Date().getFullYear()} E-Malla Rwanda. {t.footer.rights}
           </p>
         </div>
       </div>

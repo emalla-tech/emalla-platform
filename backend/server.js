@@ -3765,7 +3765,10 @@ const server = http.createServer(async (req, res) => {
       const totalAmount = subtotal + deliveryFee;
       const firstProduct = db.products.find((product) => product.id === items[0]?.productId);
       const merchantId = body.merchantId || firstProduct?.merchantId;
-      const merchantName = body.merchantName || firstProduct?.merchantName;
+      const merchantUser = merchantId
+        ? db.users.find((entry) => entry.id === merchantId && entry.role === 'MERCHANT')
+        : null;
+      const merchantName = body.merchantName || firstProduct?.merchantName || merchantUser?.name;
 
       if (!merchantId || !merchantName) {
         sendJson(res, 400, { error: 'Merchant information is required to create this order.' });

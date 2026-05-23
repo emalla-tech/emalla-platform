@@ -46,6 +46,18 @@ const safeJsonStringify = (value, fallback = '{}') => {
     return fallback;
   }
 };
+const normalizeJsonValue = (value, fallback = '{}') => {
+  if (typeof value !== 'string') {
+    return safeJsonStringify(value, fallback);
+  }
+
+  try {
+    JSON.parse(value);
+    return value;
+  } catch {
+    return safeJsonStringify(value, fallback);
+  }
+};
 const JSON_COLUMNS = {
   users: new Set(['metadata']),
   categories: new Set(['metadata']),
@@ -148,11 +160,7 @@ const upsert = async (client, table, values, conflictColumn = 'id') => {
       }
 
       const value = values[column];
-      if (typeof value === 'string') {
-        return value;
-      }
-
-      return safeJsonStringify(value, column === 'to_addresses' || column === 'images' || column === 'items' ? '[]' : '{}');
+      return normalizeJsonValue(value, column === 'to_addresses' || column === 'images' || column === 'items' ? '[]' : '{}');
     })
   );
 };

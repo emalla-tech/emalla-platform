@@ -46,6 +46,32 @@ const safeJsonStringify = (value, fallback = '{}') => {
     return fallback;
   }
 };
+const JSON_COLUMNS = {
+  users: new Set(['metadata']),
+  categories: new Set(['metadata']),
+  seller_profiles: new Set(['metadata']),
+  buyer_profiles: new Set(['metadata']),
+  rider_profiles: new Set(['metadata']),
+  sessions: new Set(['metadata']),
+  products: new Set(['images', 'metadata']),
+  product_reviews: new Set(['metadata']),
+  addresses: new Set(['metadata']),
+  orders: new Set(['items', 'shipping_address', 'metadata']),
+  order_items: new Set(['metadata']),
+  deliveries: new Set(['metadata']),
+  seller_applications: new Set(['metadata']),
+  rider_applications: new Set(['metadata']),
+  transactions: new Set(['metadata']),
+  payments: new Set(['metadata']),
+  support_tickets: new Set(['metadata']),
+  inquiries: new Set(['metadata']),
+  notifications: new Set(['metadata']),
+  audit_logs: new Set(['metadata']),
+  email_logs: new Set(['to_addresses', 'metadata']),
+  wishlists: new Set(['metadata']),
+  admin_settings: new Set(['preferences', 'category_commission_rates', 'metadata']),
+  password_reset_tokens: new Set(['metadata'])
+};
 const dedupeById = (items = []) => {
   const seen = new Set();
   return items.filter((item) => {
@@ -110,12 +136,24 @@ const upsert = async (client, table, values, conflictColumn = 'id') => {
     .filter((column) => column !== conflictColumn)
     .map((column) => `${column} = EXCLUDED.${column}`)
     .join(', ');
+  const jsonColumns = JSON_COLUMNS[table] || new Set();
 
   await client.query(
     `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders.join(', ')}) ON CONFLICT (${conflictColumn}) ${
       updates ? `DO UPDATE SET ${updates}` : 'DO NOTHING'
     }`,
-    columns.map((column) => values[column])
+    columns.map((column) => {
+      if (!jsonColumns.has(column)) {
+        return values[column];
+      }
+
+      const value = values[column];
+      if (typeof value === 'string') {
+        return value;
+      }
+
+      return safeJsonStringify(value, column === 'to_addresses' || column === 'images' || column === 'items' ? '[]' : '{}');
+    })
   );
 };
 

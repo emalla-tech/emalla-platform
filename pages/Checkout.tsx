@@ -45,6 +45,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     fullName: user?.name || '',
+    email: user?.email || '',
     phone: '0780000000',
     district: 'Gasabo',
     sector: 'Kimironko',
@@ -54,8 +55,12 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
   });
 
   useEffect(() => {
-    if (user?.name) {
-      setFormData((current) => ({ ...current, fullName: user.name }));
+    if (user?.name || user?.email) {
+      setFormData((current) => ({
+        ...current,
+        fullName: user?.name || current.fullName,
+        email: user?.email || current.email
+      }));
     }
   }, [user]);
 
@@ -69,6 +74,11 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
       return;
     }
 
+    if (!formData.fullName.trim() || !formData.phone.trim() || !formData.email.trim() || !formData.street.trim()) {
+      setErrorMessage('Please complete your name, email, phone, and address before continuing.');
+      return;
+    }
+
     setIsProcessing(true);
     setErrorMessage(null);
     try {
@@ -76,6 +86,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
       const order = await OrderService.createOrder({
         customerId: user?.id || '',
         customerName: formData.fullName,
+        customerEmail: formData.email,
         merchantId: primaryMerchant?.merchantId,
         merchantName: primaryMerchant?.merchantName,
         items: cartItems.map((item) => ({
@@ -96,7 +107,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
       const paymentInit = await PaymentService.initializePayment({
         orderId: order.id,
         amount: finalTotal,
-        customerEmail: user?.email || '',
+        customerEmail: formData.email,
         customerName: formData.fullName,
         method: formData.paymentMethod
       });
@@ -161,6 +172,12 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
                         <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Recipient Name</label>
                         <input type="text" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} className="w-full bg-gray-50 border-2 border-transparent focus:border-orange-500 focus:bg-white rounded-2xl px-6 py-4 outline-none font-bold text-gray-900 transition-all" />
                       </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Email Address</label>
+                        <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-gray-50 border-2 border-transparent focus:border-orange-500 focus:bg-white rounded-2xl px-6 py-4 outline-none font-bold text-gray-900 transition-all" placeholder="you@example.com" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div className="space-y-2">
                         <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Contact Phone</label>
                         <input type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full bg-gray-50 border-2 border-transparent focus:border-orange-500 focus:bg-white rounded-2xl px-6 py-4 outline-none font-bold text-gray-900 transition-all" placeholder="078..." />

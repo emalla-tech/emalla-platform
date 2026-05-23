@@ -441,6 +441,8 @@ const requireUser = async (req, res) => {
   return user;
 };
 
+const getOptionalUser = async (req) => getAuthorizedUser(req);
+
 const createSession = (db, user, token, req) => {
   const createdAt = new Date().toISOString();
   const expiresAt = new Date(Date.now() + getSessionMaxAgeMs()).toISOString();
@@ -3754,12 +3756,21 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/orders' && req.method === 'POST') {
-      const user = await requireUser(req, res);
-      if (!user) return;
+      const user = await getOptionalUser(req);
 
       const body = await readBody(req);
       const db = await readDb();
       const items = Array.isArray(body.items) ? body.items : [];
+      const customerName = String(body.customerName || user?.name || '').trim();
+      const customerEmail = String(body.customerEmail || user?.email || '').trim().toLowerCase();
+      const customerPhone = String(body.phone || user?.phone || '').trim();
+      const customerAddress = String(body.address || '').trim();
+
+      if (!customerName || !customerEmail || !customerPhone || !customerAddress) {
+        sendJson(res, 400, { error: 'Customer name, email, phone, and address are required.' });
+        return;
+      }
+
       const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
       const deliveryFee = body.deliveryFee || 0;
       const totalAmount = subtotal + deliveryFee;
@@ -3778,8 +3789,9 @@ const server = http.createServer(async (req, res) => {
       const order = {
         id: `o-${Date.now()}`,
         orderNumber: generateOrderNumber(),
-        customerId: user.id,
-        customerName: body.customerName || user.name,
+        customerId: user?.id || `GST-${Date.now()}`,
+        customerName,
+        customerEmail,
         merchantId,
         merchantName,
         items: items.map((item) => ({ ...item, subtotal: item.price * item.quantity })),
@@ -3789,8 +3801,8 @@ const server = http.createServer(async (req, res) => {
         deliveryFee,
         totalAmount,
         tx_ref: body.tx_ref || `TX-${Date.now()}`,
-        address: body.address || '',
-        phone: body.phone || user.phone || '',
+        address: customerAddress,
+        phone: customerPhone,
         notes: body.notes,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -3816,7 +3828,7 @@ const server = http.createServer(async (req, res) => {
       });
       createAuditLog(db, {
         event: `Order placed: ${order.orderNumber}`,
-        actor: user.name || user.email,
+        actor: user?.name || user?.email || order.customerEmail || order.customerName,
         category: 'orders',
         status: 'success',
         metadata: {
@@ -4028,8 +4040,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/payments/initiate' && req.method === 'POST') {
-      const user = await requireUser(req, res);
-      if (!user) return;
+      const user = await getOptionalUser(req);
 
       const body = await readBody(req);
       const db = await readDb();
@@ -4045,7 +4056,7 @@ const server = http.createServer(async (req, res) => {
       const payment = {
         id: `pay-${Date.now()}`,
         orderId: body.orderId,
-        userId: user.id,
+        userId: user?.id || db.orders[orderIndex].customerId,
         amount: body.amount,
         method: body.method,
         status: isCashOnDelivery ? 'PENDING' : 'SUCCESS',
@@ -4096,10 +4107,10 @@ const server = http.createServer(async (req, res) => {
           metadata: { orderId: order.id }
         });
         await sendPlatformEmail(db, {
-          to: user.email,
+          to: body.customerEmail || order.customerEmail || user?.email,
           template: 'order_confirmation',
           ...buildPlatformEmail('order_confirmation', {
-            customerName: order.customerName || user.name,
+            customerName: order.customerName || user?.name,
             orderNumber: order.orderNumber,
             totalAmount: order.totalAmount,
             paymentMethod: order.paymentMethod,
@@ -4123,7 +4134,7 @@ const server = http.createServer(async (req, res) => {
         event: isCashOnDelivery
           ? `Cash on delivery confirmed for ${db.orders[orderIndex].orderNumber}`
           : `Payment initiated for ${db.orders[orderIndex].orderNumber}`,
-        actor: user.name || user.email,
+        actor: user?.name || user?.email || body.customerEmail || db.orders[orderIndex].customerEmail || db.orders[orderIndex].customerName,
         category: 'payments',
         status: 'success',
         metadata: {

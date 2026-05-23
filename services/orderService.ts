@@ -7,19 +7,25 @@ export const OrderService = {
     const response = await apiClient.createOrder(data);
     const order = response.order as Order;
 
-    await NotificationService.send({
-      userId: order.customerId,
-      role: UserRole.CUSTOMER,
-      title: 'Order Placed!',
-      message: `Your order ${order.orderNumber} is awaiting payment.`
-    });
+    try {
+      if (!order.customerId?.startsWith('GST-')) {
+        await NotificationService.send({
+          userId: order.customerId,
+          role: UserRole.CUSTOMER,
+          title: 'Order Placed!',
+          message: `Your order ${order.orderNumber} is awaiting payment.`
+        });
+      }
 
-    await NotificationService.send({
-      userId: order.merchantId,
-      role: UserRole.MERCHANT,
-      title: 'New Incoming Order!',
-      message: `Order ${order.orderNumber} has been placed for RWF ${order.totalAmount.toLocaleString()}.`
-    });
+      await NotificationService.send({
+        userId: order.merchantId,
+        role: UserRole.MERCHANT,
+        title: 'New Incoming Order!',
+        message: `Order ${order.orderNumber} has been placed for RWF ${order.totalAmount.toLocaleString()}.`
+      });
+    } catch {
+      // Backend already creates the required notifications, so checkout should not fail here.
+    }
 
     return order;
   },

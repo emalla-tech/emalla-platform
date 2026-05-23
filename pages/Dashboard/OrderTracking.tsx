@@ -85,7 +85,14 @@ const buildTrackingSteps = (order: Order): TrackingStep[] => {
   }));
 };
 
-const OrderTracking: React.FC = () => {
+interface OrderTrackingProps {
+  guestAccess?: {
+    email?: string;
+    phone?: string;
+  };
+}
+
+const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
   const { id } = useParams();
   const location = useLocation();
   const [order, setOrder] = useState<Order | null>(null);
@@ -94,7 +101,8 @@ const OrderTracking: React.FC = () => {
 
   const isSellerView = location.pathname.includes('/seller');
   const isRiderView = location.pathname.includes('/rider');
-  const backPath = isSellerView ? '/seller/orders' : isRiderView ? '/rider/history' : '/buyer/orders';
+  const isGuestView = location.pathname.includes('/track-order');
+  const backPath = isSellerView ? '/seller/orders' : isRiderView ? '/rider/history' : isGuestView ? '/shop' : '/buyer/orders';
 
   useEffect(() => {
     const loadOrder = async () => {
@@ -107,7 +115,7 @@ const OrderTracking: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const nextOrder = await OrderService.getOrderById(id);
+        const nextOrder = await OrderService.getOrderById(id, guestAccess);
         if (!nextOrder) {
           throw new Error('Order not found.');
         }

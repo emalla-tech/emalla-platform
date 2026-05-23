@@ -45,6 +45,7 @@ const Investors = lazy(() => import('./pages/Investors'));
 const PaymentProcessing = lazy(() => import('./pages/Payment/PaymentProcessing'));
 const PaymentSuccess = lazy(() => import('./pages/Payment/PaymentSuccess'));
 const PaymentFailure = lazy(() => import('./pages/Payment/PaymentFailure'));
+const PublicOrderTracking = lazy(() => import('./pages/PublicOrderTracking'));
 const AdminLayout = lazy(() => import('./admin/AdminLayout'));
 const DashboardOverview = lazy(() => import('./admin/pages/DashboardOverview'));
 const OrderManagement = lazy(() => import('./admin/pages/OrderManagement'));
@@ -166,6 +167,7 @@ const App: React.FC = () => {
             <Route path="/payment/processing" element={withSuspense(<PaymentProcessing />)} />
             <Route path="/payment/success" element={withSuspense(<PaymentSuccess />)} />
             <Route path="/payment/failure" element={withSuspense(<PaymentFailure />)} />
+            <Route path="/track-order/:id" element={withSuspense(<PublicOrderTracking />)} />
             <Route path="/checkout" element={withSuspense(<Checkout cartItems={detailedItems} subtotal={subtotal} clearCart={clearCart} />)} />
             <Route
               path="/cart"

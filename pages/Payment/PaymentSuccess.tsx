@@ -1,15 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CheckCircle2, Package, ArrowRight, Share2, Star, Printer } from 'lucide-react';
+import { CheckCircle2, Package, ArrowRight, Share2, Star, Printer, UserPlus } from 'lucide-react';
 import { Order, PaymentMethod } from '../../types';
 import { OrderService } from '../../services/orderService';
 import { html, printPdfDocument, renderTableRows } from '../../lib/documentExport';
+import { useAuth } from '../../auth/AuthContext';
 
 const PaymentSuccess: React.FC = () => {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [order, setOrder] = useState<Order | null>(null);
   const orderId = searchParams.get('order_id');
   const mode = searchParams.get('mode');
+  const isGuestOrder = !!order?.customerId?.startsWith('GST-');
+  const guestTrackingUrl =
+    order && order.customerEmail
+      ? `/track-order/${order.id}?email=${encodeURIComponent(order.customerEmail)}`
+      : order
+        ? `/track-order/${order.id}`
+        : '/shop';
+  const createAccountUrl =
+    order?.customerEmail
+      ? `/register?role=customer&next=${encodeURIComponent(guestTrackingUrl)}`
+      : '/register?role=customer';
 
   useEffect(() => {
     if (!orderId) return;
@@ -134,6 +147,22 @@ const PaymentSuccess: React.FC = () => {
         </div>
 
         <div className="space-y-3">
+          {isGuestOrder && !user ? (
+            <div className="rounded-[28px] border border-orange-100 bg-orange-50 p-6 text-left">
+              <p className="text-[10px] font-black uppercase tracking-widest text-orange-500 mb-2">Complete Your Setup</p>
+              <h3 className="text-lg font-black text-gray-900 mb-2">Create an account to track this order faster</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Save your details, keep all future orders in one place, and get a smoother checkout next time.
+              </p>
+              <Link
+                to={createAccountUrl}
+                className="inline-flex items-center space-x-2 rounded-2xl bg-orange-500 px-5 py-3 font-black text-white hover:bg-orange-600 transition-all"
+              >
+                <UserPlus size={18} />
+                <span>Create Account</span>
+              </Link>
+            </div>
+          ) : null}
           {order ? (
             <button
               onClick={handleDownloadInvoice}
@@ -144,7 +173,7 @@ const PaymentSuccess: React.FC = () => {
             </button>
           ) : null}
           <Link 
-            to={order ? `/buyer/orders/${order.id}/track` : '/buyer/orders'} 
+            to={isGuestOrder ? guestTrackingUrl : order ? `/buyer/orders/${order.id}/track` : '/buyer/orders'} 
             className="w-full bg-black text-white py-5 rounded-[24px] font-black text-lg flex items-center justify-center space-x-3 hover:bg-orange-500 transition-all shadow-xl shadow-black/10"
           >
             <Package size={22} />

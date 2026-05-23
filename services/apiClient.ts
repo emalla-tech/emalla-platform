@@ -193,8 +193,17 @@ export const apiClient = {
     return request('/orders?scope=pool');
   },
 
-  async getOrder(orderId: string) {
-    return request(`/orders/${orderId}`);
+  async getOrder(orderId: string, options?: { email?: string; phone?: string }) {
+    const searchParams = new URLSearchParams();
+    if (options?.email) {
+      searchParams.set('email', options.email);
+    }
+    if (options?.phone) {
+      searchParams.set('phone', options.phone);
+    }
+
+    const query = searchParams.toString();
+    return request(`/orders/${orderId}${query ? `?${query}` : ''}`);
   },
 
   async createOrder(params: object) {

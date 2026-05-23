@@ -70,9 +70,9 @@ export const OrderService = {
     return true;
   },
 
-  getOrderById: async (id: string) => {
+  getOrderById: async (id: string, options?: { email?: string; phone?: string }) => {
     try {
-      const response = await apiClient.getOrder(id);
+      const response = await apiClient.getOrder(id, options);
       return response.order as Order;
     } catch {
       return null;

@@ -3728,12 +3728,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname.startsWith('/api/orders/') && req.method === 'GET') {
-      const user = await requireUser(req, res);
-      if (!user) return;
-
       const orderId = pathname.split('/').pop();
       const dbOrders = await readOrderRecords();
       const order = dbOrders.find((entry) => entry.id === orderId || entry.orderNumber === orderId);
+      const user = await getOptionalUser(req);
+      const guestEmail = String(url.searchParams.get('email') || '').trim().toLowerCase();
+      const guestPhone = String(url.searchParams.get('phone') || '').trim();
 
       if (!order) {
         sendJson(res, 404, { error: 'Order not found' });
@@ -3741,13 +3741,21 @@ const server = http.createServer(async (req, res) => {
       }
 
       const canView =
-        user.role === 'ADMIN' ||
-        order.customerId === user.id ||
-        order.merchantId === user.id ||
-        order.riderId === user.id;
+        !!user && (
+          user.role === 'ADMIN' ||
+          order.customerId === user.id ||
+          order.merchantId === user.id ||
+          order.riderId === user.id
+        );
+      const guestMatches =
+        (!user || String(order.customerId || '').startsWith('GST-')) &&
+        (
+          (guestEmail && guestEmail === String(order.customerEmail || '').trim().toLowerCase()) ||
+          (guestPhone && guestPhone === String(order.phone || '').trim())
+        );
 
-      if (!canView) {
-        sendJson(res, 403, { error: 'Forbidden' });
+      if (!canView && !guestMatches) {
+        sendJson(res, user ? 403 : 401, { error: user ? 'Forbidden' : 'Unauthorized' });
         return;
       }
 

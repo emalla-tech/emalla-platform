@@ -22,14 +22,22 @@ const normalizeHashRoute = (path = '') => {
 const createSections = (entries) =>
   entries.filter((entry) => entry && entry.label && entry.value !== undefined && entry.value !== null && entry.value !== '');
 
-const renderTemplate = ({ subject, title, intro, sections, closing, bodyLines, replyTo }) => ({
+const getSupportPayload = () => ({
+  email: 'support@emallarwanda.com',
+  url: normalizeHashRoute('/contact')
+});
+
+const renderTemplate = ({ subject, title, intro, sections, closing, bodyLines, replyTo, highlights, primaryAction, support }) => ({
   subject,
   body: bodyLines.filter(Boolean).join('\n'),
   html: createEmailHtml({
     title,
     intro,
     sections,
-    closing
+    closing,
+    highlights,
+    primaryAction,
+    support
   }),
   replyTo
 });
@@ -92,11 +100,14 @@ const renderOrderConfirmationEmail = ({ customerName, orderNumber, totalAmount, 
   const ordersUrl = normalizeHashRoute('/dashboard/orders');
   const sections = createSections([
     { label: 'Order', value: orderNumber || 'Pending' },
-    { label: 'Amount', value: formatMoney(totalAmount) },
     { label: 'Payment Method', value: paymentMethod || 'Not specified' },
     { label: 'Delivery Address', value: address || 'To be confirmed' },
     { label: 'Track Order', value: ordersUrl }
   ]);
+  const highlights = [
+    { label: 'Order Total', value: formatMoney(totalAmount), accentBg: '#ecfdf5', accentBorder: '#a7f3d0', labelColor: '#047857', valueColor: '#065f46' },
+    { label: 'Status', value: 'Confirmed', accentBg: '#fff7ed', accentBorder: '#fdba74', labelColor: '#c2410c', valueColor: '#9a3412' }
+  ];
 
   return renderTemplate({
     subject: `Order Confirmation - ${orderNumber || 'E-Malla'}`,
@@ -104,6 +115,9 @@ const renderOrderConfirmationEmail = ({ customerName, orderNumber, totalAmount, 
     intro: `Muraho ${customerName || 'there'}. Order yawe yemejwe neza kuri E-Malla Rwanda kandi team yacu yatangiye kuyikurikirana.`,
     sections,
     closing: 'Ushobora gukurikirana status ya order yawe uko ihinduka muri buyer hub cyangwa kuri page ya orders.',
+    highlights,
+    primaryAction: { label: 'Track Order', url: ordersUrl },
+    support: getSupportPayload(),
     bodyLines: [
       `Hello ${customerName || 'there'},`,
       `Your order ${orderNumber || ''} has been confirmed.`,
@@ -119,11 +133,14 @@ const renderSellerOrderNotificationEmail = ({ merchantName, orderNumber, totalAm
   const sellerOrdersUrl = normalizeHashRoute('/seller');
   const sections = createSections([
     { label: 'Order', value: orderNumber || 'Pending' },
-    { label: 'Amount', value: formatMoney(totalAmount) },
     { label: 'Payment Method', value: paymentMethod || 'Not specified' },
     { label: 'Customer', value: customerName || 'Buyer' },
     { label: 'Seller Hub', value: sellerOrdersUrl }
   ]);
+  const highlights = [
+    { label: 'New Order Value', value: formatMoney(totalAmount), accentBg: '#eff6ff', accentBorder: '#bfdbfe', labelColor: '#1d4ed8', valueColor: '#1e3a8a' },
+    { label: 'Status', value: 'Action Required', accentBg: '#fff7ed', accentBorder: '#fdba74', labelColor: '#c2410c', valueColor: '#9a3412' }
+  ];
 
   return renderTemplate({
     subject: `New Order for Your Store - ${orderNumber || 'E-Malla'}`,
@@ -131,6 +148,9 @@ const renderSellerOrderNotificationEmail = ({ merchantName, orderNumber, totalAm
     intro: `Muraho ${merchantName || 'Seller'}. Hari order nshya yemejwe kuri store yawe kandi ushobora gutangira preparation yayo.`,
     sections,
     closing: 'Jya muri Seller Hub urebe details za order, ubone gutangira packing no delivery handoff.',
+    highlights,
+    primaryAction: { label: 'Open Seller Hub', url: sellerOrdersUrl },
+    support: getSupportPayload(),
     bodyLines: [
       `Hello ${merchantName || 'Seller'},`,
       `A new order ${orderNumber || ''} has been confirmed for your store.`,
@@ -158,6 +178,8 @@ const renderRiderDeliveryAssignmentEmail = ({ riderName, orderNumber, customerNa
     intro: `Muraho ${riderName || 'Rider'}. Waherewe delivery nshya kuri E-Malla Rwanda. Reba details zayo maze utangire workflow ya pickup.`,
     sections,
     closing: 'Jya muri Rider Hub urebe assignment yawe, uhite ukurikiza intambwe za pickup na delivery.',
+    primaryAction: { label: 'Open Rider Hub', url: riderHubUrl },
+    support: getSupportPayload(),
     bodyLines: [
       `Hello ${riderName || 'Rider'},`,
       `You have been assigned delivery ${orderNumber || ''}.`,

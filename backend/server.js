@@ -115,6 +115,22 @@ const getAllowedOrigins = () =>
       .filter(Boolean)
   );
 
+const buildPublicHashRoute = (path = '') => {
+  const base = String(getAppConfig().publicAppUrl || 'http://127.0.0.1:3000/#').replace(/\/$/, '');
+  const normalizedPath = String(path || '').replace(/^#?\/?/, '');
+  return normalizedPath ? `${base}/${normalizedPath}` : base;
+};
+
+const buildCustomerTrackingUrl = (order) => {
+  if (!order?.id) {
+    return buildPublicHashRoute('/buyer/orders');
+  }
+
+  const email = String(order.customerEmail || '').trim().toLowerCase();
+  const query = email ? `?email=${encodeURIComponent(email)}` : '';
+  return buildPublicHashRoute(`/track-order/${order.id}${query}`);
+};
+
 const buildCorsHeaders = (origin, allowedOrigins) => {
   const headers = {
     ...BASE_CORS_HEADERS
@@ -4122,7 +4138,12 @@ const server = http.createServer(async (req, res) => {
             orderNumber: order.orderNumber,
             totalAmount: order.totalAmount,
             paymentMethod: order.paymentMethod,
-            address: order.address
+            address: order.address,
+            phone: order.phone,
+            txRef: order.tx_ref,
+            merchantName: order.merchantName,
+            itemCount: (order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+            trackingUrl: buildCustomerTrackingUrl(order)
           })
         });
         await sendPlatformEmail(db, {
@@ -4215,7 +4236,12 @@ const server = http.createServer(async (req, res) => {
             orderNumber: order.orderNumber,
             totalAmount: order.totalAmount,
             paymentMethod: order.paymentMethod,
-            address: order.address
+            address: order.address,
+            phone: order.phone,
+            txRef: order.tx_ref,
+            merchantName: order.merchantName,
+            itemCount: (order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+            trackingUrl: buildCustomerTrackingUrl(order)
           })
         });
         await sendPlatformEmail(db, {

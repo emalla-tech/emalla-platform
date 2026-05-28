@@ -96,12 +96,16 @@ const renderWelcomeEmail = ({ name, email, role, username }) => {
   });
 };
 
-const renderOrderConfirmationEmail = ({ customerName, orderNumber, totalAmount, paymentMethod, address }) => {
-  const ordersUrl = normalizeHashRoute('/dashboard/orders');
+const renderOrderConfirmationEmail = ({ customerName, orderNumber, totalAmount, paymentMethod, address, phone, txRef, merchantName, itemCount, trackingUrl }) => {
+  const ordersUrl = trackingUrl || normalizeHashRoute('/buyer/orders');
   const sections = createSections([
     { label: 'Order', value: orderNumber || 'Pending' },
     { label: 'Payment Method', value: paymentMethod || 'Not specified' },
+    { label: 'Items', value: itemCount ? `${itemCount} item(s)` : undefined },
+    { label: 'Merchant', value: merchantName || 'E-Malla Rwanda' },
     { label: 'Delivery Address', value: address || 'To be confirmed' },
+    { label: 'Phone', value: phone || undefined },
+    { label: 'Reference', value: txRef || undefined },
     { label: 'Track Order', value: ordersUrl }
   ]);
   const highlights = [

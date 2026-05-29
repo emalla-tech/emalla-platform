@@ -119,7 +119,8 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
           return;
         }
 
-        navigate(`/payment/processing?tx_ref=${paymentInit.tx_ref}&order_id=${order.id}`);
+        const emailParam = encodeURIComponent(formData.email);
+        navigate(`/payment/processing?tx_ref=${paymentInit.tx_ref}&order_id=${order.id}&email=${emailParam}`);
       }, 1000);
 
     } catch (err) {

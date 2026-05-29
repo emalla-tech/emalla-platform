@@ -12,7 +12,7 @@ export const PaymentService = {
     return apiClient.initiatePayment(orderData);
   },
 
-  verifyPayment: async (tx_ref: string): Promise<PaymentVerificationResult> => {
-    return apiClient.verifyPayment(tx_ref);
+  verifyPayment: async (tx_ref: string, options?: { orderId?: string; email?: string }): Promise<PaymentVerificationResult> => {
+    return apiClient.verifyPayment(tx_ref, options);
   }
 };

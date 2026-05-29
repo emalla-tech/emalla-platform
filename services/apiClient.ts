@@ -240,8 +240,17 @@ export const apiClient = {
     });
   },
 
-  async verifyPayment(txRef: string) {
-    return request(`/payments/verify/${encodeURIComponent(txRef)}`);
+  async verifyPayment(txRef: string, options?: { orderId?: string; email?: string }) {
+    const searchParams = new URLSearchParams();
+    if (options?.orderId) {
+      searchParams.set('order_id', options.orderId);
+    }
+    if (options?.email) {
+      searchParams.set('email', options.email);
+    }
+
+    const query = searchParams.toString();
+    return request(`/payments/verify/${encodeURIComponent(txRef)}${query ? `?${query}` : ''}`);
   },
 
   async getNotifications() {

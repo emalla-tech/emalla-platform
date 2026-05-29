@@ -5,11 +5,14 @@ import { RefreshCw, ShieldCheck, Zap } from 'lucide-react';
 import { PaymentService } from '../../services/paymentService';
 import { PaymentStatus } from '../../types';
 
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const PaymentProcessing: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const tx_ref = searchParams.get('tx_ref');
   const orderId = searchParams.get('order_id');
+  const email = searchParams.get('email');
   const [status, setStatus] = useState<'verifying' | 'success' | 'failed'>('verifying');
 
   useEffect(() => {
@@ -19,23 +22,37 @@ const PaymentProcessing: React.FC = () => {
     }
 
     const verify = async () => {
-      try {
-        const result = await PaymentService.verifyPayment(tx_ref);
-        if (result.status === PaymentStatus.SUCCESS) {
-          setStatus('success');
-          setTimeout(() => navigate(`/payment/success?order_id=${result.orderId || orderId || ''}`), 1000);
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        try {
+          const result = await PaymentService.verifyPayment(tx_ref, {
+            orderId: orderId || undefined,
+            email: email || undefined
+          });
+
+          if (result.status === PaymentStatus.SUCCESS) {
+            setStatus('success');
+            setTimeout(() => navigate(`/payment/success?order_id=${result.orderId || orderId || ''}`), 1000);
+            return;
+          }
+        } catch (err) {
+          if (attempt === 3) {
+            setStatus('failed');
+            navigate(`/payment/failure?order_id=${orderId || ''}`);
+            return;
+          }
+        }
+
+        if (attempt < 3) {
+          await delay(1800);
         } else {
           setStatus('failed');
           setTimeout(() => navigate(`/payment/failure?order_id=${orderId || ''}`), 1000);
         }
-      } catch (err) {
-        setStatus('failed');
-        navigate(`/payment/failure?order_id=${orderId || ''}`);
       }
     };
 
     verify();
-  }, [tx_ref, orderId, navigate]);
+  }, [tx_ref, orderId, email, navigate]);
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">

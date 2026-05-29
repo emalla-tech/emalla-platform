@@ -4130,33 +4130,35 @@ const server = http.createServer(async (req, res) => {
           type: 'info',
           metadata: { orderId: order.id }
         });
-        await sendPlatformEmail(db, {
-          to: body.customerEmail || order.customerEmail || user?.email,
-          template: 'order_confirmation',
-          ...buildPlatformEmail('order_confirmation', {
-            customerName: order.customerName || user?.name,
-            orderNumber: order.orderNumber,
-            totalAmount: order.totalAmount,
-            paymentMethod: order.paymentMethod,
-            address: order.address,
-            phone: order.phone,
-            txRef: order.tx_ref,
-            merchantName: order.merchantName,
-            itemCount: (order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
-            trackingUrl: buildCustomerTrackingUrl(order)
+        await Promise.allSettled([
+          sendPlatformEmail(db, {
+            to: body.customerEmail || order.customerEmail || user?.email,
+            template: 'order_confirmation',
+            ...buildPlatformEmail('order_confirmation', {
+              customerName: order.customerName || user?.name,
+              orderNumber: order.orderNumber,
+              totalAmount: order.totalAmount,
+              paymentMethod: order.paymentMethod,
+              address: order.address,
+              phone: order.phone,
+              txRef: order.tx_ref,
+              merchantName: order.merchantName,
+              itemCount: (order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+              trackingUrl: buildCustomerTrackingUrl(order)
+            })
+          }),
+          sendPlatformEmail(db, {
+            to: merchant?.email,
+            template: 'seller_order_notification',
+            ...buildPlatformEmail('seller_order_notification', {
+              merchantName: order.merchantName || merchant?.name,
+              orderNumber: order.orderNumber,
+              totalAmount: order.totalAmount,
+              paymentMethod: order.paymentMethod,
+              customerName: order.customerName
+            })
           })
-        });
-        await sendPlatformEmail(db, {
-          to: merchant?.email,
-          template: 'seller_order_notification',
-          ...buildPlatformEmail('seller_order_notification', {
-            merchantName: order.merchantName || merchant?.name,
-            orderNumber: order.orderNumber,
-            totalAmount: order.totalAmount,
-            paymentMethod: order.paymentMethod,
-            customerName: order.customerName
-          })
-        });
+        ]);
       }
 
       createAuditLog(db, {
@@ -4188,9 +4190,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname.startsWith('/api/payments/verify/') && req.method === 'GET') {
-      const user = await requireUser(req, res);
-      if (!user) return;
-
+      const user = await getOptionalUser(req);
       const txRef = decodeURIComponent(pathname.split('/').pop());
       const db = await readDb();
       const payment = db.payments.find((entry) => entry.tx_ref === txRef);
@@ -4201,6 +4201,21 @@ const server = http.createServer(async (req, res) => {
       }
 
       const orderIndex = db.orders.findIndex((order) => order.id === payment.orderId);
+      const order = orderIndex !== -1 ? db.orders[orderIndex] : null;
+      const guestEmail = String(url.searchParams.get('email') || '').trim().toLowerCase();
+      const canVerify =
+        !!user && !!order && (
+          user.role === 'ADMIN' ||
+          order.customerId === user.id ||
+          order.merchantId === user.id
+        );
+      const guestMatches = !user && !!order && guestEmail && guestEmail === String(order.customerEmail || '').trim().toLowerCase();
+
+      if (!canVerify && !guestMatches) {
+        sendJson(res, user ? 403 : 401, { error: user ? 'Forbidden' : 'Unauthorized' });
+        return;
+      }
+
       if (orderIndex !== -1) {
         db.orders[orderIndex] = {
           ...db.orders[orderIndex],
@@ -4228,33 +4243,35 @@ const server = http.createServer(async (req, res) => {
           metadata: { orderId: order.id }
         });
         const merchant = (db.users || []).find((entry) => entry.id === order.merchantId && entry.role === 'MERCHANT');
-        await sendPlatformEmail(db, {
-          to: user.email,
-          template: 'order_confirmation',
-          ...buildPlatformEmail('order_confirmation', {
-            customerName: order.customerName || user.name,
-            orderNumber: order.orderNumber,
-            totalAmount: order.totalAmount,
-            paymentMethod: order.paymentMethod,
-            address: order.address,
-            phone: order.phone,
-            txRef: order.tx_ref,
-            merchantName: order.merchantName,
-            itemCount: (order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
-            trackingUrl: buildCustomerTrackingUrl(order)
+        await Promise.allSettled([
+          sendPlatformEmail(db, {
+            to: order.customerEmail || user?.email,
+            template: 'order_confirmation',
+            ...buildPlatformEmail('order_confirmation', {
+              customerName: order.customerName || user?.name,
+              orderNumber: order.orderNumber,
+              totalAmount: order.totalAmount,
+              paymentMethod: order.paymentMethod,
+              address: order.address,
+              phone: order.phone,
+              txRef: order.tx_ref,
+              merchantName: order.merchantName,
+              itemCount: (order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+              trackingUrl: buildCustomerTrackingUrl(order)
+            })
+          }),
+          sendPlatformEmail(db, {
+            to: merchant?.email,
+            template: 'seller_order_notification',
+            ...buildPlatformEmail('seller_order_notification', {
+              merchantName: order.merchantName || merchant?.name,
+              orderNumber: order.orderNumber,
+              totalAmount: order.totalAmount,
+              paymentMethod: order.paymentMethod,
+              customerName: order.customerName
+            })
           })
-        });
-        await sendPlatformEmail(db, {
-          to: merchant?.email,
-          template: 'seller_order_notification',
-          ...buildPlatformEmail('seller_order_notification', {
-            merchantName: order.merchantName || merchant?.name,
-            orderNumber: order.orderNumber,
-            totalAmount: order.totalAmount,
-            paymentMethod: order.paymentMethod,
-            customerName: order.customerName
-          })
-        });
+        ]);
         createTransaction(db, {
           userId: order.merchantId,
           orderId: order.id,
@@ -4278,7 +4295,7 @@ const server = http.createServer(async (req, res) => {
         });
         createAuditLog(db, {
           event: `Payment verified for ${order.orderNumber}`,
-          actor: user.name || user.email,
+          actor: user?.name || user?.email || order.customerEmail || order.customerName,
           category: 'payments',
           status: 'success',
           metadata: {

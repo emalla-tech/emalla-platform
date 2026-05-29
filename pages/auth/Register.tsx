@@ -4,6 +4,8 @@ import {
   User,
   Mail,
   Lock,
+  Eye,
+  EyeOff,
   ArrowRight,
   Store,
   ShoppingBag,
@@ -43,6 +45,8 @@ const Register: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<SubmissionNotice | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [buyerForm, setBuyerForm] = useState({
     name: '',
     email: '',
@@ -226,13 +230,21 @@ const Register: React.FC = () => {
         <div className="relative">
           <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
-            type="password"
+            type={showPassword ? 'text' : 'password'}
             required
             value={buyerForm.password}
-            className="w-full pl-14 pr-6 py-4 bg-white border border-gray-100 rounded-2xl outline-none font-bold text-gray-900 focus:border-orange-500 transition-all"
+            className="w-full pl-14 pr-14 py-4 bg-white border border-gray-100 rounded-2xl outline-none font-bold text-gray-900 focus:border-orange-500 transition-all"
             placeholder="********"
             onChange={(e) => setBuyerForm({ ...buyerForm, password: e.target.value })}
           />
+          <button
+            type="button"
+            onClick={() => setShowPassword((current) => !current)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 transition-colors"
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+          >
+            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
         </div>
       </div>
 
@@ -241,13 +253,21 @@ const Register: React.FC = () => {
         <div className="relative">
           <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
-            type="password"
+            type={showConfirmPassword ? 'text' : 'password'}
             required
             value={buyerForm.confirmPassword}
-            className="w-full pl-14 pr-6 py-4 bg-white border border-gray-100 rounded-2xl outline-none font-bold text-gray-900 focus:border-orange-500 transition-all"
+            className="w-full pl-14 pr-14 py-4 bg-white border border-gray-100 rounded-2xl outline-none font-bold text-gray-900 focus:border-orange-500 transition-all"
             placeholder="Confirm your password"
             onChange={(e) => setBuyerForm({ ...buyerForm, confirmPassword: e.target.value })}
           />
+          <button
+            type="button"
+            onClick={() => setShowConfirmPassword((current) => !current)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 transition-colors"
+            aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+          >
+            {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
         </div>
       </div>
 

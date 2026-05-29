@@ -20,6 +20,7 @@ import {
   readAuthUserRecordByToken,
   touchAuthSessionByToken,
   deleteAuthTokenRecord,
+  persistCheckoutBundleRecord,
   writeDatabaseSnapshot as writeDb,
   ensureDatabaseReady as ensureDb,
   getDatabaseServiceStatus as getDatabaseStatus
@@ -3864,7 +3865,11 @@ const server = http.createServer(async (req, res) => {
           totalAmount: order.totalAmount
         }
       });
-      await writeDb(db);
+      await persistCheckoutBundleRecord({
+        orders: [order],
+        notifications: db.notifications.slice(0, 2),
+        auditLogs: db.auditLogs.slice(0, 1)
+      });
       sendJson(res, 201, { order });
       return;
     }
@@ -4177,8 +4182,13 @@ const server = http.createServer(async (req, res) => {
           amount: body.amount
         }
       });
-
-      await writeDb(db);
+      await persistCheckoutBundleRecord({
+        orders: [db.orders[orderIndex]],
+        payments: [payment],
+        transactions: isCashOnDelivery ? [] : db.transactions.slice(0, 1),
+        notifications: isCashOnDelivery ? db.notifications.slice(0, 2) : [],
+        auditLogs: db.auditLogs.slice(0, 1)
+      });
       sendJson(res, 200, {
         status: 'success',
         link: isCashOnDelivery ? null : `https://checkout.flutterwave.com/v3/hosted/pay/${txRef}`,
@@ -4308,8 +4318,13 @@ const server = http.createServer(async (req, res) => {
           }
         });
       }
-
-      await writeDb(db);
+      await persistCheckoutBundleRecord({
+        orders: orderIndex !== -1 ? [db.orders[orderIndex]] : [],
+        payments: [payment],
+        transactions: db.transactions.slice(0, 1),
+        notifications: orderIndex !== -1 ? db.notifications.slice(0, 2) : [],
+        auditLogs: orderIndex !== -1 ? db.auditLogs.slice(0, 1) : []
+      });
       sendJson(res, 200, {
         status: 'SUCCESS',
         amount: payment.amount,

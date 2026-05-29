@@ -165,6 +165,98 @@ const upsert = async (client, table, values, conflictColumn = 'id') => {
   );
 };
 
+const upsertOrderRecord = async (client, order) => {
+  await upsert(client, 'orders', {
+    id: order.id,
+    order_number: order.orderNumber || order.id,
+    user_id: order.customerId && !String(order.customerId).startsWith('GST-') ? order.customerId : null,
+    merchant_id: order.merchantId || null,
+    rider_id: order.riderId || null,
+    customer_name: order.customerName || null,
+    merchant_name: order.merchantName || null,
+    rider_name: order.riderName || null,
+    status: order.status || 'pending',
+    payment_status: order.paymentStatus || 'pending',
+    payment_method: order.paymentMethod || null,
+    items: order.items || [],
+    shipping_address: order.shippingAddress || { address: order.address || '', phone: order.phone || '' },
+    address: order.address || null,
+    phone: order.phone || null,
+    subtotal: toNumber(order.subtotal ?? (Number(order.totalAmount || order.total || 0) - Number(order.deliveryFee || 0))),
+    delivery_fee: toNumber(order.deliveryFee),
+    total: toNumber(order.total ?? order.totalAmount),
+    notes: order.notes || null,
+    created_at: order.createdAt || new Date().toISOString(),
+    updated_at: order.updatedAt || order.createdAt || new Date().toISOString(),
+    metadata: order
+  });
+
+  for (const [index, item] of (order.items || []).entries()) {
+    await upsert(client, 'order_items', {
+      id: item.id || `${order.id}-item-${index + 1}`,
+      order_id: order.id,
+      product_id: item.productId || null,
+      merchant_id: order.merchantId || null,
+      product_name: item.productName || 'Order item',
+      variant: item.variant || null,
+      quantity: Number(item.quantity || 0),
+      price: toNumber(item.price),
+      subtotal: toNumber(item.subtotal ?? Number(item.price || 0) * Number(item.quantity || 0)),
+      metadata: item
+    });
+  }
+};
+
+const upsertNotificationRecord = async (client, notification) =>
+  upsert(client, 'notifications', {
+    id: notification.id,
+    user_id: notification.userId && !String(notification.userId).startsWith('GST-') ? notification.userId : null,
+    role: notification.role || null,
+    title: notification.title || 'Notification',
+    message: notification.message || '',
+    type: notification.type || 'info',
+    read: Boolean(notification.read),
+    created_at: notification.createdAt || new Date().toISOString(),
+    metadata: notification.metadata || notification
+  });
+
+const upsertTransactionRecord = async (client, transaction) =>
+  upsert(client, 'transactions', {
+    id: transaction.id,
+    user_id: transaction.userId && !String(transaction.userId).startsWith('GST-') ? transaction.userId : null,
+    amount: toNumber(transaction.amount),
+    status: transaction.status || 'pending',
+    method: transaction.method || null,
+    tx_ref: transaction.tx_ref || transaction.txRef || null,
+    timestamp: transaction.timestamp || transaction.createdAt || new Date().toISOString(),
+    metadata: transaction
+  });
+
+const upsertPaymentRecord = async (client, payment) =>
+  upsert(client, 'payments', {
+    id: payment.id,
+    order_id: payment.orderId || null,
+    user_id: payment.userId && !String(payment.userId).startsWith('GST-') ? payment.userId : null,
+    amount: toNumber(payment.amount),
+    status: payment.status || 'pending',
+    method: payment.method || null,
+    tx_ref: payment.tx_ref || payment.txRef || null,
+    created_at: payment.createdAt || payment.timestamp || new Date().toISOString(),
+    updated_at: payment.updatedAt || payment.createdAt || payment.timestamp || new Date().toISOString(),
+    metadata: payment
+  });
+
+const upsertAuditLogRecord = async (client, entry) =>
+  upsert(client, 'audit_logs', {
+    id: entry.id,
+    event: entry.event || 'Audit event',
+    actor: entry.actor || null,
+    category: entry.category || 'system',
+    status: entry.status || 'info',
+    time: entry.time || entry.createdAt || new Date().toISOString(),
+    metadata: entry.metadata || entry
+  });
+
 const readRows = async (table, orderBy = 'created_at DESC') => {
   try {
     const columns = READ_COLUMNS[table] || '*';
@@ -1639,6 +1731,30 @@ export const createPostgresAdapter = () => {
           updated_at: db.adminSettings?.updatedAt || new Date().toISOString(),
           updated_by: userRef(db.adminSettings?.updatedBy, userIds)
         });
+      });
+    },
+
+    async persistCheckoutBundle(bundle = {}) {
+      await tx(async (client) => {
+        for (const order of bundle.orders || []) {
+          await upsertOrderRecord(client, order);
+        }
+
+        for (const payment of bundle.payments || []) {
+          await upsertPaymentRecord(client, payment);
+        }
+
+        for (const transaction of bundle.transactions || []) {
+          await upsertTransactionRecord(client, transaction);
+        }
+
+        for (const notification of bundle.notifications || []) {
+          await upsertNotificationRecord(client, notification);
+        }
+
+        for (const entry of bundle.auditLogs || []) {
+          await upsertAuditLogRecord(client, entry);
+        }
       });
     }
   };

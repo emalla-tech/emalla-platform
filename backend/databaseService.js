@@ -17,6 +17,7 @@ import {
   readAuthUserByToken,
   touchSessionByToken,
   deleteAuthToken,
+  persistCheckoutBundle,
   writeDb,
   getDatabaseStatus
 } from './dbProvider.js';
@@ -57,6 +58,7 @@ export const databaseService = {
   readAuthUserByToken: (token) => readAuthUserByToken(token),
   touchSessionByToken: (token, timestamp) => touchSessionByToken(token, timestamp),
   deleteAuthToken: (token) => deleteAuthToken(token),
+  persistCheckoutBundle: (bundle) => persistCheckoutBundle(bundle),
   writeSnapshot: (snapshot) => writeDb(snapshot),
   updateSnapshot: (mutator) => queueSnapshotMutation(mutator)
 };
@@ -80,5 +82,6 @@ export const persistAuthLoginRecord = (payload) => databaseService.persistAuthLo
 export const readAuthUserRecordByToken = (token) => databaseService.readAuthUserByToken(token);
 export const touchAuthSessionByToken = (token, timestamp) => databaseService.touchSessionByToken(token, timestamp);
 export const deleteAuthTokenRecord = (token) => databaseService.deleteAuthToken(token);
+export const persistCheckoutBundleRecord = (bundle) => databaseService.persistCheckoutBundle(bundle);
 export const writeDatabaseSnapshot = (snapshot) => databaseService.writeSnapshot(snapshot);
 export const updateDatabaseSnapshot = (mutator) => databaseService.updateSnapshot(mutator);

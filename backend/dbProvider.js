@@ -203,6 +203,31 @@ const getJsonAdapter = () => {
       snapshot.sessions = (snapshot.sessions || []).filter((entry) => entry.token !== token);
       await jsonDb.writeDb(snapshot);
     },
+    persistCheckoutBundle: async (bundle = {}) => {
+      const snapshot = await jsonDb.readDb();
+      snapshot.orders = snapshot.orders || [];
+      snapshot.payments = snapshot.payments || [];
+      snapshot.transactions = snapshot.transactions || [];
+      snapshot.notifications = snapshot.notifications || [];
+      snapshot.auditLogs = snapshot.auditLogs || [];
+
+      const upsertById = (collection, entry) => {
+        const index = collection.findIndex((item) => item.id === entry.id);
+        if (index >= 0) {
+          collection[index] = entry;
+        } else {
+          collection.unshift(entry);
+        }
+      };
+
+      (bundle.orders || []).forEach((entry) => upsertById(snapshot.orders, entry));
+      (bundle.payments || []).forEach((entry) => upsertById(snapshot.payments, entry));
+      (bundle.transactions || []).forEach((entry) => upsertById(snapshot.transactions, entry));
+      (bundle.notifications || []).forEach((entry) => upsertById(snapshot.notifications, entry));
+      (bundle.auditLogs || []).forEach((entry) => upsertById(snapshot.auditLogs, entry));
+
+      await jsonDb.writeDb(snapshot);
+    },
     writeDb: jsonDb.writeDb,
     ensureDb: jsonDb.ensureDb
   };
@@ -263,6 +288,7 @@ const createActiveAdapter = () => {
       readAuthUserByToken: (token) => callWithFallback('readAuthUserByToken', token),
       touchSessionByToken: (token, timestamp) => callWithFallback('touchSessionByToken', token, timestamp),
       deleteAuthToken: (token) => callWithFallback('deleteAuthToken', token),
+      persistCheckoutBundle: (bundle) => callWithFallback('persistCheckoutBundle', bundle),
       writeDb: (db) => callWithFallback('writeDb', db)
     };
   }
@@ -470,6 +496,21 @@ export const deleteAuthToken = async (token) => {
   if (typeof adapter.deleteAuthToken === 'function') {
     return adapter.deleteAuthToken(token);
   }
+};
+
+export const persistCheckoutBundle = async (bundle) => {
+  const adapter = getAdapter();
+  if (typeof adapter.persistCheckoutBundle === 'function') {
+    return adapter.persistCheckoutBundle(bundle);
+  }
+
+  const snapshot = await adapter.readDb();
+  snapshot.orders = snapshot.orders || [];
+  snapshot.payments = snapshot.payments || [];
+  snapshot.transactions = snapshot.transactions || [];
+  snapshot.notifications = snapshot.notifications || [];
+  snapshot.auditLogs = snapshot.auditLogs || [];
+  await adapter.writeDb(snapshot);
 };
 
 export const writeDb = async (db) => getAdapter().writeDb(db);

@@ -8,10 +8,10 @@ const Footer: React.FC = () => {
   const location = useLocation();
   const { t } = useLanguage();
   const socialLinks = [
-    { icon: Facebook, to: '/about', label: t.footer.about },
-    { icon: Twitter, to: '/how-it-works', label: t.footer.howItWorks },
-    { icon: Instagram, to: '/shop', label: t.footer.allProducts },
-    { icon: Linkedin, to: '/investors', label: t.footer.investors }
+    { icon: Facebook, href: 'https://www.facebook.com/profile.php?id=61590322983482', label: 'Facebook' },
+    { icon: Instagram, href: 'https://www.instagram.com/emallarwanda/', label: 'Instagram' },
+    { icon: Twitter, href: '/how-it-works', label: t.footer.howItWorks, internal: true },
+    { icon: Linkedin, href: '/investors', label: t.footer.investors, internal: true }
   ];
 
   const isActiveLink = (path: string) => {
@@ -39,11 +39,24 @@ const Footer: React.FC = () => {
               {t.footer.tagline}
             </p>
             <div className="flex space-x-4">
-              {socialLinks.map(({ icon: Icon, to, label }) => (
-                <Link key={to} to={to} aria-label={label} className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-orange-500 hover:text-white transition-all text-gray-400">
-                  <Icon size={18} />
-                </Link>
-              ))}
+              {socialLinks.map(({ icon: Icon, href, label, internal }) =>
+                internal ? (
+                  <Link key={href} to={href} aria-label={label} className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-orange-500 hover:text-white transition-all text-gray-400">
+                    <Icon size={18} />
+                  </Link>
+                ) : (
+                  <a
+                    key={href}
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={label}
+                    className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-orange-500 hover:text-white transition-all text-gray-400"
+                  >
+                    <Icon size={18} />
+                  </a>
+                )
+              )}
             </div>
           </div>
 

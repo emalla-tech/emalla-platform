@@ -11,7 +11,7 @@ const Footer: React.FC = () => {
     { icon: Facebook, href: 'https://www.facebook.com/profile.php?id=61590322983482', label: 'Facebook' },
     { icon: Instagram, href: 'https://www.instagram.com/emallarwanda/', label: 'Instagram' },
     { icon: Twitter, href: '/how-it-works', label: t.footer.howItWorks, internal: true },
-    { icon: Linkedin, href: '/investors', label: t.footer.investors, internal: true }
+    { icon: Linkedin, href: 'https://www.linkedin.com/in/e-malla-rwanda-a63649413/', label: 'LinkedIn' }
   ];
 
   const isActiveLink = (path: string) => {

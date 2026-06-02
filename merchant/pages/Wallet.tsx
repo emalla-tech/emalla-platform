@@ -20,6 +20,7 @@ const MerchantWallet: React.FC = () => {
   const [showPayoutModal, setShowPayoutModal] = useState(false);
   const [payoutAmount, setPayoutAmount] = useState('');
   const [submittingPayout, setSubmittingPayout] = useState(false);
+  const [showAllHistory, setShowAllHistory] = useState(false);
 
   useEffect(() => {
     const loadWallet = async () => {
@@ -433,13 +434,17 @@ const MerchantWallet: React.FC = () => {
       <div className="bg-white rounded-[40px] shadow-sm border border-gray-100 p-10">
         <div className="flex justify-between items-center mb-10">
           <h3 className="text-xl font-black text-gray-900">Recent Transactions</h3>
-          <button className="text-orange-500 font-bold text-sm hover:underline flex items-center">
-            View All History <ArrowUpRight size={16} className="ml-1" />
+          <button
+            type="button"
+            onClick={() => setShowAllHistory((current) => !current)}
+            className="text-orange-500 font-bold text-sm hover:underline flex items-center"
+          >
+            {showAllHistory ? 'Show Recent Only' : 'View All History'} <ArrowUpRight size={16} className="ml-1" />
           </button>
         </div>
 
         <div className="space-y-6">
-          {transactions.map((txn) => (
+          {(showAllHistory ? transactions : transactions.slice(0, 6)).map((txn) => (
             <div key={txn.id} className="flex items-center justify-between p-6 rounded-3xl hover:bg-gray-50 transition-all border border-transparent hover:border-gray-100 group">
               <div className="flex items-center space-x-6">
                 <div className={`p-3 rounded-2xl ${txn.type === 'payout' ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-500'}`}>

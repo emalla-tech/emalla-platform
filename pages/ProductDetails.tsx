@@ -26,6 +26,8 @@ import { Product, ProductReview } from '../types';
 import { useAuth } from '../auth/AuthContext';
 import { getProductGalleryImages, getProductPrimaryImage, handleProductImageError } from '../lib/productImages';
 
+const RECENTLY_VIEWED_KEY = 'emalla_recently_viewed_products';
+
 interface ProductDetailsProps {
   onAddToCart: (item: {
     productId: string;
@@ -81,6 +83,12 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
     
     if (found?.variants?.colors?.length) setSelectedColor(found.variants.colors[0].name);
     else setSelectedColor(null);
+
+    if (found) {
+      const current = JSON.parse(localStorage.getItem(RECENTLY_VIEWED_KEY) || '[]') as string[];
+      const next = [found.id, ...current.filter((entry) => entry !== found.id)].slice(0, 8);
+      localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(next));
+    }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [id, products]);
@@ -200,6 +208,11 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
     setTimeout(() => setIsAdded(false), 2000);
   };
 
+  const handleBuyNow = () => {
+    handleAddToCart();
+    navigate('/checkout');
+  };
+
   const handleToggleWishlist = async () => {
     if (!product) return;
     if (user?.role !== 'CUSTOMER') {
@@ -254,7 +267,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
   if (!product) return <div className="p-20 text-center">Product not found.</div>;
 
   return (
-    <div className="bg-white min-h-screen">
+    <div className="bg-white min-h-screen pb-32 md:pb-0">
       {/* Breadcrumbs */}
       <div className="max-w-7xl mx-auto px-4 py-4 flex items-center space-x-2 text-sm text-gray-500 border-b md:border-none">
         <Link to="/" className="hover:text-orange-500 transition-colors">Home</Link>
@@ -264,7 +277,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
         <span className="text-gray-900 font-medium truncate">{product.name}</span>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8 md:py-12">
+      <div className="max-w-7xl mx-auto px-4 py-6 md:py-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 xl:gap-20">
           
           {/* Product Gallery */}
@@ -356,6 +369,25 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
                 >
                   {reviews.length || product.reviewsCount || 0} customer reviews
                 </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 md:hidden">
+              <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Stock Availability</p>
+                <p className="mt-2 text-base font-black text-gray-900">{product.stock > 0 ? `${product.stock} items ready` : 'Currently unavailable'}</p>
+              </div>
+              <div className="rounded-3xl border border-orange-100 bg-orange-50 p-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-orange-600">Seller Info</p>
+                <p className="mt-2 text-base font-black text-gray-900">{product.merchantName || 'E-Malla Merchant'}</p>
+              </div>
+              <div className="rounded-3xl border border-blue-100 bg-blue-50 p-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Delivery Info</p>
+                <p className="mt-2 text-sm font-bold text-gray-900">Doorstep delivery and pickup options available in Rwanda.</p>
+              </div>
+              <div className="rounded-3xl border border-yellow-100 bg-yellow-50 p-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-yellow-700">Reviews</p>
+                <p className="mt-2 text-sm font-bold text-gray-900">{reviews.length || product.reviewsCount || 0} verified reviews with live rating updates.</p>
               </div>
             </div>
 
@@ -818,6 +850,37 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
             </div>
           </div>
         )}
+      </div>
+
+      <div className="md:hidden fixed inset-x-0 bottom-[calc(5.3rem+env(safe-area-inset-bottom,0px))] z-[65] px-4">
+        <div className="mx-auto max-w-lg rounded-[28px] border border-gray-200 bg-white/96 p-3 shadow-2xl backdrop-blur-xl">
+          <div className="mb-3 flex items-center justify-between gap-4 px-2">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Total</p>
+              <p className="text-lg font-black text-gray-900">RWF {(product.price * quantity).toLocaleString()}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Status</p>
+              <p className="text-sm font-black text-emerald-600">{product.stock > 0 ? 'In Stock' : 'Unavailable'}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={handleAddToCart}
+              className={`rounded-2xl px-4 py-4 text-sm font-black transition-all active:scale-[0.98] ${
+                isAdded ? 'bg-emerald-500 text-white' : 'bg-gray-900 text-white'
+              }`}
+            >
+              {isAdded ? 'Added' : 'Add to Cart'}
+            </button>
+            <button
+              onClick={handleBuyNow}
+              className="rounded-2xl bg-orange-500 px-4 py-4 text-sm font-black text-white shadow-lg shadow-orange-200 transition-all active:scale-[0.98]"
+            >
+              Buy Now
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -89,6 +89,10 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
       .map(p => p.name);
   }, [products, deferredSearchTerm]);
 
+  const categorySuggestions = useMemo(() => {
+    return CATEGORIES.slice(0, 6);
+  }, []);
+
   const addToRecentSearches = (term: string) => {
     if (!term.trim()) return;
     const newHistory = [term, ...recentSearches.filter(s => s !== term)].slice(0, 6);
@@ -161,7 +165,7 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-20">
+    <div className="bg-gray-50 min-h-screen pb-28 md:pb-20">
       <style>{`
         @keyframes flyToCart {
           0% { transform: translate(0, 0) scale(1); opacity: 1; }
@@ -180,7 +184,7 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
       ))}
 
       {/* Header / Search Area */}
-      <div className="bg-white border-b sticky top-20 z-40 py-6 px-4 sm:px-6 lg:px-8">
+      <div className="bg-white border-b sticky top-20 z-40 py-4 md:py-6 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
           <h1 className="text-2xl font-black text-gray-900">{t.shop.title}</h1>
           
@@ -189,7 +193,7 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
               <Search className={`absolute left-4 transition-colors duration-300 ${isSearchFocused ? 'text-orange-500' : 'text-gray-400'}`} size={20} />
               <input 
                 type="text" 
-                placeholder={t.shop.searchPlaceholder}
+                placeholder="Search products, shops, categories..."
                 value={searchTerm}
                 onFocus={() => setIsSearchFocused(true)}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -252,10 +256,33 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                     </div>
                   )}
 
+                  {!searchTerm.trim() && (
+                    <div className="mt-4 border-t border-gray-100 pt-4">
+                      <div className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
+                        <Filter size={14} className="mr-2" />
+                        Category Suggestions
+                      </div>
+                      <div className="flex flex-wrap gap-2 px-4 pb-2">
+                        {categorySuggestions.map((category) => (
+                          <button
+                            key={category.id}
+                            onClick={() => {
+                              handleCategoryClick(category.id);
+                              setIsSearchFocused(false);
+                            }}
+                            className="rounded-full bg-gray-50 px-3 py-2 text-xs font-black text-gray-600 transition-colors hover:bg-orange-50 hover:text-orange-600"
+                          >
+                            {category.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {!searchTerm.trim() && recentSearches.length === 0 && (
                     <div className="p-8 text-center">
                       <Search size={32} className="mx-auto text-gray-100 mb-4" />
-                      <p className="text-sm font-bold text-gray-400">{t.shop.emptySearch}</p>
+                      <p className="text-sm font-bold text-gray-400">Recent searches and category suggestions will appear here.</p>
                     </div>
                   )}
                 </div>

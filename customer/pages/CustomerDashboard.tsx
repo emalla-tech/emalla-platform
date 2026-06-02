@@ -30,6 +30,13 @@ const CustomerDashboard: React.FC = () => {
   const { user } = useAuth();
   const products = useProducts();
   const recommendedProducts = useMemo(() => products.slice(0, 2), [products]);
+  const recentlyViewedProducts = useMemo(() => {
+    const ids = JSON.parse(localStorage.getItem('emalla_recently_viewed_products') || '[]') as string[];
+    return ids
+      .map((id) => products.find((product) => product.id === id))
+      .filter(Boolean)
+      .slice(0, 3);
+  }, [products]);
 
   useEffect(() => {
     const loadSummary = async () => {
@@ -66,8 +73,8 @@ const CustomerDashboard: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-6">
+      <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center">
         <div>
           <h1 className="text-2xl font-black text-gray-900">Mwaramutse, {user?.name || 'Customer'}!</h1>
           <p className="text-gray-500 text-sm">Welcome to your E-Malla account.</p>
@@ -75,6 +82,19 @@ const CustomerDashboard: React.FC = () => {
         <Link to="/shop" className="bg-orange-500 text-white px-6 py-3 rounded-2xl font-black text-sm shadow-xl shadow-orange-200 hover:bg-orange-600 transition-all flex items-center">
           Shop Now <ArrowRight size={16} className="ml-2" />
         </Link>
+      </div>
+
+      <div className="rounded-[36px] bg-gradient-to-br from-gray-900 via-gray-800 to-orange-500 p-6 text-white shadow-2xl shadow-orange-100">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-orange-200">Wallet & MoMo Points</p>
+            <h2 className="mt-3 text-3xl font-black">{summary.pointsBalance.toLocaleString()} pts</h2>
+            <p className="mt-2 max-w-md text-sm font-medium text-orange-50/90">Use your points to unlock faster delivery perks, promo access, and repeat-order rewards.</p>
+          </div>
+          <div className="rounded-2xl bg-white/10 p-3 backdrop-blur">
+            <Zap size={22} />
+          </div>
+        </div>
       </div>
 
       {/* KPI Stats */}
@@ -164,6 +184,38 @@ const CustomerDashboard: React.FC = () => {
                </div>
              ))}
           </div>
+
+          <div className="rounded-[36px] border border-gray-100 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-black text-gray-900">Recently Viewed</h3>
+                <p className="text-sm text-gray-500">Quick return to products you opened recently.</p>
+              </div>
+            </div>
+            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+              {recentlyViewedProducts.length > 0 ? recentlyViewedProducts.map((item) => (
+                <button
+                  key={item!.id}
+                  onClick={() => navigate(`/product/${item!.id}`)}
+                  className="rounded-[28px] border border-gray-100 bg-gray-50 p-4 text-left transition-all hover:border-orange-200 hover:bg-white"
+                >
+                  <img
+                    src={getProductPrimaryImage(item!)}
+                    onError={(event) => handleProductImageError(event, item!.category)}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-24 w-full rounded-2xl object-cover"
+                    alt={item!.name}
+                  />
+                  <p className="mt-3 line-clamp-2 text-sm font-black text-gray-900">{item!.name}</p>
+                </button>
+              )) : (
+                <div className="sm:col-span-3 rounded-[28px] border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm font-bold text-gray-400">
+                  Recently viewed products will appear here once you explore more items.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Sidebar Widgets */}
@@ -191,6 +243,24 @@ const CustomerDashboard: React.FC = () => {
              <Link to="/shop?category=2" className="inline-block px-6 py-2 bg-white text-emerald-600 rounded-full font-black text-xs uppercase shadow-lg">
                 Claim Now
              </Link>
+          </div>
+
+          <div className="bg-white rounded-[40px] p-6 border border-gray-100 shadow-sm">
+            <h4 className="text-lg font-black text-gray-900">Quick Actions</h4>
+            <div className="mt-5 grid gap-3">
+              <button onClick={() => navigate('/shop')} className="flex items-center justify-between rounded-2xl bg-orange-50 px-4 py-4 text-sm font-black text-orange-600 transition-colors hover:bg-orange-100">
+                <span>Shop Now</span>
+                <ArrowRight size={16} />
+              </button>
+              <button onClick={() => summary.recentOrder.id && navigate(`/buyer/orders/${summary.recentOrder.id}/track`)} className="flex items-center justify-between rounded-2xl bg-blue-50 px-4 py-4 text-sm font-black text-blue-600 transition-colors hover:bg-blue-100">
+                <span>Track Order</span>
+                <Truck size={16} />
+              </button>
+              <button onClick={() => navigate('/contact')} className="flex items-center justify-between rounded-2xl bg-gray-100 px-4 py-4 text-sm font-black text-gray-700 transition-colors hover:bg-gray-200">
+                <span>Contact Support</span>
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </div>

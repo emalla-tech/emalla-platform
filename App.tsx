@@ -22,6 +22,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import InstallPrompt from './components/pwa/InstallPrompt';
 import MobileBottomNav from './components/pwa/MobileBottomNav';
+import CustomerMobileChrome from './components/pwa/CustomerMobileChrome';
 import { LanguageProvider } from './i18n/LanguageContext';
 
 import NotificationList from './components/notifications/NotificationList';
@@ -295,7 +296,7 @@ const App: React.FC = () => {
           <Route path="/unauthorized" element={withSuspense(<Unauthorized />)} />
 
           {/* Public Wrapper with Nav/Footer */}
-          <Route element={<><Navbar cartCount={itemCount} /><PublicOutlet /><Footer /></>}>
+          <Route element={<><Navbar cartCount={itemCount} /><PublicOutlet /><CustomerMobileChrome cartCount={itemCount} /><Footer /></>}>
             <Route path="/" element={withSuspense(<Home onAddToCart={addItem} />)} />
             <Route path="/shop" element={withSuspense(<Shop onAddToCart={addItem} />)} />
             <Route path="/product/:id" element={withSuspense(<ProductDetails onAddToCart={addItem} />)} />
@@ -463,7 +464,7 @@ const App: React.FC = () => {
   );
 };
 
-const PublicOutlet = () => <div className="flex-grow page-transition"><Outlet /></div>;
+const PublicOutlet = () => <div className="flex-grow page-transition pb-24 md:pb-0"><Outlet /></div>;
 
 const MerchantSidebar = ({ onLogout }: { onLogout: () => void }) => (
   <aside className="w-72 bg-white border-r p-8 hidden md:flex flex-col shrink-0 h-full">

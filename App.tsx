@@ -100,6 +100,146 @@ const ScrollToTop = () => {
   return null;
 };
 
+const SEO_BASE_URL = 'https://www.emallarwanda.com';
+const DEFAULT_SEO = {
+  title: 'E-Malla Rwanda | Buy, Sell & Deliver Across Rwanda',
+  description:
+    'E-Malla Rwanda is a trusted digital marketplace connecting buyers, sellers and delivery partners across Rwanda.',
+  keywords:
+    'E-Malla Rwanda, Rwanda marketplace, buy online Rwanda, sell online Rwanda, delivery Rwanda, ecommerce Rwanda',
+};
+
+const buildSeoConfig = (pathname: string) => {
+  if (pathname.startsWith('/product/')) {
+    return {
+      title: 'Product Details | E-Malla Rwanda',
+      description: 'Explore product details, pricing and delivery options on E-Malla Rwanda.',
+    };
+  }
+
+  if (pathname.startsWith('/track-order/')) {
+    return {
+      title: 'Track Order | E-Malla Rwanda',
+      description: 'Track your E-Malla Rwanda order status and delivery progress.',
+    };
+  }
+
+  const routeSeo: Record<string, { title: string; description: string }> = {
+    '/': {
+      title: DEFAULT_SEO.title,
+      description: DEFAULT_SEO.description,
+    },
+    '/shop': {
+      title: 'Shop Online in Rwanda | E-Malla Rwanda',
+      description: 'Browse products from trusted sellers across Rwanda and order with delivery through E-Malla Rwanda.',
+    },
+    '/about': {
+      title: 'About E-Malla Rwanda',
+      description: 'Learn how E-Malla Rwanda connects buyers, sellers and delivery partners across Rwanda.',
+    },
+    '/team': {
+      title: 'Our Team | E-Malla Rwanda',
+      description: 'Meet the team building E-Malla Rwanda for merchants, customers and delivery partners.',
+    },
+    '/investors': {
+      title: 'Investors | E-Malla Rwanda',
+      description: 'Discover E-Malla Rwanda growth opportunities, vision and marketplace potential.',
+    },
+    '/faq': {
+      title: 'FAQ | E-Malla Rwanda',
+      description: 'Find answers about shopping, selling, delivery and payments on E-Malla Rwanda.',
+    },
+    '/shipping': {
+      title: 'Shipping Policy | E-Malla Rwanda',
+      description: 'Review E-Malla Rwanda shipping, delivery timelines and logistics policy.',
+    },
+    '/terms': {
+      title: 'Terms of Service | E-Malla Rwanda',
+      description: 'Read the terms and conditions for using E-Malla Rwanda services and marketplace features.',
+    },
+    '/contact': {
+      title: 'Contact Us | E-Malla Rwanda',
+      description: 'Contact E-Malla Rwanda for support, partnership opportunities and customer assistance.',
+    },
+    '/how-it-works': {
+      title: 'How It Works | E-Malla Rwanda',
+      description: 'See how buying, selling and delivery work on E-Malla Rwanda from order to doorstep.',
+    },
+    '/become-seller': {
+      title: 'Become a Seller | E-Malla Rwanda',
+      description: 'Join E-Malla Rwanda as a seller and reach customers across Rwanda through our marketplace.',
+    },
+    '/cart': {
+      title: 'Your Cart | E-Malla Rwanda',
+      description: 'Review selected items and prepare your order on E-Malla Rwanda.',
+    },
+    '/checkout': {
+      title: 'Checkout | E-Malla Rwanda',
+      description: 'Complete your E-Malla Rwanda order securely with delivery details and payment options.',
+    },
+    '/login': {
+      title: 'Login | E-Malla Rwanda',
+      description: 'Sign in to your E-Malla Rwanda account to shop, sell or manage deliveries.',
+    },
+    '/register': {
+      title: 'Create Account | E-Malla Rwanda',
+      description: 'Create your E-Malla Rwanda account to buy, sell or deliver across Rwanda.',
+    },
+  };
+
+  return routeSeo[pathname] ?? {
+    title: 'E-Malla Rwanda',
+    description: DEFAULT_SEO.description,
+  };
+};
+
+const updateMetaTag = (selector: string, attribute: 'content' | 'href', value: string, tagName = 'meta') => {
+  let element = document.head.querySelector(selector) as HTMLMetaElement | HTMLLinkElement | null;
+
+  if (!element) {
+    element = document.createElement(tagName) as HTMLMetaElement | HTMLLinkElement;
+    if (tagName === 'meta') {
+      const match = selector.match(/\[(name|property)="([^"]+)"\]/);
+      if (match) {
+        element.setAttribute(match[1], match[2]);
+      }
+    }
+    if (tagName === 'link') {
+      const match = selector.match(/\[rel="([^"]+)"\]/);
+      if (match) {
+        element.setAttribute('rel', match[1]);
+      }
+    }
+    document.head.appendChild(element);
+  }
+
+  element.setAttribute(attribute, value);
+};
+
+const SeoMetaUpdater = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    const { title, description } = buildSeoConfig(location.pathname);
+    const canonicalUrl =
+      location.pathname === '/'
+        ? `${SEO_BASE_URL}/`
+        : `${SEO_BASE_URL}/#${location.pathname}`;
+
+    document.title = title;
+    updateMetaTag('meta[name="description"]', 'content', description);
+    updateMetaTag('meta[name="keywords"]', 'content', DEFAULT_SEO.keywords);
+    updateMetaTag('meta[property="og:title"]', 'content', title);
+    updateMetaTag('meta[property="og:description"]', 'content', description);
+    updateMetaTag('meta[property="og:url"]', 'content', canonicalUrl);
+    updateMetaTag('meta[name="twitter:title"]', 'content', title);
+    updateMetaTag('meta[name="twitter:description"]', 'content', description);
+    updateMetaTag('link[rel="canonical"]', 'href', canonicalUrl, 'link');
+  }, [location.pathname]);
+
+  return null;
+};
+
 const BackToTop = () => {
   const [isVisible, setIsVisible] = React.useState(false);
 
@@ -140,6 +280,7 @@ const App: React.FC = () => {
     <LanguageProvider>
       <Router>
         <ScrollToTop />
+        <SeoMetaUpdater />
         <BackToTop />
         <div className="min-h-screen flex flex-col">
           <Routes>

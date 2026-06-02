@@ -186,7 +186,7 @@ const FAQ: React.FC = () => {
               </div>
               <h4 className="text-xl font-bold mb-2">{t.faq.callUs}</h4>
               <p className="text-gray-500 text-sm mb-6">{t.faq.callText}</p>
-              <a href="tel:+250788000000" className="text-blue-500 font-bold hover:underline">+250 788 000 000</a>
+              <a href="tel:+250784352174" className="text-blue-500 font-bold hover:underline">+250 784352174</a>
             </div>
 
             <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm text-center group hover:border-orange-200 transition-all">

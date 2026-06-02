@@ -242,8 +242,8 @@
       "status": "active",
       "createdAt": "2026-03-22T01:20:49.017Z",
       "orderCount": 0,
-      "lastLoginAt": "2026-05-03T17:52:48.947Z",
-      "updatedAt": "2026-05-03T17:52:48.947Z",
+      "lastLoginAt": "2026-05-10T14:06:42.450Z",
+      "updatedAt": "2026-05-10T14:06:42.450Z",
       "mustChangePassword": false,
       "passwordChangedAt": "2026-04-07T18:07:31.914Z"
     },
@@ -533,6 +533,10 @@
     "em_tk_673eaf4f959eefe3cd770eae2efc222026fcb7e2f4f7db2e0d1a079d4bda81dd": {
       "userId": "ADM-1001",
       "createdAt": "2026-05-03T17:52:48.947Z"
+    },
+    "em_tk_aaf35ab39a60f80c33dc422afa90d1c18e805005bc0d67895c68b1919cdae658": {
+      "userId": "ADM-1001",
+      "createdAt": "2026-05-10T14:06:42.450Z"
     }
   },
   "products": [
@@ -5926,6 +5930,15 @@
   "wishlists": [],
   "passwordResetTokens": [],
   "sessions": [
+    {
+      "id": "SES-1778422002965",
+      "token": "em_tk_aaf35ab39a60f80c33dc422afa90d1c18e805005bc0d67895c68b1919cdae658",
+      "userId": "ADM-1001",
+      "createdAt": "2026-05-10T14:06:42.450Z",
+      "expiresAt": null,
+      "lastSeenAt": "2026-05-10T14:07:40.746Z",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 AVG/146.0.34394.179"
+    },
     {
       "id": "SES-1777830769606",
       "token": "em_tk_673eaf4f959eefe3cd770eae2efc222026fcb7e2f4f7db2e0d1a079d4bda81dd",

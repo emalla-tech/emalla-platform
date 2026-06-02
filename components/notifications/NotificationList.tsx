@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
-  Trash2, Check, Clock, Filter, Search, 
-  MoreVertical, Package, Zap, ShieldAlert, X, ChevronRight, Bell
+  Trash2, Check, Clock,
+  Package, Zap, ShieldAlert, ChevronRight, Bell
 } from 'lucide-react';
 import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationType, UserRole } from '../../types';
@@ -14,8 +15,22 @@ interface NotificationListProps {
 const NotificationList: React.FC<NotificationListProps> = ({ userId, role }) => {
   const { notifications, markRead, remove, markAllRead } = useNotifications(userId, role);
   const [filter, setFilter] = useState<NotificationType | 'all'>('all');
+  const navigate = useNavigate();
 
   const filtered = notifications.filter(n => filter === 'all' || n.type === filter);
+
+  const getOrderTrackingRoute = (orderId: string) => {
+    switch (role) {
+      case UserRole.MERCHANT:
+        return `/seller/orders/${orderId}/track`;
+      case UserRole.CUSTOMER:
+        return `/buyer/orders/${orderId}/track`;
+      case UserRole.ADMIN:
+        return '/admin/dashboard/orders';
+      default:
+        return null;
+    }
+  };
 
   const getStyle = (type: NotificationType) => {
     switch (type) {
@@ -100,7 +115,16 @@ const NotificationList: React.FC<NotificationListProps> = ({ userId, role }) => 
                  <p className="text-gray-600 font-medium leading-relaxed">{n.message}</p>
                  {n.metadata?.orderId && (
                    <div className="pt-4 flex">
-                      <button className="text-[10px] font-black text-orange-500 uppercase tracking-widest flex items-center group/btn">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const route = getOrderTrackingRoute(String(n.metadata.orderId));
+                          if (route) {
+                            navigate(route);
+                          }
+                        }}
+                        className="text-[10px] font-black text-orange-500 uppercase tracking-widest flex items-center group/btn"
+                      >
                          View Related Order <ChevronRight size={14} className="ml-1 group-hover/btn:translate-x-1 transition-transform" />
                       </button>
                    </div>

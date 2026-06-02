@@ -58,7 +58,7 @@ const FAQ: React.FC = () => {
     customer: [
       {
         question: "How do I track my order?",
-        answer: "Once your order is confirmed, you can track its progress in real-time through your Customer Dashboard under the 'My Orders' section. You'll also receive SMS notifications at every major step (Picked, In Transit, Delivered)."
+        answer: "Once your order is confirmed, you can track its progress in real-time through your Customer Dashboard under the 'My Orders' section. You will also receive order updates through your account notifications and email confirmations at major steps."
       },
       {
         question: "What payment methods are accepted?",

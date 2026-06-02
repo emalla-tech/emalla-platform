@@ -93,6 +93,12 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
     return CATEGORIES.slice(0, 6);
   }, []);
 
+  const trendingProducts = useMemo(() => {
+    return [...products]
+      .sort((left, right) => (Number(Boolean(right.featured)) + right.rating) - (Number(Boolean(left.featured)) + left.rating))
+      .slice(0, 4);
+  }, [products]);
+
   const addToRecentSearches = (term: string) => {
     if (!term.trim()) return;
     const newHistory = [term, ...recentSearches.filter(s => s !== term)].slice(0, 6);
@@ -259,8 +265,36 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                   {!searchTerm.trim() && (
                     <div className="mt-4 border-t border-gray-100 pt-4">
                       <div className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
+                        <TrendingUp size={14} className="mr-2" />
+                        Trending Products
+                      </div>
+                      <div className="space-y-2 px-4 pb-3">
+                        {trendingProducts.map((product) => (
+                          <button
+                            key={product.id}
+                            onClick={() => {
+                              setIsSearchFocused(false);
+                              navigate(`/product/${product.id}`);
+                            }}
+                            className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition-colors hover:bg-gray-50"
+                          >
+                            <img
+                              src={getProductPrimaryImage(product)}
+                              onError={(event) => handleProductImageError(event, product.category)}
+                              alt={product.name}
+                              className="h-12 w-12 rounded-xl object-cover"
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-black text-gray-900">{product.name}</p>
+                              <p className="text-xs font-bold text-orange-500">RWF {product.price.toLocaleString()}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
                         <Filter size={14} className="mr-2" />
-                        Category Suggestions
+                        Popular Categories
                       </div>
                       <div className="flex flex-wrap gap-2 px-4 pb-2">
                         {categorySuggestions.map((category) => (

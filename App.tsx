@@ -70,6 +70,7 @@ const MerchantSettings = lazy(() => import('./merchant/pages/Settings'));
 const CustomerDashboard = lazy(() => import('./customer/pages/CustomerDashboard'));
 const MyOrders = lazy(() => import('./customer/pages/MyOrders'));
 const AddressBook = lazy(() => import('./customer/pages/AddressBook'));
+const Wishlist = lazy(() => import('./customer/pages/Wishlist'));
 const RiderDashboard = lazy(() => import('./delivery/pages/RiderDashboard'));
 const AvailableJobs = lazy(() => import('./delivery/pages/AvailableJobs'));
 const RiderHistory = lazy(() => import('./delivery/pages/RiderHistory'));
@@ -395,6 +396,7 @@ const App: React.FC = () => {
                       <Routes>
                       <Route index element={withSuspense(<CustomerDashboard />)} />
                       <Route path="orders" element={withSuspense(<MyOrders />)} />
+                      <Route path="wishlist" element={withSuspense(<Wishlist onAddToCart={addItem} />)} />
                       <Route path="orders/:id/track" element={withSuspense(<OrderTracking />)} />
                       <Route path="settings" element={withSuspense(<AddressBook />)} />
                         <Route path="notifications" element={user ? <NotificationList userId={user.id} role={UserRole.CUSTOMER} /> : <RouteLoader />} />

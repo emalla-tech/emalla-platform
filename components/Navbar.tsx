@@ -1,12 +1,13 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Menu, X, Search, Store, User, Truck, ChevronDown, LogOut, LogIn, UserPlus, Globe } from 'lucide-react';
+import { ShoppingCart, Menu, X, Search, Store, User, Truck, ChevronDown, LogOut, LogIn, UserPlus, Globe, Heart } from 'lucide-react';
 import { NAV_LINKS } from '../constants';
 import NotificationBell from './notifications/NotificationBell';
 import { useAuth } from '../auth/AuthContext';
 import { UserRole } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
+import { CustomerService } from '../services/customerService';
 
 interface NavbarProps {
   cartCount: number;
@@ -21,6 +22,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const { language, setLanguage, t, languages } = useLanguage();
+  const [wishlistCount, setWishlistCount] = useState(0);
   const languageShortLabels: Record<string, string> = {
     en: 'EN',
     rw: 'RW',
@@ -41,6 +43,20 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
 
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
+
+  useEffect(() => {
+    const loadWishlistCount = async () => {
+      if (user?.role !== UserRole.CUSTOMER) {
+        setWishlistCount(0);
+        return;
+      }
+
+      const ids = await CustomerService.getWishlistProductIds().catch(() => []);
+      setWishlistCount(ids.length);
+    };
+
+    loadWishlistCount();
+  }, [user, location.pathname]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -121,6 +137,17 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
             </div>
 
             {user && <NotificationBell userId={user.id} role={user.role} />}
+
+            {user?.role === UserRole.CUSTOMER && (
+              <Link to="/buyer/wishlist" className="relative p-2.5 bg-gray-50 hover:bg-red-50 rounded-xl transition-all" aria-label="Open wishlist">
+                <Heart className="text-gray-700" size={20} />
+                {wishlistCount > 0 && (
+                  <span className="absolute top-1 right-1 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-lg border-2 border-white">
+                    {wishlistCount}
+                  </span>
+                )}
+              </Link>
+            )}
 
             <Link to="/cart" className="relative p-2.5 bg-gray-50 hover:bg-orange-50 rounded-xl transition-all">
               <ShoppingCart className="text-gray-700" size={20} />
@@ -305,6 +332,11 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
               </>
             )}
             <Link to={user ? '/buyer' : '/login?next=%2Fbuyer'} className="p-4 bg-blue-50 rounded-2xl text-xs font-black text-blue-600 text-center" onClick={() => setIsOpen(false)}>{t.nav.buyerHub}</Link>
+            {user?.role === UserRole.CUSTOMER && (
+              <Link to="/buyer/wishlist" className="p-4 bg-red-50 rounded-2xl text-xs font-black text-red-600 text-center" onClick={() => setIsOpen(false)}>
+                Wishlist {wishlistCount > 0 ? `(${wishlistCount})` : ''}
+              </Link>
+            )}
             <Link to={user ? '/seller' : '/login?next=%2Fseller'} className="p-4 bg-orange-50 rounded-2xl text-xs font-black text-orange-600 text-center" onClick={() => setIsOpen(false)}>{t.nav.sellerHub}</Link>
             <Link to={user ? '/rider' : '/login?next=%2Frider'} className="p-4 bg-emerald-50 rounded-2xl text-xs font-black text-emerald-600 text-center" onClick={() => setIsOpen(false)}>{t.nav.riderHub}</Link>
             {user?.role === UserRole.ADMIN && (

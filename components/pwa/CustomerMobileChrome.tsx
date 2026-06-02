@@ -14,6 +14,7 @@ const HIDDEN_PATTERNS = [
   '/register',
   '/forgot-password',
   '/reset-password',
+  '/checkout',
   '/admin',
   '/seller',
   '/rider',
@@ -52,12 +53,12 @@ const CustomerMobileChrome: React.FC<CustomerMobileChromeProps> = ({ cartCount }
         <Link
           to="/cart"
           aria-label="Open shopping cart"
-          className="md:hidden fixed right-4 bottom-[calc(5.8rem+env(safe-area-inset-bottom,0px))] z-[70] flex items-center gap-2 rounded-full bg-orange-500 px-4 py-3 text-white shadow-2xl shadow-orange-300 transition-transform active:scale-95"
+          className="md:hidden fixed right-4 bottom-[calc(7.1rem+env(safe-area-inset-bottom,0px))] z-[70] flex items-center gap-2 rounded-full bg-orange-500 px-4 py-3 text-white shadow-[0_18px_40px_rgba(249,115,22,0.38)] transition-transform active:scale-95"
         >
           <ShoppingCart size={18} />
           <span className="text-xs font-black uppercase tracking-widest">Cart</span>
           {cartCount > 0 && (
-            <span className="min-w-6 rounded-full bg-white px-2 py-1 text-center text-[10px] font-black text-orange-600">
+            <span className="min-w-6 animate-cart-badge rounded-full bg-white px-2 py-1 text-center text-[10px] font-black text-orange-600">
               {cartCount}
             </span>
           )}

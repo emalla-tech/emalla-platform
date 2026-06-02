@@ -1,11 +1,71 @@
 html {
   background: #fcfcfc;
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
+  color: #111827;
+  -webkit-tap-highlight-color: rgba(249, 115, 22, 0.18);
+  text-rendering: optimizeLegibility;
 }
 
 #root {
   min-height: 100vh;
+}
+
+body.pwa-standalone {
+  overscroll-behavior-y: contain;
+  user-select: none;
+}
+
+a,
+button {
+  touch-action: manipulation;
+}
+
+.app-shell {
+  min-height: 100vh;
+  animation: app-shell-enter 240ms ease-out;
+}
+
+.page-transition {
+  animation: page-fade-in 260ms ease-out;
+}
+
+.install-banner-enter {
+  animation: install-banner-in 280ms ease-out;
+}
+
+@keyframes app-shell-enter {
+  from {
+    opacity: 0.01;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0.01;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes install-banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

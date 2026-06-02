@@ -20,6 +20,7 @@ import {
 // Components
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import InstallPrompt from './components/pwa/InstallPrompt';
 import { LanguageProvider } from './i18n/LanguageContext';
 
 import NotificationList from './components/notifications/NotificationList';
@@ -282,7 +283,8 @@ const App: React.FC = () => {
         <ScrollToTop />
         <SeoMetaUpdater />
         <BackToTop />
-        <div className="min-h-screen flex flex-col">
+        <div className="min-h-screen flex flex-col app-shell">
+          <InstallPrompt />
           <Routes>
           <Route path="/login" element={withSuspense(<Login />)} />
           <Route path="/forgot-password" element={withSuspense(<ForgotPassword />)} />
@@ -433,7 +435,7 @@ const App: React.FC = () => {
   );
 };
 
-const PublicOutlet = () => <div className="flex-grow"><Outlet /></div>;
+const PublicOutlet = () => <div className="flex-grow page-transition"><Outlet /></div>;
 
 const MerchantSidebar = ({ onLogout }: { onLogout: () => void }) => (
   <aside className="w-72 bg-white border-r p-8 hidden md:flex flex-col shrink-0 h-full">

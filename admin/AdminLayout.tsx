@@ -20,6 +20,7 @@ import {
   Shield
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import MobileBottomNav from '../components/pwa/MobileBottomNav';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -50,7 +51,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Sidebar */}
       <aside 
-        className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-gray-200 transition-all duration-300 flex flex-col h-full z-50`}
+        className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-gray-200 transition-all duration-300 hidden md:flex flex-col h-full z-50`}
       >
         <div className="h-20 flex items-center justify-between px-6 border-b border-gray-50">
           <Link to="/" className={`flex items-center space-x-3 ${!isSidebarOpen && 'hidden'}`}>
@@ -101,7 +102,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       {/* Main Content Area */}
       <div className="flex-grow flex flex-col min-w-0">
         {/* Topbar */}
-        <header className="h-20 bg-white border-b border-gray-200 px-8 flex items-center justify-between">
+        <header className="h-20 bg-white border-b border-gray-200 px-4 md:px-8 flex items-center justify-between">
           <div className="flex items-center space-x-4 max-w-lg w-full">
             <div className="relative w-full group">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={18} />
@@ -113,12 +114,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             </div>
           </div>
 
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-3 md:space-x-6">
             <button className="relative p-2 text-gray-400 hover:bg-gray-50 rounded-lg">
               <Bell size={20} />
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
             </button>
-            <div className="flex items-center space-x-3 pl-6 border-l border-gray-100">
+            <div className="flex items-center space-x-3 pl-3 md:pl-6 border-l border-gray-100">
               <div className="text-right">
                 <p className="text-sm font-bold text-gray-900">Admin Panel</p>
                 <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest">Super User</p>
@@ -129,11 +130,21 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         </header>
 
         {/* Dynamic Page Content */}
-        <main className="flex-grow overflow-y-auto p-8 bg-gray-50/50">
+        <main className="flex-grow overflow-y-auto p-4 pb-28 md:p-8 bg-gray-50/50">
           <div className="max-w-[1600px] mx-auto">
             {children}
           </div>
         </main>
+        <MobileBottomNav
+          accentClass="text-gray-900"
+          backgroundClass="bg-white/96"
+          items={[
+            { to: '/admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard /> },
+            { to: '/admin/dashboard/sellers', label: 'Sellers', icon: <Store /> },
+            { to: '/admin/dashboard/orders', label: 'Orders', icon: <ShoppingBag /> },
+            { to: '/admin/dashboard/settings', label: 'Settings', icon: <Settings /> }
+          ]}
+        />
       </div>
     </div>
   );

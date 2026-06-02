@@ -21,6 +21,7 @@ import {
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import InstallPrompt from './components/pwa/InstallPrompt';
+import MobileBottomNav from './components/pwa/MobileBottomNav';
 import { LanguageProvider } from './i18n/LanguageContext';
 
 import NotificationList from './components/notifications/NotificationList';
@@ -355,10 +356,10 @@ const App: React.FC = () => {
           <Route path="/seller/*" element={
             <ProtectedRoute>
               <RoleRoute allowedRoles={[UserRole.MERCHANT]}>
-                <div className="flex h-screen bg-gray-50">
-                  <MerchantSidebar onLogout={logout} />
-                  <div className="flex-grow p-4 md:p-8 overflow-y-auto no-scrollbar">
-                    <Routes>
+                  <div className="flex min-h-screen bg-gray-50">
+                    <MerchantSidebar onLogout={logout} />
+                    <div className="flex-grow p-4 pb-28 md:p-8 overflow-y-auto no-scrollbar">
+                      <Routes>
                       <Route index element={withSuspense(<MerchantDashboard />)} />
                       <Route path="change-password" element={withSuspense(<SellerPasswordReset />)} />
                       <Route path="products" element={withSuspense(<MerchantInventory />)} />
@@ -366,40 +367,58 @@ const App: React.FC = () => {
                       <Route path="orders/:id/track" element={withSuspense(<OrderTracking />)} />
                       <Route path="analytics" element={withSuspense(<MerchantWallet />)} />
                       <Route path="settings" element={withSuspense(<MerchantSettings />)} />
-                      <Route path="notifications" element={user ? <NotificationList userId={user.id} role={UserRole.MERCHANT} /> : <RouteLoader />} />
-                    </Routes>
+                        <Route path="notifications" element={user ? <NotificationList userId={user.id} role={UserRole.MERCHANT} /> : <RouteLoader />} />
+                      </Routes>
+                    </div>
+                    <MobileBottomNav
+                      accentClass="text-orange-500"
+                      items={[
+                        { to: '/seller', label: 'Dashboard', icon: <LayoutDashboard /> },
+                        { to: '/seller/products', label: 'Products', icon: <Package /> },
+                        { to: '/seller/orders', label: 'Orders', icon: <History /> },
+                        { to: '/seller/settings', label: 'Account', icon: <User /> }
+                      ]}
+                    />
                   </div>
-                </div>
-              </RoleRoute>
-            </ProtectedRoute>
-          } />
+                </RoleRoute>
+              </ProtectedRoute>
+            } />
 
           {/* Direct Buyer Access */}
           <Route path="/buyer/*" element={
             <ProtectedRoute>
               <RoleRoute allowedRoles={[UserRole.CUSTOMER]}>
-                <div className="flex h-screen bg-gray-50">
-                  <CustomerSidebar onLogout={logout} />
-                  <div className="flex-grow p-4 md:p-8 overflow-y-auto no-scrollbar">
-                    <Routes>
+                  <div className="flex min-h-screen bg-gray-50">
+                    <CustomerSidebar onLogout={logout} />
+                    <div className="flex-grow p-4 pb-28 md:p-8 overflow-y-auto no-scrollbar">
+                      <Routes>
                       <Route index element={withSuspense(<CustomerDashboard />)} />
                       <Route path="orders" element={withSuspense(<MyOrders />)} />
                       <Route path="orders/:id/track" element={withSuspense(<OrderTracking />)} />
                       <Route path="settings" element={withSuspense(<AddressBook />)} />
-                      <Route path="notifications" element={user ? <NotificationList userId={user.id} role={UserRole.CUSTOMER} /> : <RouteLoader />} />
-                    </Routes>
+                        <Route path="notifications" element={user ? <NotificationList userId={user.id} role={UserRole.CUSTOMER} /> : <RouteLoader />} />
+                      </Routes>
+                    </div>
+                    <MobileBottomNav
+                      accentClass="text-blue-600"
+                      items={[
+                        { to: '/', label: 'Home', icon: <HomeIcon /> },
+                        { to: '/shop', label: 'Shop', icon: <ShoppingBag /> },
+                        { to: '/buyer/orders', label: 'Orders', icon: <Package /> },
+                        { to: '/buyer/settings', label: 'Account', icon: <User /> }
+                      ]}
+                    />
                   </div>
-                </div>
-              </RoleRoute>
-            </ProtectedRoute>
-          } />
+                </RoleRoute>
+              </ProtectedRoute>
+            } />
 
           {/* Direct Rider Access */}
           <Route path="/rider/*" element={
             <ProtectedRoute>
               <RoleRoute allowedRoles={[UserRole.DELIVERY]}>
                 <div className="flex min-h-screen bg-gray-100 max-w-xl mx-auto border-x shadow-2xl">
-                  <div className="flex-grow p-4 pb-24 overflow-y-auto no-scrollbar">
+                    <div className="flex-grow p-4 pb-28 overflow-y-auto no-scrollbar">
                     <div className="mb-6 p-4 bg-emerald-500 text-white rounded-2xl text-center md:hidden">
                        <p className="text-xs font-black uppercase tracking-widest">Rider Mobile Hub</p>
                     </div>
@@ -409,14 +428,23 @@ const App: React.FC = () => {
                       <Route path="history" element={withSuspense(<RiderHistory />)} />
                       <Route path="earnings" element={withSuspense(<RiderEarnings />)} />
                       <Route path="orders/:id/track" element={withSuspense(<OrderTracking />)} />
-                      <Route path="notifications" element={user ? <NotificationList userId={user.id} role={UserRole.DELIVERY} /> : <RouteLoader />} />
-                    </Routes>
+                        <Route path="notifications" element={user ? <NotificationList userId={user.id} role={UserRole.DELIVERY} /> : <RouteLoader />} />
+                      </Routes>
+                    </div>
+                    <MobileBottomNav
+                      accentClass="text-emerald-500"
+                      backgroundClass="bg-white/95"
+                      items={[
+                        { to: '/rider', label: 'Dashboard', icon: <LayoutDashboard /> },
+                        { to: '/rider/available', label: 'Deliveries', icon: <Package /> },
+                        { to: '/rider/earnings', label: 'Earnings', icon: <Wallet /> },
+                        { to: '/rider/notifications', label: 'Account', icon: <User /> }
+                      ]}
+                    />
                   </div>
-                  <RiderBottomNav onLogout={logout} />
-                </div>
-              </RoleRoute>
-            </ProtectedRoute>
-          } />
+                </RoleRoute>
+              </ProtectedRoute>
+            } />
 
           <Route
             path="/dashboard/*"
@@ -548,42 +576,5 @@ const CustomerSidebar = ({ onLogout }: { onLogout: () => void }) => (
     </div>
   </aside>
 );
-
-const RiderBottomNav = ({ onLogout }: { onLogout: () => void }) => {
-  const NavItem = ({ to, icon, label }: any) => (
-    <Link to={to} className="flex flex-col items-center space-y-1 group">
-      <div className="p-1 rounded-lg group-active:scale-90 transition-transform">
-        {React.cloneElement(icon, { 
-          className: `transition-colors ${window.location.hash.includes(to) ? 'text-orange-500' : 'text-gray-400'}` 
-        })}
-      </div>
-      <span className={`text-[9px] font-black uppercase tracking-widest ${window.location.hash.includes(to) ? 'text-orange-500' : 'text-gray-400'}`}>
-        {label}
-      </span>
-    </Link>
-  );
-
-  return (
-    <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-xl bg-white border-t p-4 flex justify-around items-center z-50 shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
-      <NavItem to="/rider/available" icon={<Package size={22} />} label="Pool" />
-      <NavItem to="/rider/notifications" icon={<Bell size={22} />} label="Alerts" />
-      <div className="relative -top-6">
-        <Link to="/rider" className="w-14 h-14 bg-orange-500 rounded-full flex items-center justify-center text-white shadow-xl shadow-orange-200 border-4 border-white active:scale-90 transition-transform">
-           <LayoutDashboard size={24} />
-        </Link>
-      </div>
-      <NavItem to="/rider/history" icon={<History size={22} />} label="Log" />
-      <NavItem to="/rider/earnings" icon={<Wallet size={22} />} label="Wallet" />
-      <button onClick={onLogout} className="flex flex-col items-center space-y-1 group">
-        <div className="p-1 rounded-lg group-active:scale-90 transition-transform">
-          <LogOut size={22} className="text-red-500" />
-        </div>
-        <span className="text-[9px] font-black uppercase tracking-widest text-red-500">
-          Logout
-        </span>
-      </button>
-    </div>
-  );
-};
 
 export default App;

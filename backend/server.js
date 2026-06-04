@@ -3187,10 +3187,23 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/products' && req.method === 'GET') {
-        const products = await getCachedProducts();
-        sendJson(res, 200, { products });
-        return;
+      const user = await getOptionalUser(req);
+      const products = await getCachedProducts();
+      let visibleProducts = products;
+
+      if (user?.role === 'ADMIN') {
+        visibleProducts = products;
+      } else if (user?.role === 'MERCHANT') {
+        visibleProducts = products.filter((product) =>
+          (product.status || 'pending') === 'approved' || product.merchantId === user.id
+        );
+      } else {
+        visibleProducts = products.filter((product) => (product.status || 'pending') === 'approved');
       }
+
+      sendJson(res, 200, { products: visibleProducts });
+      return;
+    }
 
     if (pathname === '/api/uploads/image' && req.method === 'POST') {
       const body = await readBody(req);
@@ -3351,24 +3364,25 @@ const server = http.createServer(async (req, res) => {
 
       const body = await readBody(req);
       const db = await readDb();
-        const product = normalizeProductMedia({
-          id: `p${Date.now()}`,
-          name: body.name || 'Unnamed Product',
-          price: body.price || 0,
-          category: body.category || '1',
-          image: body.image || '/catalog/electronics.svg',
+      const canControlApproval = user.role === 'ADMIN';
+      const product = normalizeProductMedia({
+        id: `p${Date.now()}`,
+        name: body.name || 'Unnamed Product',
+        price: body.price || 0,
+        category: body.category || '1',
+        image: body.image || '/catalog/electronics.svg',
         images: body.images || [],
         stock: body.stock || 0,
         rating: body.rating || 0,
         description: body.description || '',
         specifications: body.specifications || '',
-        merchantId: body.merchantId || user.id,
-        merchantName: body.merchantName || user.name,
-          status: body.status || 'pending',
-          featured: body.featured ?? true,
-          reviewsCount: body.reviewsCount || 0,
-          variants: body.variants
-        });
+        merchantId: canControlApproval ? body.merchantId || user.id : user.id,
+        merchantName: canControlApproval ? body.merchantName || user.name : user.name,
+        status: canControlApproval ? body.status || 'pending' : 'pending',
+        featured: canControlApproval ? body.featured ?? true : false,
+        reviewsCount: body.reviewsCount || 0,
+        variants: body.variants
+      });
 
       db.products.unshift(product);
       invalidateProductsCache();
@@ -3412,7 +3426,20 @@ const server = http.createServer(async (req, res) => {
       }
 
       const previousMediaUrls = getProductMediaUrls(existing);
-      db.products[index] = normalizeProductMedia({ ...existing, ...body });
+      const canControlApproval = user.role === 'ADMIN';
+      const safeUpdates = canControlApproval
+        ? body
+        : {
+            ...body,
+            merchantId: existing.merchantId,
+            merchantName: existing.merchantName,
+            status: existing.status,
+            featured: existing.featured,
+            rating: existing.rating,
+            reviewsCount: existing.reviewsCount
+          };
+
+      db.products[index] = normalizeProductMedia({ ...existing, ...safeUpdates });
       invalidateProductsCache();
       const nextMediaUrls = getProductMediaUrls(db.products[index]);
       const removedMediaUrls = collectRemovedAssetUrls(previousMediaUrls, nextMediaUrls);

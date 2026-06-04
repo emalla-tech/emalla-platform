@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Plus, Search, Filter, Edit3, Trash2, ExternalLink, 
-  AlertTriangle, CheckCircle, Package, X, Sparkles, Loader2, Star
+  AlertTriangle, CheckCircle, Package, X, Sparkles, Loader2
 } from 'lucide-react';
 import { MerchantService } from '../../services/merchantService';
 import { geminiService } from '../../services/geminiService';
@@ -267,16 +267,6 @@ const Inventory: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleStatusChange = async (productId: string, status: string) => {
-    await MerchantService.updateProduct(productId, { status });
-    loadProducts();
-  };
-
-  const handleFeaturedToggle = async (product: Product) => {
-    await MerchantService.updateProduct(product.id, { featured: !product.featured });
-    loadProducts();
-  };
-
   const resetForm = () => {
     setEditingProductId(null);
       setNewProduct({
@@ -289,7 +279,7 @@ const Inventory: React.FC = () => {
         image: '',
         images: [],
       status: 'pending',
-      featured: true
+      featured: false
     });
     setStructuredSpecifications(createEmptySpecifications());
   };
@@ -388,7 +378,6 @@ const Inventory: React.FC = () => {
                         <div className="flex items-center space-x-2">
                            <p className="font-bold text-gray-900 group-hover:text-orange-600 transition-colors">{p.name}</p>
                            {justAddedId === p.id && <span className="bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase">New</span>}
-                           {p.featured && <span className="bg-yellow-100 text-yellow-700 text-[8px] font-black px-1.5 py-0.5 rounded uppercase">Featured</span>}
                         </div>
                         <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">SKU: EM-{p.id.toUpperCase()}</p>
                       </div>
@@ -411,20 +400,10 @@ const Inventory: React.FC = () => {
                       }`}>
                         <CheckCircle size={10} className="mr-1.5" /> {p.status || 'pending'}
                       </span>
-                      <select
-                        value={p.status || 'pending'}
-                        onChange={(e) => handleStatusChange(p.id, e.target.value)}
-                        className="bg-gray-50 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest outline-none"
-                      >
-                        <option value="draft">Draft</option>
-                        <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
-                      </select>
                     </div>
                   </td>
                   <td className="px-8 py-6 text-right">
                     <div className="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-all">
-                      <button onClick={() => handleFeaturedToggle(p)} className={`p-2 rounded-xl transition-all ${p.featured ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500 hover:bg-yellow-100 hover:text-yellow-700'}`}><Star size={16} /></button>
                       <button onClick={() => handleEditProduct(p)} className="p-2 bg-gray-100 text-gray-500 rounded-xl hover:bg-black hover:text-white transition-all"><Edit3 size={16} /></button>
                       <Link to={`/product/${p.id}`} className="p-2 bg-gray-100 text-gray-500 rounded-xl hover:bg-black hover:text-white transition-all"><ExternalLink size={16} /></Link>
                       <button onClick={() => handleDeleteProduct(p.id)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={16} /></button>
@@ -609,32 +588,11 @@ const Inventory: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Approval Status</label>
-                  <select
-                    value={newProduct.status || 'pending'}
-                    onChange={e => setNewProduct({ ...newProduct, status: e.target.value })}
-                    className="w-full px-6 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 rounded-2xl outline-none font-bold text-gray-900 appearance-none"
-                  >
-                    <option value="draft">Draft</option>
-                    <option value="pending">Pending Review</option>
-                    <option value="approved">Approved</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Home Placement</label>
-                  <button
-                    type="button"
-                    onClick={() => setNewProduct({ ...newProduct, featured: !(newProduct.featured ?? false) })}
-                    className={`w-full px-6 py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center ${
-                      newProduct.featured ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-50 text-gray-500'
-                    }`}
-                  >
-                    <Star size={16} className="mr-2" />
-                    {newProduct.featured ? 'Featured on Home' : 'Standard Listing'}
-                  </button>
-                </div>
+              <div className="rounded-3xl border border-orange-100 bg-orange-50 px-5 py-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-orange-500">Review Workflow</p>
+                <p className="mt-2 text-sm font-bold text-gray-900">
+                  Seller listings are submitted for admin review first. Approval status and featured placement are managed by the admin team.
+                </p>
               </div>
 
               <div className="space-y-2 relative">

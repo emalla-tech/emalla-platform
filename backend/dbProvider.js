@@ -210,6 +210,7 @@ const getJsonAdapter = () => {
       snapshot.transactions = snapshot.transactions || [];
       snapshot.notifications = snapshot.notifications || [];
       snapshot.auditLogs = snapshot.auditLogs || [];
+      snapshot.emailLogs = snapshot.emailLogs || [];
 
       const upsertById = (collection, entry) => {
         const index = collection.findIndex((item) => item.id === entry.id);
@@ -225,6 +226,7 @@ const getJsonAdapter = () => {
       (bundle.transactions || []).forEach((entry) => upsertById(snapshot.transactions, entry));
       (bundle.notifications || []).forEach((entry) => upsertById(snapshot.notifications, entry));
       (bundle.auditLogs || []).forEach((entry) => upsertById(snapshot.auditLogs, entry));
+      (bundle.emailLogs || []).forEach((entry) => upsertById(snapshot.emailLogs, entry));
 
       await jsonDb.writeDb(snapshot);
     },

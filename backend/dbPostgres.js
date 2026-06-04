@@ -257,6 +257,23 @@ const upsertAuditLogRecord = async (client, entry) =>
     metadata: entry.metadata || entry
   });
 
+const upsertEmailLogRecord = async (client, entry) =>
+  upsert(client, 'email_logs', {
+    id: entry.id,
+    to_addresses: entry.toAddresses || (Array.isArray(entry.to) ? entry.to : [entry.to].filter(Boolean)),
+    subject: entry.subject || 'Email',
+    template: entry.template || null,
+    body: entry.body || null,
+    html: entry.html || null,
+    sent_at: entry.sentAt || entry.createdAt || new Date().toISOString(),
+    status: entry.status || 'queued',
+    provider: entry.provider || 'log',
+    provider_message_id: entry.providerMessageId || null,
+    error: entry.error || null,
+    note: entry.note || null,
+    metadata: entry.metadata || entry
+  });
+
 const readRows = async (table, orderBy = 'created_at DESC') => {
   try {
     const columns = READ_COLUMNS[table] || '*';
@@ -1754,6 +1771,10 @@ export const createPostgresAdapter = () => {
 
         for (const entry of bundle.auditLogs || []) {
           await upsertAuditLogRecord(client, entry);
+        }
+
+        for (const entry of bundle.emailLogs || []) {
+          await upsertEmailLogRecord(client, entry);
         }
       });
     }

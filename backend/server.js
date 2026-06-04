@@ -583,6 +583,61 @@ const sendPlatformEmailSafely = async (email) => {
   }
 };
 
+const formatOrderStatusLabel = (status = '') => String(status || '').replaceAll('_', ' ');
+
+const buildOrderStatusEmailMessage = ({ order, status, actorName }) => {
+  const statusLabel = formatOrderStatusLabel(status);
+  const trackingUrl = buildCustomerTrackingUrl(order);
+
+  return {
+    subject: `Order Update - ${order.orderNumber || 'E-Malla'}`,
+    template: 'order_status_update',
+    body: `Hello ${order.customerName || 'there'}, your order ${order.orderNumber || ''} is now ${statusLabel}. Track it here: ${trackingUrl}`,
+    html: createEmailHtml({
+      title: 'Order status updated',
+      intro: `Muraho ${order.customerName || 'there'}. Order yawe ${order.orderNumber || ''} igeze kuri status ya ${statusLabel}.`,
+      sections: [
+        { label: 'Order', value: order.orderNumber || 'Pending' },
+        { label: 'New Status', value: statusLabel },
+        { label: 'Merchant', value: order.merchantName || 'E-Malla Rwanda' },
+        { label: 'Updated By', value: actorName || 'E-Malla Team' },
+        { label: 'Tracking', value: trackingUrl }
+      ],
+      closing: 'Komeza gukurikirana order yawe kuri tracking page kugira ngo ubone updates zose za nyuma.',
+      primaryAction: { label: 'Track Order', url: trackingUrl },
+      support: {
+        email: 'support@emallarwanda.com',
+        url: buildPublicHashRoute('/contact')
+      }
+    })
+  };
+};
+
+const buildRiderAssignmentEmailMessage = ({ order, riderName }) => {
+  const trackingUrl = buildCustomerTrackingUrl(order);
+  return {
+    subject: `Rider Assigned - ${order.orderNumber || 'E-Malla'}`,
+    template: 'rider_assignment_update',
+    body: `Hello ${order.customerName || 'there'}, rider ${riderName || 'E-Malla Rider'} has been assigned to order ${order.orderNumber || ''}. Track it here: ${trackingUrl}`,
+    html: createEmailHtml({
+      title: 'Rider assigned to your order',
+      intro: `Muraho ${order.customerName || 'there'}. Rider ${riderName || 'E-Malla Rider'} yamaze guhabwa order yawe kugira ngo ayitware.`,
+      sections: [
+        { label: 'Order', value: order.orderNumber || 'Pending' },
+        { label: 'Rider', value: riderName || 'E-Malla Rider' },
+        { label: 'Delivery Address', value: order.address || 'To be confirmed' },
+        { label: 'Tracking', value: trackingUrl }
+      ],
+      closing: 'Ushobora gukurikirana order yawe uko rider ayegera kugeza igeze aho yagenewe.',
+      primaryAction: { label: 'Track Delivery', url: trackingUrl },
+      support: {
+        email: 'support@emallarwanda.com',
+        url: buildPublicHashRoute('/contact')
+      }
+    })
+  };
+};
+
 const createAuditLog = (db, entry) => {
   db.auditLogs = db.auditLogs || [];
   const record = {
@@ -3912,7 +3967,8 @@ const server = http.createServer(async (req, res) => {
       await persistCheckoutBundleRecord({
         orders: [order],
         notifications: db.notifications.slice(0, 2),
-        auditLogs: db.auditLogs.slice(0, 1)
+        auditLogs: db.auditLogs.slice(0, 1),
+        emailLogs: db.emailLogs.slice(0, 2)
       });
       sendJson(res, 201, { order });
       return;
@@ -3976,6 +4032,15 @@ const server = http.createServer(async (req, res) => {
           nextStatus: body.status,
           merchantId: current.merchantId
         }
+      });
+
+      await sendPlatformEmail(db, {
+        to: current.customerEmail,
+        ...buildOrderStatusEmailMessage({
+          order: db.orders[index],
+          status: body.status,
+          actorName: user.name || user.email
+        })
       });
 
       await writeDb(db);
@@ -4043,6 +4108,13 @@ const server = http.createServer(async (req, res) => {
           customerName: assignedOrder.customerName,
           address: assignedOrder.address,
           phone: assignedOrder.phone
+        })
+      });
+      await sendPlatformEmail(db, {
+        to: assignedOrder.customerEmail,
+        ...buildRiderAssignmentEmailMessage({
+          order: assignedOrder,
+          riderName: assignedOrder.riderName || riderRecipient?.name
         })
       });
       createAuditLog(db, {
@@ -4244,7 +4316,8 @@ const server = http.createServer(async (req, res) => {
         payments: [payment],
         transactions: isCashOnDelivery ? [] : db.transactions.slice(0, 1),
         notifications: isCashOnDelivery ? db.notifications.slice(0, 2) : [],
-        auditLogs: db.auditLogs.slice(0, 1)
+        auditLogs: db.auditLogs.slice(0, 1),
+        emailLogs: db.emailLogs.slice(0, 2)
       });
       sendJson(res, 200, {
         status: 'success',
@@ -4380,7 +4453,8 @@ const server = http.createServer(async (req, res) => {
         payments: [payment],
         transactions: db.transactions.slice(0, 1),
         notifications: orderIndex !== -1 ? db.notifications.slice(0, 2) : [],
-        auditLogs: orderIndex !== -1 ? db.auditLogs.slice(0, 1) : []
+        auditLogs: orderIndex !== -1 ? db.auditLogs.slice(0, 1) : [],
+        emailLogs: db.emailLogs.slice(0, 2)
       });
       sendJson(res, 200, {
         status: 'SUCCESS',

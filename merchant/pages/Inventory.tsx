@@ -79,6 +79,25 @@ const buildSpecifications = (specifications: StructuredSpecifications) => {
   return [...lines, ...additionalLines].join('\n');
 };
 
+const mergeProductIntoInventory = (items: Product[], product: Product) => {
+  const existingIndex = items.findIndex((entry) => entry.id === product.id);
+  if (existingIndex === -1) {
+    return [product, ...items];
+  }
+
+  const nextItems = [...items];
+  nextItems[existingIndex] = product;
+  return nextItems;
+};
+
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return 'Unable to save product changes right now. Please try again.';
+};
+
 const Inventory: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -89,7 +108,7 @@ const Inventory: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' | 'info' } | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
   const [structuredSpecifications, setStructuredSpecifications] = useState<StructuredSpecifications>(createEmptySpecifications());
@@ -104,22 +123,33 @@ const Inventory: React.FC = () => {
     image: '',
     images: [],
     status: 'pending',
-    featured: true
+    featured: false
   });
 
   useEffect(() => {
     loadProducts();
   }, []);
 
-  const loadProducts = async () => {
-    const data = await MerchantService.getProducts();
-    setProducts(data);
+  const showToast = (message: string, tone: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, tone });
+    window.setTimeout(() => setToast(null), 3500);
+  };
+
+  const loadProducts = async (options?: { silent?: boolean }) => {
+    try {
+      const data = await MerchantService.getProducts();
+      setProducts(data);
+    } catch (error) {
+      console.error(error);
+      if (!options?.silent) {
+        showToast(getErrorMessage(error), 'error');
+      }
+    }
   };
 
   const handleAiGenerate = async () => {
     if (!newProduct.name) {
-      setToast('Please enter a product name first to help the AI.');
-      setTimeout(() => setToast(null), 3000);
+      showToast('Please enter a product name first to help the AI.', 'info');
       return;
     }
     setIsGenerating(true);
@@ -150,11 +180,9 @@ const Inventory: React.FC = () => {
       });
 
       const usedFallback = uploadedImages.some((entry) => entry.provider !== 'cloudinary');
-      setToast(usedFallback ? 'Images uploaded locally. Add storage credentials for cloud delivery.' : 'Images uploaded successfully.');
-      setTimeout(() => setToast(null), 3000);
+      showToast(usedFallback ? 'Images uploaded locally. Add storage credentials for cloud delivery.' : 'Images uploaded successfully.', usedFallback ? 'info' : 'success');
     } catch (error) {
-      setToast(error instanceof Error ? error.message : 'Image upload failed.');
-      setTimeout(() => setToast(null), 3000);
+      showToast(error instanceof Error ? error.message : 'Image upload failed.', 'error');
     } finally {
       setIsUploadingImages(false);
     }
@@ -206,24 +234,25 @@ const Inventory: React.FC = () => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      const description = String(newProduct.description || '').trim();
+      const specifications = buildSpecifications(structuredSpecifications);
       const productPayload = {
         ...newProduct,
-        specifications: buildSpecifications(structuredSpecifications)
+        description,
+        specifications
       };
 
       const savedProduct = editingProductId
         ? await MerchantService.updateProduct(editingProductId, productPayload)
         : await MerchantService.saveProduct(productPayload);
-      
-      const updatedProducts = await MerchantService.getProducts();
-      setProducts(updatedProducts);
+
+      setProducts((current) => mergeProductIntoInventory(current, savedProduct));
       
       if (savedProduct?.id) {
         setJustAddedId(savedProduct.id);
       }
       setTimeout(() => setJustAddedId(null), 3000);
-      setToast(editingProductId ? 'Product updated successfully.' : 'Product added successfully.');
-      setTimeout(() => setToast(null), 3000);
+      showToast(editingProductId ? 'Product updated successfully.' : 'Product added successfully.', 'success');
 
       setIsModalOpen(false);
       setEditingProductId(null);
@@ -242,6 +271,7 @@ const Inventory: React.FC = () => {
       setStructuredSpecifications(createEmptySpecifications());
     } catch (err) {
       console.error(err);
+      showToast(getErrorMessage(err), 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -299,8 +329,16 @@ const Inventory: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {toast && (
-        <div className="fixed top-24 right-6 z-[120] bg-emerald-500 text-white px-5 py-4 rounded-2xl shadow-2xl font-black text-sm">
-          {toast}
+        <div
+          className={`fixed top-24 right-6 z-[120] px-5 py-4 rounded-2xl shadow-2xl font-black text-sm text-white ${
+            toast.tone === 'error'
+              ? 'bg-red-500'
+              : toast.tone === 'success'
+                ? 'bg-emerald-500'
+                : 'bg-slate-900'
+          }`}
+        >
+          {toast.message}
         </div>
       )}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

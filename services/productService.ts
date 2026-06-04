@@ -55,7 +55,7 @@ export const ProductService = {
     };
   },
 
-  getProducts: async (options?: { force?: boolean }): Promise<Product[]> => {
+  getProducts: async (options?: { force?: boolean; fallbackToCatalog?: boolean }): Promise<Product[]> => {
     if (!options?.force && cachedProducts) {
       return cloneProducts(cachedProducts);
     }
@@ -68,7 +68,10 @@ export const ProductService = {
       try {
         const response = await request();
         cachedProducts = response.products;
-      } catch {
+      } catch (error) {
+        if (options?.fallbackToCatalog === false) {
+          throw error;
+        }
         cachedProducts = cloneProducts(CATALOG_PRODUCTS);
       } finally {
         inflightProductsRequest = null;

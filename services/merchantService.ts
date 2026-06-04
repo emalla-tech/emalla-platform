@@ -104,7 +104,7 @@ export const MerchantService = {
   getProducts: async (): Promise<Product[]> => {
     const merchant = getCurrentMerchantIdentity();
     if (!merchant) return [];
-    const products = await ProductService.getProducts();
+    const products = await ProductService.getProducts({ fallbackToCatalog: false });
     return products.filter((product) => product.merchantId === merchant.id);
   },
 

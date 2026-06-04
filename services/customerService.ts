@@ -23,6 +23,7 @@ export const CustomerService = {
     const getEta = () => {
       if (!mostRecent) return 'No active delivery';
       if ([OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(mostRecent.status)) return 'Delivered';
+      if (mostRecent.status === OrderStatus.OUT_FOR_DELIVERY) return 'Arriving soon';
       if (mostRecent.status === OrderStatus.ON_THE_WAY) return 'En route';
       if (mostRecent.status === OrderStatus.PREPARING) return 'Preparing order';
       if (mostRecent.status === OrderStatus.PENDING_PAYMENT) return 'Waiting for payment';

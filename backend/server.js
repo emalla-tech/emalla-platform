@@ -502,7 +502,7 @@ const allowedTransitions = {
   ready_for_pickup: ['assigned', 'cancelled'],
   assigned: ['picked_up', 'cancelled'],
   picked_up: ['on_the_way'],
-  on_the_way: ['delivered'],
+  on_the_way: ['out_for_delivery', 'delivered'],
   delivered: ['completed'],
   completed: [],
   cancelled: ['refunded'],
@@ -3827,7 +3827,24 @@ const server = http.createServer(async (req, res) => {
       const deliveryFee = body.deliveryFee || 0;
       const totalAmount = subtotal + deliveryFee;
       const firstProduct = db.products.find((product) => product.id === items[0]?.productId);
-      const merchantId = body.merchantId || firstProduct?.merchantId;
+      const matchedProducts = items
+        .map((item) => db.products.find((product) => product.id === item.productId))
+        .filter(Boolean);
+      const merchantIdsInCart = Array.from(
+        new Set(
+          [
+            body.merchantId,
+            ...matchedProducts.map((product) => product?.merchantId)
+          ].filter(Boolean)
+        )
+      );
+
+      if (merchantIdsInCart.length > 1) {
+        sendJson(res, 400, { error: 'Please place separate orders for products from different sellers.' });
+        return;
+      }
+
+      const merchantId = body.merchantId || merchantIdsInCart[0] || firstProduct?.merchantId;
       const merchantUser = merchantId
         ? db.users.find((entry) => entry.id === merchantId && entry.role === 'MERCHANT')
         : null;
@@ -3986,10 +4003,23 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      const assignedRiderId = body.riderId || user.id;
+      const riderRecord = (db.users || []).find((entry) => entry.id === assignedRiderId && entry.role === 'DELIVERY');
+
+      if (!riderRecord) {
+        sendJson(res, 404, { error: 'Rider not found' });
+        return;
+      }
+
+      if (riderRecord.status !== 'active') {
+        sendJson(res, 400, { error: 'Only riders who are online can accept deliveries.' });
+        return;
+      }
+
       db.orders[index] = {
         ...current,
-        riderId: body.riderId || user.id,
-        riderName: body.riderName || user.name,
+        riderId: riderRecord.id,
+        riderName: riderRecord.name || body.riderName || user.name,
         status: 'assigned',
         updatedAt: new Date().toISOString()
       };

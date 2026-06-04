@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Order, OrderStatus, PaymentMethod } from '../../types';
 import { OrderService } from '../../services/orderService';
+import { RiderService } from '../../services/riderService';
 
 interface TrackingStep {
   key: OrderStatus;
@@ -85,6 +86,13 @@ const buildTrackingSteps = (order: Order): TrackingStep[] => {
   }));
 };
 
+const RIDER_NEXT_ACTIONS: Partial<Record<OrderStatus, { next: OrderStatus; label: string }>> = {
+  [OrderStatus.ASSIGNED]: { next: OrderStatus.PICKED_UP, label: 'Mark Picked Up' },
+  [OrderStatus.PICKED_UP]: { next: OrderStatus.ON_THE_WAY, label: 'Start Transit' },
+  [OrderStatus.ON_THE_WAY]: { next: OrderStatus.OUT_FOR_DELIVERY, label: 'Out for Delivery' },
+  [OrderStatus.OUT_FOR_DELIVERY]: { next: OrderStatus.DELIVERED, label: 'Confirm Delivery' }
+};
+
 interface OrderTrackingProps {
   guestAccess?: {
     email?: string;
@@ -98,41 +106,63 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   const isSellerView = location.pathname.includes('/seller');
   const isRiderView = location.pathname.includes('/rider');
   const isGuestView = location.pathname.includes('/track-order');
   const backPath = isSellerView ? '/seller/orders' : isRiderView ? '/rider/history' : isGuestView ? '/shop' : '/buyer/orders';
 
+  const loadOrder = async () => {
+    if (!id) {
+      setError('Order reference missing.');
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const nextOrder = await OrderService.getOrderById(id, guestAccess);
+      if (!nextOrder) {
+        throw new Error('Order not found.');
+      }
+      setOrder(nextOrder);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Unable to load tracking details.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadOrder = async () => {
-      if (!id) {
-        setError('Order reference missing.');
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-      try {
-        const nextOrder = await OrderService.getOrderById(id, guestAccess);
-        if (!nextOrder) {
-          throw new Error('Order not found.');
-        }
-        setOrder(nextOrder);
-      } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : 'Unable to load tracking details.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadOrder();
-  }, [id]);
+  }, [id, guestAccess?.email, guestAccess?.phone]);
 
   const trackingData = useMemo(() => (order ? buildTrackingSteps(order) : []), [order]);
   const currentStep = useMemo(() => trackingData.find((step) => step.current) || trackingData.find((step) => step.completed), [trackingData]);
   const totalItems = useMemo(() => (order?.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0), [order]);
+  const nextRiderAction = order && isRiderView ? RIDER_NEXT_ACTIONS[order.status] : null;
+
+  const handleRiderStatusUpdate = async () => {
+    if (!order || !nextRiderAction) return;
+
+    setIsUpdatingStatus(true);
+    setStatusMessage(null);
+    setStatusError(null);
+
+    try {
+      await RiderService.updateDeliveryStatus(order.id, nextRiderAction.next);
+      setStatusMessage(`Delivery updated to ${String(nextRiderAction.next).replaceAll('_', ' ')}.`);
+      await loadOrder();
+    } catch (updateError) {
+      setStatusError(updateError instanceof Error ? updateError.message : 'Unable to update this delivery right now.');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -328,6 +358,31 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
               Contact Support
             </Link>
           </div>
+
+          {isRiderView ? (
+            <div className="bg-white rounded-[40px] p-8 border border-gray-100 shadow-sm">
+              <h4 className="font-bold text-gray-900 mb-2">Rider Delivery Actions</h4>
+              <p className="text-xs text-gray-500 mb-5">
+                Update the live delivery stage so the customer, seller, and admin all see the same progress instantly.
+              </p>
+              {statusMessage ? <p className="mb-4 text-sm font-bold text-emerald-600">{statusMessage}</p> : null}
+              {statusError ? <p className="mb-4 text-sm font-bold text-red-600">{statusError}</p> : null}
+              {nextRiderAction ? (
+                <button
+                  type="button"
+                  onClick={handleRiderStatusUpdate}
+                  disabled={isUpdatingStatus}
+                  className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black text-sm hover:bg-emerald-600 transition-all disabled:opacity-60"
+                >
+                  {isUpdatingStatus ? 'Updating Delivery...' : nextRiderAction.label}
+                </button>
+              ) : (
+                <div className="rounded-2xl bg-gray-50 px-4 py-4 text-sm font-bold text-gray-500 border border-gray-100">
+                  This delivery is already at its final rider stage.
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

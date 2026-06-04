@@ -67,6 +67,8 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
   const deliveryFee = subtotal > 50000 ? 0 : 3500;
   const cartTotal = subtotal;
   const finalTotal = cartTotal + deliveryFee;
+  const merchantIds = Array.from(new Set(cartItems.map((item) => item.product.merchantId).filter(Boolean)));
+  const hasMixedMerchantCart = merchantIds.length > 1;
 
   const handlePlaceOrder = async () => {
     if (cartItems.length === 0) {
@@ -76,6 +78,11 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
 
     if (!formData.fullName.trim() || !formData.phone.trim() || !formData.email.trim() || !formData.street.trim()) {
       setErrorMessage('Please complete your name, email, phone, and address before continuing.');
+      return;
+    }
+
+    if (hasMixedMerchantCart) {
+      setErrorMessage('Your cart contains products from different sellers. Please complete checkout one seller at a time.');
       return;
     }
 
@@ -167,6 +174,14 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
               {step === 1 ? (
                 <div className="p-6 md:p-12 animate-in fade-in slide-in-from-left duration-500">
                   <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-8">Delivery Information</h2>
+                  {hasMixedMerchantCart ? (
+                    <div className="mb-6 rounded-3xl border border-red-100 bg-red-50 px-5 py-4">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-red-500">Separate Seller Checkout</p>
+                      <p className="mt-2 text-sm font-bold text-gray-900">
+                        This cart combines products from different sellers. Please keep one seller per checkout so fulfillment and rider assignment stay accurate.
+                      </p>
+                    </div>
+                  ) : null}
                   <div className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div className="space-y-2">

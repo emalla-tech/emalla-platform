@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'e-malla-pwa-v1';
+const CACHE_VERSION = 'e-malla-pwa-v2';
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const OFFLINE_URL = '/offline.html';

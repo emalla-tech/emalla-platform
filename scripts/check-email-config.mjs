@@ -45,7 +45,7 @@ const samplePayloads = {
     name: 'Demo Buyer',
     email: 'buyer@example.com',
     role: 'CUSTOMER',
-    resetUrl: 'https://example.com/#/reset-password?token=demo-token'
+    resetUrl: 'https://example.com/reset-password?token=demo-token'
   }
 };
 

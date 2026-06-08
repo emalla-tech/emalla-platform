@@ -1,6 +1,6 @@
 
 import React, { Suspense, lazy, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate, Outlet, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { UserRole } from './types';
 import { 
   LayoutDashboard, 
@@ -100,6 +100,18 @@ const ScrollToTop = () => {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [pathname]);
+
+  return null;
+};
+
+const LegacyHashRedirect = () => {
+  const navigate = useNavigate();
+  const { hash } = useLocation();
+
+  useEffect(() => {
+    if (!hash.startsWith('#/')) return;
+    navigate(hash.slice(1), { replace: true });
+  }, [hash, navigate]);
 
   return null;
 };
@@ -283,6 +295,7 @@ const App: React.FC = () => {
   return (
     <LanguageProvider>
       <Router>
+        <LegacyHashRedirect />
         <ScrollToTop />
         <SeoMetaUpdater />
         <BackToTop />

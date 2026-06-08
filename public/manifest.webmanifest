@@ -31,17 +31,17 @@
     {
       "name": "Shop",
       "short_name": "Shop",
-      "url": "/#/shop"
+      "url": "/shop"
     },
     {
       "name": "Track Order",
       "short_name": "Track",
-      "url": "/#/buyer/orders"
+      "url": "/buyer/orders"
     },
     {
       "name": "Become a Seller",
       "short_name": "Sell",
-      "url": "/#/become-seller"
+      "url": "/become-seller"
     }
   ]
 }

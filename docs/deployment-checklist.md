@@ -114,7 +114,7 @@ npm run db:postgres:import
 
 ### Admin flow
 
-- Login through `/#/admin`
+- Login through `/admin`
 - Review seller applications
 - Review rider applications
 - Review products

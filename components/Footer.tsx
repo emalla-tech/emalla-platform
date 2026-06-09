@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin, ArrowRight } from 'lucide-react';
+import { Facebook, Twitter, Instagram, Linkedin, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 
 const Footer: React.FC = () => {
@@ -130,20 +130,9 @@ const Footer: React.FC = () => {
           </div>
         </div>
 
-        <div className="border-t border-white/10 pt-12 flex flex-col md:flex-row justify-between items-center gap-8">
-          <div className="flex flex-col md:flex-row items-center gap-8 text-gray-500 text-xs font-bold uppercase tracking-widest">
-            <div className="flex items-center space-x-2">
-              <MapPin size={14} className="text-orange-500" />
-              <span>Kigali, Rwanda</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Phone size={14} className="text-orange-500" />
-              <span>+250 784352174</span>
-            </div>
-          </div>
-          
-          <p className="text-gray-600 text-[10px] font-black uppercase tracking-[3px]">
-            &copy; {new Date().getFullYear()} E-Malla Rwanda. {t.footer.rights}
+        <div className="border-t border-white/10 pt-12 flex justify-center">
+          <p className="text-gray-500 text-[10px] font-black uppercase tracking-[3px] text-center">
+            &copy; {new Date().getFullYear()} E-Malla Rwanda Powered By E-Malla Technologies
           </p>
         </div>
       </div>

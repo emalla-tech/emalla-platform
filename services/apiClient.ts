@@ -220,6 +220,13 @@ export const apiClient = {
     });
   },
 
+  async confirmOrderReceived(orderId: string, options?: { email?: string; phone?: string }) {
+    return request(`/orders/${orderId}/confirm-received`, {
+      method: 'PUT',
+      body: JSON.stringify(options || {})
+    });
+  },
+
   async assignRider(orderId: string, riderId: string, riderName: string) {
     return request(`/orders/${orderId}/assign-rider`, {
       method: 'PUT',

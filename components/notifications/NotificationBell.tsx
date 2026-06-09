@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Bell, Check, X, Clock, Package, Zap, ShieldAlert, ChevronRight } from 'lucide-react';
 import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationType, UserRole } from '../../types';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface NotificationBellProps {
   userId: string;
@@ -12,6 +12,7 @@ interface NotificationBellProps {
 
 const NotificationBell: React.FC<NotificationBellProps> = ({ userId, role }) => {
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications(userId, role);
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -35,6 +36,18 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, role }) => 
   };
 
   const getRecent = notifications.slice(0, 5);
+  const notificationCenterPath = {
+    [UserRole.CUSTOMER]: '/buyer/notifications',
+    [UserRole.MERCHANT]: '/seller/notifications',
+    [UserRole.DELIVERY]: '/rider/notifications',
+    [UserRole.ADMIN]: '/admin/dashboard/notifications'
+  }[role];
+  const getOrderTrackingPath = (orderId: string) => {
+    if (role === UserRole.CUSTOMER) return `/buyer/orders/${orderId}/track`;
+    if (role === UserRole.MERCHANT) return `/seller/orders/${orderId}/track`;
+    if (role === UserRole.DELIVERY) return `/rider/orders/${orderId}/track`;
+    return '/admin/dashboard/orders';
+  };
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -68,7 +81,15 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, role }) => 
                 {getRecent.map((n) => (
                   <div 
                     key={n.id} 
-                    onClick={() => { markRead(n.id); if(!n.read) {} }}
+                    onClick={() => {
+                      if (!n.read) {
+                        void markRead(n.id);
+                      }
+                      if (n.metadata?.orderId) {
+                        setIsOpen(false);
+                        navigate(getOrderTrackingPath(String(n.metadata.orderId)));
+                      }
+                    }}
                     className={`p-5 flex gap-4 transition-colors cursor-pointer relative group ${n.read ? 'bg-white' : 'bg-orange-50/30'}`}
                   >
                     {!n.read && <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500 rounded-r-full" />}
@@ -95,7 +116,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, role }) => 
           </div>
 
           <Link 
-            to={`/${role.toLowerCase()}/notifications`}
+            to={notificationCenterPath}
             onClick={() => setIsOpen(false)}
             className="block p-4 bg-gray-50 hover:bg-gray-100 text-center text-[10px] font-black text-gray-500 uppercase tracking-[3px] transition-colors"
           >

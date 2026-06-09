@@ -435,8 +435,15 @@ const App: React.FC = () => {
               <RoleRoute allowedRoles={[UserRole.DELIVERY]}>
                 <div className="flex min-h-screen bg-gray-100 max-w-xl mx-auto border-x shadow-2xl">
                     <div className="flex-grow p-4 pb-28 overflow-y-auto no-scrollbar">
-                    <div className="mb-6 p-4 bg-emerald-500 text-white rounded-2xl text-center md:hidden">
+                    <div className="mb-6 p-4 bg-emerald-500 text-white rounded-2xl flex items-center justify-between gap-4 shadow-lg shadow-emerald-100">
                        <p className="text-xs font-black uppercase tracking-widest">Rider Mobile Hub</p>
+                       <Link
+                         to="/rider/notifications"
+                         className="inline-flex items-center gap-2 rounded-xl bg-white/15 px-3 py-2 text-[10px] font-black uppercase tracking-widest transition-colors hover:bg-white/25"
+                       >
+                         <Bell size={16} />
+                         Alerts
+                       </Link>
                     </div>
                     <Routes>
                       <Route index element={withSuspense(<RiderDashboard />)} />
@@ -454,7 +461,7 @@ const App: React.FC = () => {
                         { to: '/rider', label: 'Dashboard', icon: <LayoutDashboard /> },
                         { to: '/rider/available', label: 'Deliveries', icon: <Package /> },
                         { to: '/rider/earnings', label: 'Earnings', icon: <Wallet /> },
-                        { to: '/rider/notifications', label: 'Account', icon: <User /> }
+                        { to: '/rider/notifications', label: 'Alerts', icon: <Bell /> }
                       ]}
                     />
                   </div>

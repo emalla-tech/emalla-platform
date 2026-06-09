@@ -8,9 +8,13 @@ export const useNotifications = (userId: string, role?: UserRole) => {
   const [unreadCount, setUnreadCount] = useState(0);
 
   const load = useCallback(async () => {
-    const data = await NotificationService.getUserNotifications(userId, role);
-    setNotifications(data);
-    setUnreadCount(await NotificationService.getUnreadCount(userId, role));
+    try {
+      const data = await NotificationService.getUserNotifications(userId, role);
+      setNotifications(data);
+      setUnreadCount(data.filter((notification) => !notification.read).length);
+    } catch {
+      // Keep the last successful notification state during temporary network interruptions.
+    }
   }, [userId, role]);
 
   useEffect(() => {
@@ -20,9 +24,27 @@ export const useNotifications = (userId: string, role?: UserRole) => {
     const handleUpdate = () => {
       void load();
     };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void load();
+      }
+    };
+    const refreshInterval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void load();
+      }
+    }, 15000);
+
     window.addEventListener('emalla_notifications_updated', handleUpdate);
+    window.addEventListener('focus', handleUpdate);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    return () => window.removeEventListener('emalla_notifications_updated', handleUpdate);
+    return () => {
+      window.clearInterval(refreshInterval);
+      window.removeEventListener('emalla_notifications_updated', handleUpdate);
+      window.removeEventListener('focus', handleUpdate);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [load]);
 
   const markRead = (id: string) => NotificationService.markAsRead(id);

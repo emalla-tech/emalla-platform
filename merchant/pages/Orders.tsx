@@ -15,14 +15,24 @@ const MerchantOrders: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [activeTab, setActiveTab] = useState<OrderStatus | 'all'>('all');
+  const [activeTab, setActiveTab] = useState<OrderStatus | 'all' | 'incoming' | 'transit'>('all');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'cod'>('all');
   const [stats, setStats] = useState({ new: 0, preparing: 0, completed: 0 });
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user?.id) {
-      loadOrders(user.id);
-    }
+    if (!user?.id) return;
+
+    void loadOrders(user.id);
+    const refreshInterval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void loadOrders(user.id);
+      }
+    }, 15000);
+
+    return () => window.clearInterval(refreshInterval);
   }, [user]);
 
   const loadOrders = async (merchantId: string) => {
@@ -31,14 +41,28 @@ const MerchantOrders: React.FC = () => {
     setStats({
       new: data.filter(o => [OrderStatus.PAID, OrderStatus.CONFIRMED].includes(o.status)).length,
       preparing: data.filter(o => [OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP].includes(o.status)).length,
-      completed: data.filter(o => [OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(o.status)).length
+      completed: data.filter(o => o.status === OrderStatus.COMPLETED).length
     });
   };
 
   const handleUpdateStatus = async (orderId: string, status: OrderStatus) => {
-    await OrderService.updateOrderStatus(orderId, status);
-    if (user?.id) {
-      loadOrders(user.id);
+    setUpdatingOrderId(orderId);
+    setActionMessage(null);
+    setActionError(null);
+    try {
+      await OrderService.updateOrderStatus(orderId, status);
+      setActionMessage(
+        status === OrderStatus.PREPARING
+          ? 'Preparation started. The customer has been notified.'
+          : 'Order marked ready for pickup. Riders can now accept the delivery.'
+      );
+      if (user?.id) {
+        await loadOrders(user.id);
+      }
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Unable to update this order right now.');
+    } finally {
+      setUpdatingOrderId(null);
     }
   };
 
@@ -192,7 +216,16 @@ const MerchantOrders: React.FC = () => {
   };
 
   const filteredOrders = orders.filter((order) => {
-    const matchesStatus = activeTab === 'all' || order.status === activeTab;
+    const matchesStatus =
+      activeTab === 'all' ||
+      (activeTab === 'incoming' && [OrderStatus.PAID, OrderStatus.CONFIRMED].includes(order.status)) ||
+      (activeTab === 'transit' && [
+        OrderStatus.ASSIGNED,
+        OrderStatus.PICKED_UP,
+        OrderStatus.ON_THE_WAY,
+        OrderStatus.OUT_FOR_DELIVERY
+      ].includes(order.status)) ||
+      order.status === activeTab;
     const matchesPayment = paymentFilter === 'all' || order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY;
     return matchesStatus && matchesPayment;
   });
@@ -250,13 +283,23 @@ const MerchantOrders: React.FC = () => {
       </div>
 
       {/* Tabs */}
+      {actionMessage ? (
+        <div className="rounded-2xl bg-emerald-50 border border-emerald-100 px-5 py-4 text-sm font-bold text-emerald-700">
+          {actionMessage}
+        </div>
+      ) : null}
+      {actionError ? (
+        <div className="rounded-2xl bg-red-50 border border-red-100 px-5 py-4 text-sm font-bold text-red-600">
+          {actionError}
+        </div>
+      ) : null}
       <div className="flex space-x-8 border-b border-gray-100 overflow-x-auto no-scrollbar pb-2">
         {[
           { id: 'all', label: 'All Activity' },
-          { id: OrderStatus.PAID, label: 'Incoming' },
+          { id: 'incoming', label: 'Incoming' },
           { id: OrderStatus.PREPARING, label: 'Preparing' },
           { id: OrderStatus.READY_FOR_PICKUP, label: 'Dispatch' },
-          { id: OrderStatus.ON_THE_WAY, label: 'Transit' }
+          { id: 'transit', label: 'Transit' }
         ].map((tab) => (
           <button 
             key={tab.id}
@@ -315,20 +358,22 @@ const MerchantOrders: React.FC = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4">
-                  {order.status === OrderStatus.PAID && (
+                  {[OrderStatus.PAID, OrderStatus.CONFIRMED].includes(order.status) && (
                     <button 
                       onClick={() => handleUpdateStatus(order.id, OrderStatus.PREPARING)}
+                      disabled={updatingOrderId === order.id}
                       className="px-8 py-3 bg-blue-600 text-white rounded-2xl font-black text-sm hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 flex items-center active:scale-95"
                     >
-                      <Play size={18} className="mr-2" /> Start Preparing
+                      <Play size={18} className="mr-2" /> {updatingOrderId === order.id ? 'Starting...' : 'Start Preparing'}
                     </button>
                   )}
                   {order.status === OrderStatus.PREPARING && (
                     <button 
                       onClick={() => handleUpdateStatus(order.id, OrderStatus.READY_FOR_PICKUP)}
+                      disabled={updatingOrderId === order.id}
                       className="px-8 py-3 bg-orange-500 text-white rounded-2xl font-black text-sm hover:bg-orange-600 transition-all shadow-xl shadow-orange-100 flex items-center active:scale-95"
                     >
-                      <Check size={18} className="mr-2" /> Ready for Pickup
+                      <Check size={18} className="mr-2" /> {updatingOrderId === order.id ? 'Completing...' : 'Complete Preparation'}
                     </button>
                   )}
                   {order.status === OrderStatus.READY_FOR_PICKUP && (

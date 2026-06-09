@@ -116,20 +116,20 @@ const getAllowedOrigins = () =>
       .filter(Boolean)
   );
 
-const buildPublicHashRoute = (path = '') => {
-  const base = String(getAppConfig().publicAppUrl || 'http://127.0.0.1:3000/#').replace(/\/$/, '');
+const buildPublicRoute = (path = '') => {
+  const base = String(getAppConfig().publicAppUrl || 'http://127.0.0.1:3000').replace(/\/#?$/, '');
   const normalizedPath = String(path || '').replace(/^#?\/?/, '');
   return normalizedPath ? `${base}/${normalizedPath}` : base;
 };
 
 const buildCustomerTrackingUrl = (order) => {
   if (!order?.id) {
-    return buildPublicHashRoute('/buyer/orders');
+    return buildPublicRoute('/buyer/orders');
   }
 
   const email = String(order.customerEmail || '').trim().toLowerCase();
   const query = email ? `?email=${encodeURIComponent(email)}` : '';
-  return buildPublicHashRoute(`/track-order/${order.id}${query}`);
+  return buildPublicRoute(`/track-order/${order.id}${query}`);
 };
 
 const buildCorsHeaders = (origin, allowedOrigins) => {
@@ -496,7 +496,7 @@ const generateOrderNumber = () => {
 
 const allowedTransitions = {
   pending_payment: ['paid', 'cancelled'],
-  paid: ['confirmed', 'cancelled'],
+  paid: ['confirmed', 'preparing', 'cancelled'],
   confirmed: ['preparing', 'cancelled'],
   preparing: ['ready_for_pickup'],
   ready_for_pickup: ['assigned', 'cancelled'],
@@ -511,6 +511,25 @@ const allowedTransitions = {
   pending: ['paid', 'cancelled'],
   processing: ['ready_for_pickup'],
   out_for_delivery: ['delivered']
+};
+
+const roleOrderTransitions = {
+  MERCHANT: {
+    paid: ['preparing'],
+    confirmed: ['preparing'],
+    preparing: ['ready_for_pickup']
+  },
+  DELIVERY: {
+    assigned: ['picked_up'],
+    picked_up: ['on_the_way'],
+    on_the_way: ['out_for_delivery'],
+    out_for_delivery: ['delivered']
+  }
+};
+
+const canRoleUpdateOrderStatus = (role, currentStatus, nextStatus) => {
+  if (role === 'ADMIN') return true;
+  return roleOrderTransitions[role]?.[currentStatus]?.includes(nextStatus) || false;
 };
 
 const createNotification = (db, notification) => {
@@ -585,6 +604,48 @@ const sendPlatformEmailSafely = async (email) => {
 
 const formatOrderStatusLabel = (status = '') => String(status || '').replaceAll('_', ' ');
 
+const getOrderStatusNotification = (order, status) => {
+  const messages = {
+    preparing: {
+      title: 'Seller Started Preparing Your Order',
+      message: `${order.merchantName} is now preparing ${order.orderNumber}.`
+    },
+    ready_for_pickup: {
+      title: 'Order Ready for Rider Pickup',
+      message: `${order.orderNumber} is packed and waiting for an available rider.`
+    },
+    picked_up: {
+      title: 'Order Picked Up',
+      message: `${order.riderName || 'Your rider'} has collected ${order.orderNumber} from the seller.`
+    },
+    on_the_way: {
+      title: 'Order Is On The Way',
+      message: `${order.riderName || 'Your rider'} is transporting ${order.orderNumber}.`
+    },
+    out_for_delivery: {
+      title: 'Rider Is Approaching',
+      message: `${order.orderNumber} is out for delivery. Please keep your phone reachable.`
+    },
+    delivered: {
+      title: 'Delivery Awaiting Your Confirmation',
+      message: `${order.orderNumber} has arrived. Please confirm that you received it well.`
+    },
+    completed: {
+      title: 'Order Completed',
+      message: `Thank you for confirming receipt of ${order.orderNumber}.`
+    },
+    cancelled: {
+      title: 'Order Cancelled',
+      message: `${order.orderNumber} has been cancelled.`
+    }
+  };
+
+  return messages[status] || {
+    title: 'Order Updated',
+    message: `Your order ${order.orderNumber} is now ${formatOrderStatusLabel(status)}.`
+  };
+};
+
 const buildOrderStatusEmailMessage = ({ order, status, actorName }) => {
   const statusLabel = formatOrderStatusLabel(status);
   const trackingUrl = buildCustomerTrackingUrl(order);
@@ -607,7 +668,7 @@ const buildOrderStatusEmailMessage = ({ order, status, actorName }) => {
       primaryAction: { label: 'Track Order', url: trackingUrl },
       support: {
         email: 'support@emallarwanda.com',
-        url: buildPublicHashRoute('/contact')
+        url: buildPublicRoute('/contact')
       }
     })
   };
@@ -632,7 +693,7 @@ const buildRiderAssignmentEmailMessage = ({ order, riderName }) => {
       primaryAction: { label: 'Track Delivery', url: trackingUrl },
       support: {
         email: 'support@emallarwanda.com',
-        url: buildPublicHashRoute('/contact')
+        url: buildPublicRoute('/contact')
       }
     })
   };
@@ -1345,7 +1406,7 @@ const server = http.createServer(async (req, res) => {
         if (user) {
           db.passwordResetTokens = (db.passwordResetTokens || []).filter((entry) => entry.userId !== user.id);
           const resetToken = createResetToken();
-          const resetUrl = `${String(getAppConfig().publicAppUrl || 'http://127.0.0.1:3000/#').replace(/\/$/, '')}/reset-password?token=${encodeURIComponent(resetToken)}`;
+          const resetUrl = `${String(getAppConfig().publicAppUrl || 'http://127.0.0.1:3000').replace(/\/#?$/, '')}/reset-password?token=${encodeURIComponent(resetToken)}`;
           db.passwordResetTokens.unshift({
             id: `PRT-${Date.now()}`,
             token: resetToken,
@@ -3974,6 +4035,98 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (pathname.startsWith('/api/orders/') && pathname.endsWith('/confirm-received') && req.method === 'PUT') {
+      const user = await getOptionalUser(req);
+      const orderId = pathname.split('/')[3];
+      const body = await readBody(req);
+      const db = await readDb();
+      const index = db.orders.findIndex((order) => order.id === orderId);
+
+      if (index === -1) {
+        sendJson(res, 404, { error: 'Order not found' });
+        return;
+      }
+
+      const current = db.orders[index];
+      const guestEmail = String(body.email || '').trim().toLowerCase();
+      const guestPhone = String(body.phone || '').trim();
+      const customerMatches = user?.role === 'CUSTOMER' && current.customerId === user.id;
+      const guestMatches =
+        String(current.customerId || '').startsWith('GST-') &&
+        (
+          (guestEmail && guestEmail === String(current.customerEmail || '').trim().toLowerCase()) ||
+          (guestPhone && guestPhone === String(current.phone || '').trim())
+        );
+
+      if (!customerMatches && !guestMatches) {
+        sendJson(res, user ? 403 : 401, { error: user ? 'Forbidden' : 'Tracking email or phone is required.' });
+        return;
+      }
+
+      if (current.status !== 'delivered') {
+        sendJson(res, 400, { error: 'Receipt can only be confirmed after the rider marks the order delivered.' });
+        return;
+      }
+
+      db.orders[index] = {
+        ...current,
+        status: 'completed',
+        updatedAt: new Date().toISOString()
+      };
+
+      const customerUpdate = getOrderStatusNotification(db.orders[index], 'completed');
+      createNotification(db, {
+        userId: current.customerId,
+        role: 'CUSTOMER',
+        title: customerUpdate.title,
+        message: customerUpdate.message,
+        type: 'success',
+        metadata: { orderId: current.id }
+      });
+      createNotification(db, {
+        userId: current.merchantId,
+        role: 'MERCHANT',
+        title: 'Customer Confirmed Receipt',
+        message: `${current.customerName} confirmed that ${current.orderNumber} was received well.`,
+        type: 'success',
+        metadata: { orderId: current.id }
+      });
+      if (current.riderId) {
+        createNotification(db, {
+          userId: current.riderId,
+          role: 'DELIVERY',
+          title: 'Delivery Confirmed by Customer',
+          message: `${current.customerName} confirmed receipt of ${current.orderNumber}.`,
+          type: 'success',
+          metadata: { orderId: current.id }
+        });
+      }
+      createAuditLog(db, {
+        event: `Customer confirmed receipt: ${current.orderNumber}`,
+        actor: user?.name || current.customerName || current.customerEmail,
+        category: 'orders',
+        status: 'success',
+        metadata: {
+          orderId: current.id,
+          orderNumber: current.orderNumber,
+          previousStatus: current.status,
+          nextStatus: 'completed'
+        }
+      });
+      await sendPlatformEmail(db, {
+        to: current.customerEmail,
+        ...buildOrderStatusEmailMessage({
+          order: db.orders[index],
+          status: 'completed',
+          actorName: user?.name || current.customerName
+        })
+      });
+
+      await writeDb(db);
+      sendJson(res, 200, { order: db.orders[index] });
+      return;
+    }
+
     if (pathname.startsWith('/api/orders/') && pathname.endsWith('/status') && req.method === 'PUT') {
       const user = await requireRole(req, res, ['MERCHANT', 'ADMIN', 'DELIVERY']);
       if (!user) return;
@@ -3995,12 +4148,17 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      if (!canRoleUpdateOrderStatus(user.role, current.status, body.status)) {
+        sendJson(res, 403, { error: 'This order action is not available for your role.' });
+        return;
+      }
+
       if (user.role === 'MERCHANT' && current.merchantId !== user.id) {
         sendJson(res, 403, { error: 'Forbidden' });
         return;
       }
 
-      if (user.role === 'DELIVERY' && current.riderId && current.riderId !== user.id) {
+      if (user.role === 'DELIVERY' && current.riderId !== user.id) {
         sendJson(res, 403, { error: 'Forbidden' });
         return;
       }
@@ -4012,14 +4170,51 @@ const server = http.createServer(async (req, res) => {
         updatedAt: new Date().toISOString()
       };
 
+      const customerUpdate = getOrderStatusNotification(db.orders[index], body.status);
       createNotification(db, {
         userId: current.customerId,
         role: 'CUSTOMER',
-        title: 'Order Updated',
-        message: `Your order ${current.orderNumber} is now ${body.status.replaceAll('_', ' ')}.`,
+        title: customerUpdate.title,
+        message: customerUpdate.message,
         type: body.status === 'cancelled' ? 'warning' : 'info',
         metadata: { orderId: current.id }
       });
+
+      if (body.status === 'ready_for_pickup') {
+        createNotification(db, {
+          userId: 'broadcast_DELIVERY',
+          role: 'DELIVERY',
+          title: 'New Pickup Job Available',
+          message: `${current.orderNumber} is ready for pickup from ${current.merchantName}.`,
+          type: 'success',
+          metadata: { orderId: current.id }
+        });
+      }
+
+      if (['picked_up', 'on_the_way', 'out_for_delivery', 'delivered', 'completed'].includes(body.status)) {
+        createNotification(db, {
+          userId: current.merchantId,
+          role: 'MERCHANT',
+          title: body.status === 'completed' ? 'Customer Confirmed Receipt' : 'Delivery Progress Updated',
+          message:
+            body.status === 'completed'
+              ? `${current.customerName} confirmed that ${current.orderNumber} was received well.`
+              : `${current.orderNumber} is now ${formatOrderStatusLabel(body.status)}.`,
+          type: body.status === 'completed' ? 'success' : 'info',
+          metadata: { orderId: current.id }
+        });
+      }
+
+      if (body.status === 'completed' && current.riderId) {
+        createNotification(db, {
+          userId: current.riderId,
+          role: 'DELIVERY',
+          title: 'Delivery Confirmed by Customer',
+          message: `${current.customerName} confirmed receipt of ${current.orderNumber}.`,
+          type: 'success',
+          metadata: { orderId: current.id }
+        });
+      }
       createAuditLog(db, {
         event: `Order ${current.orderNumber} updated to ${body.status.replaceAll('_', ' ')}`,
         actor: user.name || user.email,
@@ -4068,7 +4263,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const assignedRiderId = body.riderId || user.id;
+      const assignedRiderId = user.role === 'DELIVERY' ? user.id : body.riderId || user.id;
       const riderRecord = (db.users || []).find((entry) => entry.id === assignedRiderId && entry.role === 'DELIVERY');
 
       if (!riderRecord) {
@@ -4098,6 +4293,22 @@ const server = http.createServer(async (req, res) => {
         metadata: { orderId: db.orders[index].id }
       });
       const assignedOrder = db.orders[index];
+      createNotification(db, {
+        userId: assignedOrder.customerId,
+        role: 'CUSTOMER',
+        title: 'Rider Assigned to Your Order',
+        message: `${assignedOrder.riderName || 'An E-Malla rider'} accepted ${assignedOrder.orderNumber} and will deliver it to you.`,
+        type: 'success',
+        metadata: { orderId: assignedOrder.id }
+      });
+      createNotification(db, {
+        userId: assignedOrder.merchantId,
+        role: 'MERCHANT',
+        title: 'Rider Accepted Pickup',
+        message: `${assignedOrder.riderName || 'An E-Malla rider'} accepted pickup for ${assignedOrder.orderNumber}.`,
+        type: 'success',
+        metadata: { orderId: assignedOrder.id }
+      });
       const riderRecipient = (db.users || []).find((entry) => entry.id === assignedOrder.riderId && entry.role === 'DELIVERY');
       await sendPlatformEmail(db, {
         to: riderRecipient?.email,

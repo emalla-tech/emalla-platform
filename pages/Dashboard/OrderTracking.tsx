@@ -29,14 +29,14 @@ const TRACKING_FLOW: Array<{ key: OrderStatus; label: string }> = [
   { key: OrderStatus.PENDING_PAYMENT, label: 'Order Placed' },
   { key: OrderStatus.PAID, label: 'Payment Confirmed' },
   { key: OrderStatus.CONFIRMED, label: 'Order Confirmed' },
-  { key: OrderStatus.PREPARING, label: 'Processed & Packed' },
+  { key: OrderStatus.PREPARING, label: 'Seller Preparing Order' },
   { key: OrderStatus.READY_FOR_PICKUP, label: 'Ready for Pickup' },
   { key: OrderStatus.ASSIGNED, label: 'Rider Assigned' },
   { key: OrderStatus.PICKED_UP, label: 'Picked Up' },
   { key: OrderStatus.ON_THE_WAY, label: 'In Transit' },
   { key: OrderStatus.OUT_FOR_DELIVERY, label: 'Out for Delivery' },
-  { key: OrderStatus.DELIVERED, label: 'Delivered' },
-  { key: OrderStatus.COMPLETED, label: 'Completed' }
+  { key: OrderStatus.DELIVERED, label: 'Delivered - Awaiting Confirmation' },
+  { key: OrderStatus.COMPLETED, label: 'Received Well' }
 ];
 
 const formatStatus = (status?: string) => String(status || '').replaceAll('_', ' ');
@@ -109,6 +109,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isConfirmingReceipt, setIsConfirmingReceipt] = useState(false);
 
   const isSellerView = location.pathname.includes('/seller');
   const isRiderView = location.pathname.includes('/rider');
@@ -161,6 +162,23 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
       setStatusError(updateError instanceof Error ? updateError.message : 'Unable to update this delivery right now.');
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleConfirmReceipt = async () => {
+    if (!order) return;
+
+    setIsConfirmingReceipt(true);
+    setStatusMessage(null);
+    setStatusError(null);
+    try {
+      await OrderService.confirmReceived(order.id, guestAccess);
+      setStatusMessage('Thank you. This order is now confirmed as received well.');
+      await loadOrder();
+    } catch (confirmationError) {
+      setStatusError(confirmationError instanceof Error ? confirmationError.message : 'Unable to confirm receipt right now.');
+    } finally {
+      setIsConfirmingReceipt(false);
     }
   };
 
@@ -381,6 +399,25 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
                   This delivery is already at its final rider stage.
                 </div>
               )}
+            </div>
+          ) : null}
+
+          {!isSellerView && !isRiderView && order.status === OrderStatus.DELIVERED ? (
+            <div className="bg-emerald-50 rounded-[40px] p-8 border border-emerald-100 shadow-sm">
+              <h4 className="font-black text-emerald-900 mb-2">Confirm Your Delivery</h4>
+              <p className="text-xs text-emerald-700 mb-5">
+                Confirm only after the order has arrived and you have checked that it was received well.
+              </p>
+              {statusMessage ? <p className="mb-4 text-sm font-bold text-emerald-700">{statusMessage}</p> : null}
+              {statusError ? <p className="mb-4 text-sm font-bold text-red-600">{statusError}</p> : null}
+              <button
+                type="button"
+                onClick={handleConfirmReceipt}
+                disabled={isConfirmingReceipt}
+                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm hover:bg-emerald-700 transition-all disabled:opacity-60"
+              >
+                {isConfirmingReceipt ? 'Confirming Receipt...' : 'Confirm Received Well'}
+              </button>
             </div>
           ) : null}
         </div>

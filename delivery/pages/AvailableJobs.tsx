@@ -8,16 +8,27 @@ import {
 import { OrderService } from '../../services/orderService';
 import { Order, OrderStatus } from '../../types';
 import { useAuth } from '../../auth/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const AvailableJobs: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [jobs, setJobs] = useState<Order[]>([]);
   const [dismissedJobIds, setDismissedJobIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [acceptingJobId, setAcceptingJobId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadPool();
+    void loadPool();
+    const refreshInterval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void loadPool();
+      }
+    }, 15000);
+
+    return () => window.clearInterval(refreshInterval);
   }, []);
 
   const loadPool = async () => {
@@ -36,10 +47,18 @@ const AvailableJobs: React.FC = () => {
     const riderId = user.id;
     const riderName = user.name || 'E-Malla Rider';
 
-    await OrderService.assignRider(orderId, riderId, riderName);
-    setMessage('Job accepted. Head to the merchant location.');
-    window.setTimeout(() => setMessage(null), 3000);
-    loadPool();
+    setAcceptingJobId(orderId);
+    setError(null);
+    try {
+      await OrderService.assignRider(orderId, riderId, riderName);
+      setMessage('Delivery accepted. The customer and seller have been notified.');
+      await loadPool();
+      window.setTimeout(() => navigate(`/rider/orders/${orderId}/track`), 900);
+    } catch (acceptError) {
+      setError(acceptError instanceof Error ? acceptError.message : 'Unable to accept this delivery right now.');
+    } finally {
+      setAcceptingJobId(null);
+    }
   };
 
   const handleDismissJob = (orderId: string) => {
@@ -55,6 +74,11 @@ const AvailableJobs: React.FC = () => {
       {message ? (
         <div className="mx-2 rounded-2xl bg-emerald-500 text-white px-5 py-4 text-sm font-black shadow-lg">
           {message}
+        </div>
+      ) : null}
+      {error ? (
+        <div className="mx-2 rounded-2xl bg-red-50 border border-red-100 text-red-600 px-5 py-4 text-sm font-black">
+          {error}
         </div>
       ) : null}
       <div className="flex justify-between items-end px-2">
@@ -114,10 +138,11 @@ const AvailableJobs: React.FC = () => {
                 </button>
                 <button 
                   onClick={() => handleAcceptJob(job.id)}
+                  disabled={acceptingJobId === job.id}
                   className="py-5 bg-black text-white rounded-[24px] font-black text-xs shadow-xl shadow-black/10 active:bg-orange-500 transition-all uppercase tracking-widest active:scale-95 flex items-center justify-center space-x-2"
                 >
                   <Navigation size={16} />
-                  <span>Accept & Map</span>
+                  <span>{acceptingJobId === job.id ? 'Accepting...' : 'Accept Delivery'}</span>
                 </button>
              </div>
           </div>

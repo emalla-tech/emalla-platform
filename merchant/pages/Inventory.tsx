@@ -189,7 +189,7 @@ const Inventory: React.FC = () => {
   };
 
   const handleImagesChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+    const files = Array.from(e.target.files || []) as File[];
     await processSelectedFiles(files);
     e.target.value = '';
   };
@@ -215,7 +215,7 @@ const Inventory: React.FC = () => {
   const handleDropUpload = async (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
     setIsDragActive(false);
-    const files = Array.from(e.dataTransfer.files || []).filter((file) => file.type.startsWith('image/'));
+    const files = (Array.from(e.dataTransfer.files || []) as File[]).filter((file) => file.type.startsWith('image/'));
     await processSelectedFiles(files);
   };
 

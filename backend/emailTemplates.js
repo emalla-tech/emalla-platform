@@ -13,8 +13,8 @@ const EMAIL_TEMPLATE_NAMES = [
 
 const formatMoney = (value) => `RWF ${Number(value || 0).toLocaleString()}`;
 
-const normalizeHashRoute = (path = '') => {
-  const base = String(getAppConfig().publicAppUrl || 'http://127.0.0.1:3000/#').replace(/\/$/, '');
+const normalizePublicRoute = (path = '') => {
+  const base = String(getAppConfig().publicAppUrl || 'http://127.0.0.1:3000').replace(/\/#?$/, '');
   const normalizedPath = String(path || '').replace(/^#?\/?/, '');
   return normalizedPath ? `${base}/${normalizedPath}` : base;
 };
@@ -24,7 +24,7 @@ const createSections = (entries) =>
 
 const getSupportPayload = () => ({
   email: 'support@emallarwanda.com',
-  url: normalizeHashRoute('/contact')
+  url: normalizePublicRoute('/contact')
 });
 
 const renderTemplate = ({ subject, title, intro, sections, closing, bodyLines, replyTo, highlights, primaryAction, support }) => ({
@@ -43,7 +43,7 @@ const renderTemplate = ({ subject, title, intro, sections, closing, bodyLines, r
 });
 
 const renderAccountVerificationEmail = ({ name, email, role, username }) => {
-  const loginUrl = normalizeHashRoute('/login');
+  const loginUrl = normalizePublicRoute('/login');
   const sections = createSections([
     { label: 'Name', value: name || 'E-Malla User' },
     { label: 'Email', value: email || 'Not provided' },
@@ -70,7 +70,7 @@ const renderAccountVerificationEmail = ({ name, email, role, username }) => {
 };
 
 const renderWelcomeEmail = ({ name, email, role, username }) => {
-  const homeUrl = normalizeHashRoute('/');
+  const homeUrl = normalizePublicRoute('/');
   const sections = createSections([
     { label: 'Name', value: name || 'E-Malla User' },
     { label: 'Email', value: email || 'Not provided' },
@@ -97,7 +97,7 @@ const renderWelcomeEmail = ({ name, email, role, username }) => {
 };
 
 const renderOrderConfirmationEmail = ({ customerName, orderNumber, totalAmount, paymentMethod, address, phone, txRef, merchantName, itemCount, trackingUrl }) => {
-  const ordersUrl = trackingUrl || normalizeHashRoute('/buyer/orders');
+  const ordersUrl = trackingUrl || normalizePublicRoute('/buyer/orders');
   const sections = createSections([
     { label: 'Order', value: orderNumber || 'Pending' },
     { label: 'Payment Method', value: paymentMethod || 'Not specified' },
@@ -134,7 +134,7 @@ const renderOrderConfirmationEmail = ({ customerName, orderNumber, totalAmount, 
 };
 
 const renderSellerOrderNotificationEmail = ({ merchantName, orderNumber, totalAmount, paymentMethod, customerName }) => {
-  const sellerOrdersUrl = normalizeHashRoute('/seller');
+  const sellerOrdersUrl = normalizePublicRoute('/seller');
   const sections = createSections([
     { label: 'Order', value: orderNumber || 'Pending' },
     { label: 'Payment Method', value: paymentMethod || 'Not specified' },
@@ -167,7 +167,7 @@ const renderSellerOrderNotificationEmail = ({ merchantName, orderNumber, totalAm
 };
 
 const renderRiderDeliveryAssignmentEmail = ({ riderName, orderNumber, customerName, address, phone }) => {
-  const riderHubUrl = normalizeHashRoute('/rider');
+  const riderHubUrl = normalizePublicRoute('/rider');
   const sections = createSections([
     { label: 'Order', value: orderNumber || 'Pending' },
     { label: 'Customer', value: customerName || 'Buyer' },
@@ -196,7 +196,7 @@ const renderRiderDeliveryAssignmentEmail = ({ riderName, orderNumber, customerNa
 };
 
 const renderSupportTicketConfirmationEmail = ({ name, email, subject }) => {
-  const supportUrl = normalizeHashRoute('/contact');
+  const supportUrl = normalizePublicRoute('/contact');
   const sections = createSections([
     { label: 'Name', value: name || 'Visitor' },
     { label: 'Email', value: email || 'Not provided' },
@@ -224,7 +224,7 @@ const renderPasswordResetEmail = ({ name, email, role, resetUrl }) => {
   const sections = createSections([
     { label: 'Account', value: email || 'Not provided' },
     { label: 'Role', value: role || 'Unknown' },
-    { label: 'Reset Link', value: resetUrl || normalizeHashRoute('/reset-password') }
+    { label: 'Reset Link', value: resetUrl || normalizePublicRoute('/reset-password') }
   ]);
 
   return renderTemplate({
@@ -238,7 +238,7 @@ const renderPasswordResetEmail = ({ name, email, role, resetUrl }) => {
       'A password reset was requested for your E-Malla account.',
       `Account: ${email || 'Not provided'}`,
       `Role: ${role || 'Unknown'}`,
-      `Reset link: ${resetUrl || normalizeHashRoute('/reset-password')}`
+      `Reset link: ${resetUrl || normalizePublicRoute('/reset-password')}`
     ]
   });
 };

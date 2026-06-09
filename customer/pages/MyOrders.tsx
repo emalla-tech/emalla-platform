@@ -20,22 +20,36 @@ const MyOrders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeFilter, setActiveFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [confirmingReceipt, setConfirmingReceipt] = useState(false);
+  const [receiptMessage, setReceiptMessage] = useState<string | null>(null);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
   const products = useProducts();
 
   useEffect(() => {
     if (!user) return;
-    OrderService.getOrdersByCustomer(user.id).then((data) => {
+
+    const loadOrders = async () => {
+      const data = await OrderService.getOrdersByCustomer(user.id);
       setOrders(data);
-      setSelectedOrder(data[0] || null);
-    });
+      setSelectedOrder((current) => data.find((order) => order.id === current?.id) || data[0] || null);
+    };
+
+    void loadOrders();
+    const refreshInterval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void loadOrders();
+      }
+    }, 15000);
+
+    return () => window.clearInterval(refreshInterval);
   }, [user]);
 
   const filteredOrders = orders.filter((order) => {
     if (activeFilter === 'all') return true;
     if (activeFilter === 'active') {
-      return ![OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.CANCELLED].includes(order.status);
+      return ![OrderStatus.COMPLETED, OrderStatus.CANCELLED].includes(order.status);
     }
-    return [OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(order.status);
+    return order.status === OrderStatus.COMPLETED;
   });
 
   const productImageById = useMemo(() => {
@@ -43,8 +57,18 @@ const MyOrders: React.FC = () => {
   }, [products]);
 
   const getTimelineSteps = (order: Order) => {
-    const isPaid = order.paymentStatus === 'SUCCESS';
+    const isPaid = order.paymentStatus === 'SUCCESS' || order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY;
     const isSellerConfirmed = ![OrderStatus.PENDING, OrderStatus.PENDING_PAYMENT, OrderStatus.PAID].includes(order.status);
+    const isPreparing = [
+      OrderStatus.PREPARING,
+      OrderStatus.READY_FOR_PICKUP,
+      OrderStatus.ASSIGNED,
+      OrderStatus.PICKED_UP,
+      OrderStatus.ON_THE_WAY,
+      OrderStatus.OUT_FOR_DELIVERY,
+      OrderStatus.DELIVERED,
+      OrderStatus.COMPLETED
+    ].includes(order.status);
     const isReadyForDispatch = [
       OrderStatus.READY_FOR_PICKUP,
       OrderStatus.ASSIGNED,
@@ -54,14 +78,33 @@ const MyOrders: React.FC = () => {
       OrderStatus.DELIVERED,
       OrderStatus.COMPLETED
     ].includes(order.status);
+    const isRiderAssigned = [
+      OrderStatus.ASSIGNED,
+      OrderStatus.PICKED_UP,
+      OrderStatus.ON_THE_WAY,
+      OrderStatus.OUT_FOR_DELIVERY,
+      OrderStatus.DELIVERED,
+      OrderStatus.COMPLETED
+    ].includes(order.status);
+    const isOnTheWay = [
+      OrderStatus.ON_THE_WAY,
+      OrderStatus.OUT_FOR_DELIVERY,
+      OrderStatus.DELIVERED,
+      OrderStatus.COMPLETED
+    ].includes(order.status);
     const isDelivered = [OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(order.status);
+    const isCompleted = order.status === OrderStatus.COMPLETED;
 
     return [
       { label: 'Order Placed', done: true, time: new Date(order.createdAt).toLocaleString() },
-      { label: 'Payment Verified', done: isPaid, time: isPaid ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
+      { label: order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY ? 'Cash on Delivery Confirmed' : 'Payment Verified', done: isPaid, time: isPaid ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
       { label: 'Seller Confirmed', done: isSellerConfirmed, time: isSellerConfirmed ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
+      { label: 'Seller Preparing Order', done: isPreparing, time: isPreparing ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
       { label: 'Ready for Dispatch', done: isReadyForDispatch, time: isReadyForDispatch ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
-      { label: 'Delivered', done: isDelivered, time: isDelivered ? new Date(order.updatedAt).toLocaleString() : 'Pending' }
+      { label: 'Rider Assigned', done: isRiderAssigned, time: isRiderAssigned ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
+      { label: 'On the Way', done: isOnTheWay, time: isOnTheWay ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
+      { label: 'Delivered', done: isDelivered, time: isDelivered ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
+      { label: 'Received Well', done: isCompleted, time: isCompleted ? new Date(order.updatedAt).toLocaleString() : 'Waiting for your confirmation' }
     ];
   };
 
@@ -71,8 +114,13 @@ const MyOrders: React.FC = () => {
       [OrderStatus.PAID]: { bg: 'bg-blue-50', text: 'text-blue-600', label: 'Paid' },
       [OrderStatus.CONFIRMED]: { bg: 'bg-indigo-50', text: 'text-indigo-600', label: 'Confirmed' },
       [OrderStatus.PREPARING]: { bg: 'bg-orange-50', text: 'text-orange-600', label: 'Preparing' },
+      [OrderStatus.READY_FOR_PICKUP]: { bg: 'bg-cyan-50', text: 'text-cyan-600', label: 'Ready for Pickup' },
+      [OrderStatus.ASSIGNED]: { bg: 'bg-teal-50', text: 'text-teal-600', label: 'Rider Assigned' },
+      [OrderStatus.PICKED_UP]: { bg: 'bg-violet-50', text: 'text-violet-600', label: 'Picked Up' },
       [OrderStatus.ON_THE_WAY]: { bg: 'bg-purple-50', text: 'text-purple-600', label: 'On The Way' },
+      [OrderStatus.OUT_FOR_DELIVERY]: { bg: 'bg-fuchsia-50', text: 'text-fuchsia-600', label: 'Out for Delivery' },
       [OrderStatus.DELIVERED]: { bg: 'bg-emerald-50', text: 'text-emerald-600', label: 'Delivered' },
+      [OrderStatus.COMPLETED]: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Received Well' },
       [OrderStatus.CANCELLED]: { bg: 'bg-red-50', text: 'text-red-600', label: 'Cancelled' },
     };
     const style = config[status as keyof typeof config] || { bg: 'bg-gray-50', text: 'text-gray-400', label: status };
@@ -108,6 +156,23 @@ const MyOrders: React.FC = () => {
       const updated = await OrderService.getOrdersByCustomer(user?.id || '');
       setOrders(updated);
       setSelectedOrder(null);
+    }
+  };
+
+  const handleConfirmReceived = async (order: Order) => {
+    setConfirmingReceipt(true);
+    setReceiptMessage(null);
+    setReceiptError(null);
+    try {
+      await OrderService.confirmReceived(order.id);
+      const updated = await OrderService.getOrdersByCustomer(user?.id || '');
+      setOrders(updated);
+      setSelectedOrder(updated.find((entry) => entry.id === order.id) || null);
+      setReceiptMessage('Thank you. The order has been confirmed as received well.');
+    } catch (error) {
+      setReceiptError(error instanceof Error ? error.message : 'Unable to confirm receipt right now.');
+    } finally {
+      setConfirmingReceipt(false);
     }
   };
 
@@ -354,6 +419,24 @@ const MyOrders: React.FC = () => {
                   </div>
 
                   <div className="pt-6 border-t border-gray-100 space-y-3">
+                    {receiptMessage ? <p className="text-sm font-bold text-emerald-600">{receiptMessage}</p> : null}
+                    {receiptError ? <p className="text-sm font-bold text-red-600">{receiptError}</p> : null}
+                    {selectedOrder.status === OrderStatus.DELIVERED ? (
+                      <div className="rounded-3xl bg-emerald-50 border border-emerald-100 p-5 space-y-4">
+                        <div>
+                          <p className="text-sm font-black text-emerald-800">Has your order arrived safely?</p>
+                          <p className="text-xs text-emerald-700 mt-1">Confirm only after checking that the package was received well.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmReceived(selectedOrder)}
+                          disabled={confirmingReceipt}
+                          className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black text-sm hover:bg-emerald-700 transition-all disabled:opacity-60"
+                        >
+                          {confirmingReceipt ? 'Confirming Receipt...' : 'Confirm Received Well'}
+                        </button>
+                      </div>
+                    ) : null}
                     <button
                       onClick={() => handleDownloadInvoice(selectedOrder)}
                       className="w-full py-4 bg-black text-white rounded-2xl font-black text-sm flex items-center justify-center space-x-2 hover:bg-orange-500 transition-all"

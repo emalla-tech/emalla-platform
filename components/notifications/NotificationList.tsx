@@ -27,6 +27,8 @@ const NotificationList: React.FC<NotificationListProps> = ({ userId, role }) => 
         return `/buyer/orders/${orderId}/track`;
       case UserRole.ADMIN:
         return '/admin/dashboard/orders';
+      case UserRole.DELIVERY:
+        return `/rider/orders/${orderId}/track`;
       default:
         return null;
     }

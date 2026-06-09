@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, '..');
-const DEFAULT_PUBLIC_APP_URL = 'http://127.0.0.1:3000/#';
+const DEFAULT_PUBLIC_APP_URL = 'http://127.0.0.1:3000';
 const DEFAULT_CORS_ALLOWED_ORIGINS = ['http://127.0.0.1:3000', 'http://localhost:3000'];
 
 let envLoaded = false;

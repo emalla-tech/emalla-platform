@@ -60,6 +60,11 @@ export const OrderService = {
     return true;
   },
 
+  confirmReceived: async (orderId: string, options?: { email?: string; phone?: string }): Promise<Order> => {
+    const response = await apiClient.confirmOrderReceived(orderId, options);
+    return response.order as Order;
+  },
+
   assignRider: async (orderId: string, riderId: string, riderName: string): Promise<boolean> => {
     await apiClient.assignRider(orderId, riderId, riderName);
     return true;

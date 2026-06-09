@@ -11,6 +11,21 @@ interface HomeProps {
   onAddToCart: (item: { productId: string; quantity: number }) => void;
 }
 
+const TRUSTED_BRANDS = [
+  'HP',
+  'Dell',
+  'Lenovo',
+  'APC',
+  'Apple',
+  'Epson',
+  'Canon',
+  'Samsung',
+  'Cisco',
+  'TP-Link',
+  'Microsoft',
+  'Logitech',
+];
+
 const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
   const navigate = useNavigate();
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
@@ -94,6 +109,38 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Trusted Brands */}
+      <section className="trusted-brands-section" aria-labelledby="trusted-brands-title">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-7">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-orange-500 mb-2">Shop with confidence</p>
+              <h2 id="trusted-brands-title" className="text-2xl md:text-3xl font-black text-gray-900">Brands shoppers know and trust</h2>
+            </div>
+            <p className="max-w-md text-sm text-gray-500 font-medium md:text-right">
+              Explore the marketplace by brand and discover current listings from sellers across Rwanda.
+            </p>
+          </div>
+        </div>
+
+        <div className="trusted-brands-marquee" aria-label="Browse products by brand">
+          <div className="trusted-brands-track">
+            {[...TRUSTED_BRANDS, ...TRUSTED_BRANDS].map((brand, index) => (
+              <Link
+                key={`${brand}-${index}`}
+                to={`/shop?search=${encodeURIComponent(brand)}`}
+                className="trusted-brand-card"
+                aria-label={`Shop ${brand} products`}
+                aria-hidden={index >= TRUSTED_BRANDS.length}
+                tabIndex={index >= TRUSTED_BRANDS.length ? -1 : 0}
+              >
+                <span>{brand}</span>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 

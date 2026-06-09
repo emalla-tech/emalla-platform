@@ -101,6 +101,84 @@ button {
   animation: install-banner-in 280ms ease-out;
 }
 
+.trusted-brands-section {
+  padding: 3.5rem 0;
+  overflow: hidden;
+  border-bottom: 1px solid #f3f4f6;
+  background:
+    radial-gradient(circle at 8% 20%, rgba(249, 115, 22, 0.09), transparent 24rem),
+    linear-gradient(180deg, #fff 0%, #fffaf6 100%);
+}
+
+.trusted-brands-marquee {
+  position: relative;
+  overflow: hidden;
+}
+
+.trusted-brands-marquee::before,
+.trusted-brands-marquee::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  width: clamp(2rem, 8vw, 8rem);
+  pointer-events: none;
+}
+
+.trusted-brands-marquee::before {
+  left: 0;
+  background: linear-gradient(90deg, #fffaf6, transparent);
+}
+
+.trusted-brands-marquee::after {
+  right: 0;
+  background: linear-gradient(270deg, #fffaf6, transparent);
+}
+
+.trusted-brands-track {
+  display: flex;
+  width: max-content;
+  gap: 1rem;
+  padding: 0.35rem 0;
+  animation: trusted-brands-scroll 34s linear infinite;
+}
+
+.trusted-brands-marquee:hover .trusted-brands-track,
+.trusted-brands-marquee:focus-within .trusted-brands-track {
+  animation-play-state: paused;
+}
+
+.trusted-brand-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 10rem;
+  min-height: 4.75rem;
+  padding: 1rem 1.75rem;
+  border: 1px solid rgba(229, 231, 235, 0.9);
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.88);
+  color: #6b7280;
+  box-shadow: 0 12px 30px rgba(17, 24, 39, 0.04);
+  transition: color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.trusted-brand-card span {
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.trusted-brand-card:hover,
+.trusted-brand-card:focus-visible {
+  color: #111827;
+  border-color: rgba(249, 115, 22, 0.45);
+  box-shadow: 0 16px 36px rgba(249, 115, 22, 0.12);
+  transform: translateY(-2px);
+  outline: none;
+}
+
 @keyframes app-shell-enter {
   from {
     opacity: 0.01;
@@ -146,13 +224,27 @@ button {
   }
 }
 
+@keyframes trusted-brands-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-50% - 0.5rem));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .app-shell,
   .page-transition,
   .install-banner-enter,
   .mobile-bottom-nav__item,
-  .mobile-bottom-nav__icon {
+  .mobile-bottom-nav__icon,
+  .trusted-brands-track {
     animation: none !important;
     transition: none !important;
+  }
+
+  .trusted-brands-marquee {
+    overflow-x: auto;
   }
 }

@@ -1,4 +1,5 @@
 import { apiUrl } from './apiConfig';
+import { monitoringService } from './monitoringService';
 
 const request = async (path: string, init: RequestInit = {}) => {
   const token = localStorage.getItem('emalla_token');
@@ -17,11 +18,23 @@ const request = async (path: string, init: RequestInit = {}) => {
       headers
     });
   } catch (error) {
+    monitoringService.reportApiError({
+      path,
+      message: error instanceof Error ? error.message : 'Backend unavailable'
+    });
     throw new Error('Backend unavailable. Restart the app and try again.');
   }
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status >= 500) {
+      monitoringService.reportApiError({
+        path,
+        statusCode: response.status,
+        message: data.error || 'Server request failed',
+        requestId: data.requestId || response.headers.get('x-request-id') || undefined
+      });
+    }
     throw new Error(data.error || 'Request failed');
   }
 
@@ -359,6 +372,10 @@ export const apiClient = {
 
   async getAdminStats() {
     return request('/admin/stats');
+  },
+
+  async getAdminMonitoring() {
+    return request('/admin/monitoring');
   },
 
   async getAdminFinance() {

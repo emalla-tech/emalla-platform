@@ -22,6 +22,7 @@ import {
   deleteAuthTokenRecord,
   persistCheckoutBundleRecord,
   writeDatabaseSnapshot as writeDb,
+  updateDatabaseSnapshot,
   ensureDatabaseReady as ensureDb,
   getDatabaseServiceStatus as getDatabaseStatus
 } from './databaseService.js';
@@ -47,7 +48,8 @@ const PORT = Number(process.env.PORT || getRuntimeConfig().port || 4000);
 const DEFAULT_ALLOWED_ORIGINS = ['http://127.0.0.1:3000', 'http://localhost:3000'];
 const BASE_CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Expose-Headers': 'X-Request-ID'
 };
 
 const PASSWORD_SCHEME = 'scrypt';
@@ -74,9 +76,45 @@ const AUTH_RATE_LIMITS = {
 const API_RATE_LIMITS = {
   general: { max: 300, windowMs: 5 * 60 * 1000 },
   mutation: { max: 120, windowMs: 5 * 60 * 1000 },
+  monitoring: { max: 20, windowMs: 10 * 60 * 1000 },
   upload: { max: 30, windowMs: 15 * 60 * 1000 }
 };
 const RESPONSE_COMPRESSION_THRESHOLD_BYTES = 1024;
+const MONITORING_TEXT_LIMIT = 3000;
+
+const structuredLog = (level, message, details = {}) => {
+  const payload = JSON.stringify({
+    timestamp: new Date().toISOString(),
+    level,
+    message,
+    service: 'emalla-backend',
+    ...details
+  });
+
+  if (level === 'error') {
+    console.error(payload);
+    return;
+  }
+  if (level === 'warn') {
+    console.warn(payload);
+    return;
+  }
+  console.log(payload);
+};
+
+const sanitizeMonitoringText = (value, maxLength = MONITORING_TEXT_LIMIT) =>
+  String(value || '')
+    .replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
+    .replace(/em_tk_[a-z0-9]+/gi, '[redacted-token]')
+    .replace(/([?&](?:token|code|key|secret|password)=)[^&\s]+/gi, '$1[redacted]')
+    .slice(0, maxLength);
+
+const createRequestId = (req) => {
+  const forwardedId = String(req.headers['x-request-id'] || req.headers['x-vercel-id'] || '').trim();
+  return /^[a-zA-Z0-9._:-]{6,100}$/.test(forwardedId)
+    ? forwardedId
+    : `req_${randomBytes(8).toString('hex')}`;
+};
 
 const getSecurityHeaders = () => {
   const runtime = getRuntimeConfig();
@@ -337,6 +375,7 @@ const sendJson = (res, statusCode, payload, extraHeaders = {}) => {
   const headers = {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': statusCode >= 400 ? 'no-store' : 'no-cache',
+    ...(res.__requestId ? { 'X-Request-ID': res.__requestId } : {}),
     ...getSecurityHeaders(),
     ...corsHeaders,
     ...extraHeaders
@@ -709,6 +748,24 @@ const createAuditLog = (db, entry) => {
   };
   db.auditLogs.unshift(record);
   return record;
+};
+
+const recordMonitoringEvent = async (entry) => {
+  try {
+    await updateDatabaseSnapshot((db) => {
+      createAuditLog(db, {
+        actor: 'E-Malla Monitoring',
+        category: 'monitoring',
+        status: 'error',
+        ...entry
+      });
+      return db;
+    });
+  } catch (error) {
+    structuredLog('error', 'monitoring_event_persist_failed', {
+      error: sanitizeMonitoringText(error instanceof Error ? error.message : error)
+    });
+  }
 };
 
 const normalizeInquiryStatus = (value) => {
@@ -1248,6 +1305,23 @@ const recalculateProductReviewMetrics = (db, productId) => {
 };
 
 const server = http.createServer(async (req, res) => {
+  const requestStartedAt = Date.now();
+  const requestId = createRequestId(req);
+  const requestRoute = String(req.url || '/').split('?')[0];
+  res.__requestId = requestId;
+  res.on('finish', () => {
+    if (requestRoute === '/api/health' && res.statusCode < 400) return;
+
+    const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
+    structuredLog(level, 'api_request_completed', {
+      requestId,
+      method: req.method,
+      route: requestRoute,
+      statusCode: res.statusCode,
+      durationMs: Date.now() - requestStartedAt
+    });
+  });
+
   if (!req.url) {
     sendJson(res, 404, { error: 'Not found' });
     return;
@@ -1280,7 +1354,15 @@ const server = http.createServer(async (req, res) => {
   const pathname = url.pathname;
 
   try {
-    if (!enforceApiRateLimit(req, res, pathname === '/api/uploads/image' ? 'upload' : req.method === 'GET' ? 'general' : 'mutation')) {
+    const rateLimitAction =
+      pathname === '/api/uploads/image'
+        ? 'upload'
+        : pathname === '/api/monitoring/client-error'
+          ? 'monitoring'
+          : req.method === 'GET'
+            ? 'general'
+            : 'mutation';
+    if (!enforceApiRateLimit(req, res, rateLimitAction)) {
       return;
     }
 
@@ -2313,6 +2395,44 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/admin/monitoring' && req.method === 'GET') {
+      const user = await requireRole(req, res, ['ADMIN']);
+      if (!user) return;
+
+      const db = await readDb();
+      const since24Hours = Date.now() - 24 * 60 * 60 * 1000;
+      const monitoringEvents = (db.auditLogs || [])
+        .filter((entry) => entry.category === 'monitoring')
+        .sort((left, right) => new Date(right.time || 0).getTime() - new Date(left.time || 0).getTime());
+      const recent24Hours = monitoringEvents.filter(
+        (entry) => new Date(entry.time || 0).getTime() >= since24Hours
+      );
+      const memory = process.memoryUsage();
+
+      sendJson(res, 200, {
+        status: recent24Hours.length > 0 ? 'attention' : 'healthy',
+        checkedAt: new Date().toISOString(),
+        services: {
+          database: { ...getDatabaseStatus(), ready: true },
+          email: getEmailDeliveryStatus(),
+          storage: getStorageHealth()
+        },
+        runtime: {
+          nodeEnv: runtime.nodeEnv,
+          uptimeSeconds: Math.round(process.uptime()),
+          memoryUsedMb: Number((memory.heapUsed / 1024 / 1024).toFixed(1)),
+          memoryLimitObservedMb: Number((memory.heapTotal / 1024 / 1024).toFixed(1))
+        },
+        metrics: {
+          errorsLast24Hours: recent24Hours.length,
+          frontendErrorsLast24Hours: recent24Hours.filter((entry) => entry.metadata?.source && entry.metadata.source !== 'server_error').length,
+          serverErrorsLast24Hours: recent24Hours.filter((entry) => entry.metadata?.source === 'server_error').length
+        },
+        recentErrors: monitoringEvents.slice(0, 50)
+      });
+      return;
+    }
+
     if (pathname === '/api/admin/sellers' && req.method === 'GET') {
       const user = await requireRole(req, res, ['ADMIN']);
       if (!user) return;
@@ -3318,6 +3438,40 @@ const server = http.createServer(async (req, res) => {
       }
 
       sendJson(res, 200, { products: visibleProducts });
+      return;
+    }
+
+    if (pathname === '/api/monitoring/client-error' && req.method === 'POST') {
+      const user = await getOptionalUser(req);
+      const body = await readBody(req);
+      const source = ['window_error', 'unhandled_rejection', 'react_error_boundary', 'api_error'].includes(body.source)
+        ? body.source
+        : 'client_error';
+      const message = sanitizeMonitoringText(body.message, 1000) || 'Unknown frontend error';
+      const route = sanitizeMonitoringText(body.route, 300).split('?')[0] || '/';
+      const stack = sanitizeMonitoringText(body.stack);
+      const metadata = {
+        source,
+        route,
+        stack,
+        requestId: sanitizeMonitoringText(body.requestId, 120),
+        statusCode: Number(body.statusCode || 0) || undefined,
+        userRole: user?.role || 'GUEST',
+        userId: user?.id || undefined,
+        userAgent: sanitizeMonitoringText(req.headers['user-agent'], 300)
+      };
+
+      structuredLog('error', 'frontend_error_reported', {
+        requestId,
+        error: message,
+        ...metadata
+      });
+      await recordMonitoringEvent({
+        event: `Frontend error: ${message}`,
+        actor: user?.email || user?.name || 'Guest browser',
+        metadata
+      });
+      sendJson(res, 202, { received: true, requestId });
       return;
     }
 
@@ -5011,7 +5165,32 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 404, { error: 'Not found' });
   } catch (error) {
     const statusCode = Number(error?.statusCode || 500);
-    sendJson(res, statusCode, { error: error instanceof Error ? error.message : 'Server error' });
+    const errorMessage = sanitizeMonitoringText(error instanceof Error ? error.message : 'Server error', 1000);
+    structuredLog('error', 'api_request_failed', {
+      requestId,
+      method: req.method,
+      route: requestRoute,
+      statusCode,
+      durationMs: Date.now() - requestStartedAt,
+      error: errorMessage,
+      stack: sanitizeMonitoringText(error instanceof Error ? error.stack : '')
+    });
+    if (statusCode >= 500) {
+      await recordMonitoringEvent({
+        event: `Backend error: ${errorMessage}`,
+        metadata: {
+          source: 'server_error',
+          requestId,
+          method: req.method,
+          route: requestRoute,
+          statusCode
+        }
+      });
+    }
+    sendJson(res, statusCode, {
+      error: statusCode >= 500 ? 'Server error. Please try again.' : errorMessage,
+      requestId
+    });
   }
 });
 
@@ -5035,11 +5214,17 @@ const shutdownServer = (signal) => {
 });
 
 process.on('unhandledRejection', (error) => {
-  console.error('Unhandled promise rejection:', error instanceof Error ? error.message : error);
+  structuredLog('error', 'unhandled_promise_rejection', {
+    error: sanitizeMonitoringText(error instanceof Error ? error.message : error),
+    stack: sanitizeMonitoringText(error instanceof Error ? error.stack : '')
+  });
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception:', error instanceof Error ? error.message : error);
+  structuredLog('error', 'uncaught_exception', {
+    error: sanitizeMonitoringText(error instanceof Error ? error.message : error),
+    stack: sanitizeMonitoringText(error instanceof Error ? error.stack : '')
+  });
   shutdownServer('uncaughtException');
 });
 

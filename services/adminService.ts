@@ -193,6 +193,10 @@ export const AdminService = {
     return response.emailLogs || [];
   },
 
+  getMonitoring: async () => {
+    return apiClient.getAdminMonitoring();
+  },
+
   getEmailStatus: async (): Promise<AdminEmailStatus> => {
     const response = await apiClient.getAdminEmailStatus();
     return response.email;

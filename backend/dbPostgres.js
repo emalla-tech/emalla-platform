@@ -24,7 +24,7 @@ const READ_COLUMNS = {
   support_tickets: 'id, type, name, email, subject, company, message, status, assigned_to, internal_notes, replied_at, resolved_at, created_at, updated_at',
   inquiries: 'id, type, name, email, subject, company, message, status, assigned_to, internal_notes, replied_at, resolved_at, created_at, updated_at',
   notifications: 'id, user_id, role, title, message, type, read, created_at',
-  audit_logs: 'id, event, actor, category, status, time',
+  audit_logs: 'id, event, actor, category, status, time, metadata',
   email_logs: 'id, to_addresses, subject, template, body, html, sent_at, status, provider, provider_message_id, error, note',
   wishlists: 'id, user_id, product_id, created_at',
   admin_settings: 'id, preferences, category_commission_rates, updated_at, updated_by',
@@ -590,7 +590,8 @@ export const createPostgresAdapter = () => {
           actor: row.actor,
           category: row.category,
           status: row.status,
-          time: toIso(row.time)
+          time: toIso(row.time),
+          metadata: row.metadata || {}
         })),
         products: fallbackProducts.map(mapProduct),
         notifications: fallbackNotifications.map((row) => ({
@@ -1252,7 +1253,8 @@ export const createPostgresAdapter = () => {
           actor: row.actor || '',
           category: row.category,
           status: row.status,
-          time: toIso(row.time)
+          time: toIso(row.time),
+          metadata: row.metadata || {}
         })),
         emailLogs: emailLogs.map((row) => ({
           ...(row.metadata || {}),

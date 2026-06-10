@@ -57,6 +57,7 @@ const SellerApplications = lazy(() => import('./admin/pages/SellerApplications')
 const RiderManagement = lazy(() => import('./admin/pages/RiderManagement'));
 const FinanceOverview = lazy(() => import('./admin/pages/FinanceOverview'));
 const AuditLogsPage = lazy(() => import('./admin/pages/AuditLogsPage'));
+const Monitoring = lazy(() => import('./admin/pages/Monitoring'));
 const AdminSecurity = lazy(() => import('./admin/pages/AdminSecurity'));
 const AdminSettings = lazy(() => import('./admin/pages/AdminSettings'));
 const CustomerManagement = lazy(() => import('./admin/pages/CustomerManagement'));
@@ -358,6 +359,7 @@ const App: React.FC = () => {
                     <Route path="logistics" element={withSuspense(<RiderManagement />)} />
                     <Route path="finance" element={withSuspense(<FinanceOverview />)} />
                     <Route path="logs" element={withSuspense(<AuditLogsPage />)} />
+                    <Route path="monitoring" element={withSuspense(<Monitoring />)} />
                     <Route path="security" element={withSuspense(<AdminSecurity />)} />
                     <Route path="settings" element={withSuspense(<AdminSettings />)} />
                     <Route path="*" element={<Navigate to="/admin/dashboard" />} />

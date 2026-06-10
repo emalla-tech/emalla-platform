@@ -5,6 +5,8 @@ import App from './App';
 import { AuthProvider } from './auth/AuthContext';
 import { pwaService } from './services/pwaService';
 import { notificationPrepService } from './services/notificationPrepService';
+import { monitoringService } from './services/monitoringService';
+import AppErrorBoundary from './components/monitoring/AppErrorBoundary';
 import './index.css';
 
 const rootElement = document.getElementById('root');
@@ -15,9 +17,11 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    <AppErrorBoundary>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </AppErrorBoundary>
   </React.StrictMode>
 );
 
@@ -33,3 +37,4 @@ window.setTimeout(() => {
 
 void pwaService.registerServiceWorker();
 void notificationPrepService.syncWithServiceWorker();
+monitoringService.installGlobalHandlers();

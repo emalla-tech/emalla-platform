@@ -17,7 +17,8 @@ import {
   Search,
   FileText,
   Mail,
-  Shield
+  Shield,
+  Activity
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import MobileBottomNav from '../components/pwa/MobileBottomNav';
@@ -43,6 +44,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { name: 'Logistics', path: '/admin/dashboard/logistics', icon: <Truck size={20} /> },
     { name: 'Finance', path: '/admin/dashboard/finance', icon: <DollarSign size={20} /> },
     { name: 'Audit Logs', path: '/admin/dashboard/logs', icon: <ShieldAlert size={20} /> },
+    { name: 'Monitoring', path: '/admin/dashboard/monitoring', icon: <Activity size={20} /> },
     { name: 'Security', path: '/admin/dashboard/security', icon: <Shield size={20} /> },
     { name: 'Settings', path: '/admin/dashboard/settings', icon: <Settings size={20} /> },
   ];
@@ -115,10 +117,14 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           </div>
 
           <div className="flex items-center space-x-3 md:space-x-6">
-            <button className="relative p-2 text-gray-400 hover:bg-gray-50 rounded-lg">
+            <Link
+              to="/admin/dashboard/monitoring"
+              aria-label="Open system monitoring"
+              className="relative p-2 text-gray-400 hover:bg-gray-50 rounded-lg"
+            >
               <Bell size={20} />
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-            </button>
+            </Link>
             <div className="flex items-center space-x-3 pl-3 md:pl-6 border-l border-gray-100">
               <div className="text-right">
                 <p className="text-sm font-bold text-gray-900">Admin Panel</p>

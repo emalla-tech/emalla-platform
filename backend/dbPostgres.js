@@ -330,8 +330,8 @@ const mapOrder = (row) => ({
   ...(row.metadata || {}),
   id: row.id,
   orderNumber: row.order_number,
-  userId: row.user_id || undefined,
-  customerId: row.user_id || undefined,
+  userId: row.user_id || row.metadata?.customerId || undefined,
+  customerId: row.user_id || row.metadata?.customerId || undefined,
   merchantId: row.merchant_id || undefined,
   riderId: row.rider_id || undefined,
   status: row.status,
@@ -1754,7 +1754,51 @@ export const createPostgresAdapter = () => {
     },
 
     async persistCheckoutBundle(bundle = {}) {
-      await tx(async (client) => {
+      return tx(async (client) => {
+        const updatedProducts = [];
+        if (bundle.inventoryReleaseOrderId) {
+          const orderResult = await client.query(
+            'SELECT metadata FROM orders WHERE id = $1 FOR UPDATE',
+            [bundle.inventoryReleaseOrderId]
+          );
+          if (orderResult.rows[0]?.metadata?.inventoryRestockedAt) {
+            const error = new Error('This order inventory has already been restored.');
+            error.statusCode = 409;
+            throw error;
+          }
+        }
+
+        const adjustments = [...(bundle.inventoryAdjustments || [])]
+          .sort((left, right) => String(left.productId).localeCompare(String(right.productId)));
+
+        for (const adjustment of adjustments) {
+          const result = await client.query(
+            'SELECT id, name, stock FROM products WHERE id = $1 FOR UPDATE',
+            [adjustment.productId]
+          );
+          const product = result.rows[0];
+          if (!product) {
+            const error = new Error('A product in your cart is no longer available.');
+            error.statusCode = 409;
+            throw error;
+          }
+
+          const delta = Number(adjustment.delta || 0);
+          const currentStock = Number(product.stock || 0);
+          const nextStock = currentStock + delta;
+          if (!Number.isInteger(delta) || nextStock < 0) {
+            const error = new Error(`${product.name || 'Product'} only has ${currentStock} unit(s) available.`);
+            error.statusCode = 409;
+            throw error;
+          }
+
+          await client.query(
+            'UPDATE products SET stock = $2, updated_at = NOW() WHERE id = $1',
+            [product.id, nextStock]
+          );
+          updatedProducts.push({ id: product.id, name: product.name, stock: nextStock });
+        }
+
         for (const order of bundle.orders || []) {
           await upsertOrderRecord(client, order);
         }
@@ -1778,6 +1822,8 @@ export const createPostgresAdapter = () => {
         for (const entry of bundle.emailLogs || []) {
           await upsertEmailLogRecord(client, entry);
         }
+
+        return { updatedProducts };
       });
     }
   };

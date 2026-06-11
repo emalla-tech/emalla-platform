@@ -13,6 +13,7 @@ interface CartProps {
       name: string;
       price: number;
       image: string;
+      stock: number;
     };
   }>;
   subtotal: number;
@@ -21,6 +22,8 @@ interface CartProps {
 }
 
 const Cart: React.FC<CartProps> = ({ cartItems, subtotal, onUpdateQuantity, onRemoveItem }) => {
+  const hasStockIssue = cartItems.some((item) => item.product.stock <= 0 || item.quantity > item.product.stock);
+
   if (cartItems.length === 0) {
     return (
       <div className="bg-gray-50 min-h-screen py-16">
@@ -59,6 +62,9 @@ const Cart: React.FC<CartProps> = ({ cartItems, subtotal, onUpdateQuantity, onRe
                 <div className="flex-grow text-center sm:text-left">
                   <h3 className="text-xl font-bold text-gray-900 mb-2">{item.product.name}</h3>
                   <p className="text-orange-500 font-black text-lg">RWF {item.product.price.toLocaleString()}</p>
+                  <p className={`mt-2 text-xs font-bold ${item.product.stock > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {item.product.stock > 0 ? `${item.product.stock} unit(s) available` : 'Out of stock'}
+                  </p>
                   {(item.selectedColor || item.selectedSize) && (
                     <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-2">
                       {[item.selectedColor, item.selectedSize].filter(Boolean).join(' / ')}
@@ -70,7 +76,14 @@ const Cart: React.FC<CartProps> = ({ cartItems, subtotal, onUpdateQuantity, onRe
                   <div className="flex items-center bg-gray-50 rounded-2xl p-1 border border-gray-100">
                     <button onClick={() => onUpdateQuantity(item.productId, item.quantity - 1)} className="p-2 hover:bg-white hover:text-orange-500 rounded-xl transition-all"><Minus size={16} /></button>
                     <span className="px-4 font-bold text-gray-900">{item.quantity}</span>
-                    <button onClick={() => onUpdateQuantity(item.productId, item.quantity + 1)} className="p-2 hover:bg-white hover:text-orange-500 rounded-xl transition-all"><Plus size={16} /></button>
+                    <button
+                      onClick={() => onUpdateQuantity(item.productId, item.quantity + 1)}
+                      disabled={item.quantity >= item.product.stock}
+                      className="p-2 hover:bg-white hover:text-orange-500 rounded-xl transition-all disabled:cursor-not-allowed disabled:opacity-30"
+                      aria-label="Increase quantity"
+                    >
+                      <Plus size={16} />
+                    </button>
                   </div>
                   
                   <button onClick={() => onRemoveItem(item.productId)} className="text-gray-300 hover:text-red-500 transition-colors p-2">
@@ -116,13 +129,19 @@ const Cart: React.FC<CartProps> = ({ cartItems, subtotal, onUpdateQuantity, onRe
                 </p>
               </div>
 
-              <Link 
-                to="/checkout" 
-                className="w-full bg-orange-500 text-white py-5 rounded-2xl font-black text-lg flex items-center justify-center space-x-3 hover:bg-orange-600 transition-all shadow-xl shadow-orange-200 active:scale-95 group"
-              >
-                <span>Proceed to Checkout</span>
-                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-              </Link>
+              {hasStockIssue ? (
+                <div className="w-full rounded-2xl bg-red-50 px-5 py-4 text-center text-sm font-bold text-red-600">
+                  Update or remove unavailable products before checkout.
+                </div>
+              ) : (
+                <Link
+                  to="/checkout"
+                  className="w-full bg-orange-500 text-white py-5 rounded-2xl font-black text-lg flex items-center justify-center space-x-3 hover:bg-orange-600 transition-all shadow-xl shadow-orange-200 active:scale-95 group"
+                >
+                  <span>Proceed to Checkout</span>
+                  <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                </Link>
+              )}
             </div>
           </div>
 

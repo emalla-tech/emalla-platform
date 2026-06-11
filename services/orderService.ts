@@ -70,8 +70,8 @@ export const OrderService = {
     return true;
   },
 
-  cancelOrder: async (orderId: string): Promise<boolean> => {
-    await apiClient.cancelOrder(orderId);
+  cancelOrder: async (orderId: string, options?: { email?: string; phone?: string }): Promise<boolean> => {
+    await apiClient.cancelOrder(orderId, options);
     return true;
   },
 

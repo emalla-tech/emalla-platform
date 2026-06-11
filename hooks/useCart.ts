@@ -39,6 +39,10 @@ export const useCart = () => {
 
   const addItem = useCallback((item: CartItem) => {
     setItems((current) => {
+      const catalogProduct = catalogProducts[item.productId];
+      const availableStock = catalogProduct ? Math.max(0, Number(catalogProduct.stock || 0)) : Number.POSITIVE_INFINITY;
+      if (catalogProduct && availableStock === 0) return current;
+
       const existingIndex = current.findIndex(
         (entry) =>
           entry.productId === item.productId &&
@@ -47,25 +51,27 @@ export const useCart = () => {
       );
 
       if (existingIndex === -1) {
-        return [...current, item];
+        return [...current, { ...item, quantity: Math.min(Math.max(1, item.quantity), availableStock) }];
       }
 
       const next = [...current];
       next[existingIndex] = {
         ...next[existingIndex],
-        quantity: next[existingIndex].quantity + item.quantity
+        quantity: Math.min(next[existingIndex].quantity + item.quantity, availableStock)
       };
       return next;
     });
-  }, []);
+  }, [catalogProducts]);
 
   const updateQuantity = useCallback((productId: string, quantity: number) => {
+    const catalogProduct = catalogProducts[productId];
+    const availableStock = catalogProduct ? Math.max(0, Number(catalogProduct.stock || 0)) : Number.POSITIVE_INFINITY;
     setItems((current) =>
       current
-        .map((item) => (item.productId === productId ? { ...item, quantity } : item))
+        .map((item) => (item.productId === productId ? { ...item, quantity: Math.min(quantity, availableStock) } : item))
         .filter((item) => item.quantity > 0)
     );
-  }, []);
+  }, [catalogProducts]);
 
   const removeItem = useCallback((productId: string) => {
     setItems((current) => current.filter((item) => item.productId !== productId));

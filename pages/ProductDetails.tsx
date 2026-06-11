@@ -198,9 +198,10 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
   };
 
   const handleAddToCart = () => {
+    if (!product || product.stock <= 0) return;
     onAddToCart({
-      productId: product!.id,
-      quantity,
+      productId: product.id,
+      quantity: Math.min(quantity, product.stock),
       selectedSize,
       selectedColor
     });
@@ -475,8 +476,9 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
                           <span className="font-bold text-lg">{quantity}</span>
                         </div>
                         <button 
-                          onClick={() => setQuantity(quantity + 1)}
-                          className="p-3 bg-gray-50 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                          onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
+                          disabled={quantity >= product.stock}
+                          className="p-3 bg-gray-50 hover:bg-orange-50 hover:text-orange-600 transition-colors disabled:cursor-not-allowed disabled:opacity-30"
                           aria-label="Increase quantity"
                         >
                           <Plus size={18} />
@@ -493,14 +495,15 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
                   <div className="flex gap-4 pt-2">
                     <button 
                       onClick={handleAddToCart}
-                      className={`flex-grow py-5 rounded-2xl font-bold flex items-center justify-center space-x-3 transition-all shadow-lg active:scale-95 group ${isAdded ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-200'}`}
+                      disabled={product.stock <= 0}
+                      className={`flex-grow py-5 rounded-2xl font-bold flex items-center justify-center space-x-3 transition-all shadow-lg active:scale-95 group disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none ${isAdded ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-200'}`}
                     >
                       {isAdded ? (
                         <Check size={20} className="animate-in zoom-in" />
                       ) : (
                         <ShoppingBag size={20} className="group-hover:rotate-12 transition-transform" />
                       )}
-                      <span className="text-lg">{isAdded ? 'Added to Cart' : 'Add to Cart'}</span>
+                      <span className="text-lg">{product.stock <= 0 ? 'Out of Stock' : isAdded ? 'Added to Cart' : 'Add to Cart'}</span>
                     </button>
                     <button
                       onClick={handleToggleWishlist}
@@ -867,15 +870,17 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={handleAddToCart}
+              disabled={product.stock <= 0}
               className={`rounded-2xl px-4 py-4 text-sm font-black transition-all active:scale-[0.98] ${
-                isAdded ? 'bg-emerald-500 text-white' : 'bg-gray-900 text-white'
+                product.stock <= 0 ? 'cursor-not-allowed bg-gray-200 text-gray-500' : isAdded ? 'bg-emerald-500 text-white' : 'bg-gray-900 text-white'
               }`}
             >
-              {isAdded ? 'Added' : 'Add to Cart'}
+              {product.stock <= 0 ? 'Out of Stock' : isAdded ? 'Added' : 'Add to Cart'}
             </button>
             <button
               onClick={handleBuyNow}
-              className="rounded-2xl bg-orange-500 px-4 py-4 text-sm font-black text-white shadow-lg shadow-orange-200 transition-all active:scale-[0.98]"
+              disabled={product.stock <= 0}
+              className="rounded-2xl bg-orange-500 px-4 py-4 text-sm font-black text-white shadow-lg shadow-orange-200 transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none"
             >
               Buy Now
             </button>

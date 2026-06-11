@@ -205,7 +205,9 @@ const getJsonAdapter = () => {
     },
     persistCheckoutBundle: async (bundle = {}) => {
       const snapshot = await jsonDb.readDb();
+      const updatedProducts = [];
       snapshot.orders = snapshot.orders || [];
+      snapshot.products = snapshot.products || [];
       snapshot.payments = snapshot.payments || [];
       snapshot.transactions = snapshot.transactions || [];
       snapshot.notifications = snapshot.notifications || [];
@@ -221,6 +223,36 @@ const getJsonAdapter = () => {
         }
       };
 
+      if (bundle.inventoryReleaseOrderId) {
+        const existingOrder = snapshot.orders.find((entry) => entry.id === bundle.inventoryReleaseOrderId);
+        if (existingOrder?.inventoryRestockedAt) {
+          const error = new Error('This order inventory has already been restored.');
+          error.statusCode = 409;
+          throw error;
+        }
+      }
+
+      for (const adjustment of bundle.inventoryAdjustments || []) {
+        const product = snapshot.products.find((entry) => entry.id === adjustment.productId);
+        if (!product) {
+          const error = new Error('A product in your cart is no longer available.');
+          error.statusCode = 409;
+          throw error;
+        }
+
+        const delta = Number(adjustment.delta || 0);
+        const nextStock = Number(product.stock || 0) + delta;
+        if (!Number.isInteger(delta) || nextStock < 0) {
+          const error = new Error(`${product.name || 'Product'} only has ${Number(product.stock || 0)} unit(s) available.`);
+          error.statusCode = 409;
+          throw error;
+        }
+
+        product.stock = nextStock;
+        product.updatedAt = new Date().toISOString();
+        updatedProducts.push({ id: product.id, name: product.name, stock: nextStock });
+      }
+
       (bundle.orders || []).forEach((entry) => upsertById(snapshot.orders, entry));
       (bundle.payments || []).forEach((entry) => upsertById(snapshot.payments, entry));
       (bundle.transactions || []).forEach((entry) => upsertById(snapshot.transactions, entry));
@@ -229,6 +261,7 @@ const getJsonAdapter = () => {
       (bundle.emailLogs || []).forEach((entry) => upsertById(snapshot.emailLogs, entry));
 
       await jsonDb.writeDb(snapshot);
+      return { updatedProducts };
     },
     writeDb: jsonDb.writeDb,
     ensureDb: jsonDb.ensureDb

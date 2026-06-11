@@ -88,6 +88,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
 
     setIsProcessing(true);
     setErrorMessage(null);
+    let createdOrderId: string | null = null;
     try {
       const primaryMerchant = cartItems[0]?.product;
       const order = await OrderService.createOrder({
@@ -110,6 +111,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
         paymentMethod: formData.paymentMethod,
         notes: formData.notes
       });
+      createdOrderId = order.id;
 
       const paymentInit = await PaymentService.initializePayment({
         orderId: order.id,
@@ -131,6 +133,12 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
       }, 1000);
 
     } catch (err) {
+      if (createdOrderId) {
+        await OrderService.cancelOrder(createdOrderId, {
+          email: formData.email,
+          phone: formData.phone
+        }).catch(() => undefined);
+      }
       setErrorMessage(err instanceof Error ? err.message : 'Checkout failed. Please try again.');
       setIsProcessing(false);
     }

@@ -81,6 +81,7 @@ const API_RATE_LIMITS = {
 };
 const RESPONSE_COMPRESSION_THRESHOLD_BYTES = 1024;
 const MONITORING_TEXT_LIMIT = 3000;
+const LOW_STOCK_THRESHOLD = 5;
 
 const structuredLog = (level, message, details = {}) => {
   const payload = JSON.stringify({
@@ -683,6 +684,84 @@ const getOrderStatusNotification = (order, status) => {
     title: 'Order Updated',
     message: `Your order ${order.orderNumber} is now ${formatOrderStatusLabel(status)}.`
   };
+};
+
+const buildInventoryAdjustments = (items = [], direction = -1) => {
+  const quantities = new Map();
+  for (const item of items) {
+    const productId = String(item.productId || '').trim();
+    const quantity = Number(item.quantity || 0);
+    if (!productId || !Number.isInteger(quantity) || quantity <= 0) continue;
+    quantities.set(productId, (quantities.get(productId) || 0) + quantity);
+  }
+
+  return Array.from(quantities, ([productId, quantity]) => ({
+    productId,
+    delta: quantity * direction
+  }));
+};
+
+const buildTrustedOrderItems = (db, rawItems = []) => {
+  if (!Array.isArray(rawItems) || rawItems.length === 0) {
+    const error = new Error('Your cart is empty.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return rawItems.map((item) => {
+    const product = (db.products || []).find((entry) => entry.id === item.productId);
+    const quantity = Number(item.quantity || 0);
+
+    if (!product || product.status !== 'approved') {
+      const error = new Error('A product in your cart is no longer available.');
+      error.statusCode = 409;
+      throw error;
+    }
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      const error = new Error(`Choose a valid quantity for ${product.name}.`);
+      error.statusCode = 400;
+      throw error;
+    }
+    if (quantity > Number(product.stock || 0)) {
+      const error = new Error(`${product.name} only has ${Number(product.stock || 0)} unit(s) available.`);
+      error.statusCode = 409;
+      throw error;
+    }
+
+    const price = Number(product.price || 0);
+    return {
+      productId: product.id,
+      productName: product.name,
+      quantity,
+      price,
+      subtotal: price * quantity,
+      variant: item.variant || [item.selectedColor, item.selectedSize].filter(Boolean).join(' / ') || undefined
+    };
+  });
+};
+
+const createLowStockNotifications = (db, products, items) => {
+  const quantities = new Map(buildInventoryAdjustments(items).map((entry) => [entry.productId, Math.abs(entry.delta)]));
+  const notifications = [];
+
+  for (const product of products) {
+    const projectedStock = Number(product.stock || 0) - Number(quantities.get(product.id) || 0);
+    if (projectedStock > LOW_STOCK_THRESHOLD) continue;
+
+    notifications.push(createNotification(db, {
+      userId: product.merchantId,
+      role: 'MERCHANT',
+      title: projectedStock === 0 ? 'Product Out of Stock' : 'Low Stock Alert',
+      message:
+        projectedStock === 0
+          ? `${product.name} is now out of stock. Restock it before accepting more sales.`
+          : `${product.name} will have only ${projectedStock} unit(s) remaining after this order.`,
+      type: projectedStock === 0 ? 'warning' : 'info',
+      metadata: { productId: product.id, projectedStock }
+    }));
+  }
+
+  return notifications;
 };
 
 const buildOrderStatusEmailMessage = ({ order, status, actorName }) => {
@@ -3630,6 +3709,11 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
 
       const body = await readBody(req);
+      const stock = Number(body.stock ?? 0);
+      if (!Number.isInteger(stock) || stock < 0) {
+        sendJson(res, 400, { error: 'Stock must be a non-negative whole number.' });
+        return;
+      }
       const db = await readDb();
       const canControlApproval = user.role === 'ADMIN';
       const product = normalizeProductMedia({
@@ -3639,7 +3723,7 @@ const server = http.createServer(async (req, res) => {
         category: body.category || '1',
         image: body.image || '/catalog/electronics.svg',
         images: body.images || [],
-        stock: body.stock || 0,
+        stock,
         rating: body.rating || 0,
         description: body.description || '',
         specifications: body.specifications || '',
@@ -3690,6 +3774,15 @@ const server = http.createServer(async (req, res) => {
       if (user.role !== 'ADMIN' && existing.merchantId !== user.id) {
         sendJson(res, 403, { error: 'Forbidden' });
         return;
+      }
+
+      if (body.stock !== undefined) {
+        const stock = Number(body.stock);
+        if (!Number.isInteger(stock) || stock < 0) {
+          sendJson(res, 400, { error: 'Stock must be a non-negative whole number.' });
+          return;
+        }
+        body.stock = stock;
       }
 
       const previousMediaUrls = getProductMediaUrls(existing);
@@ -4079,7 +4172,7 @@ const server = http.createServer(async (req, res) => {
 
       const body = await readBody(req);
       const db = await readDb();
-      const items = Array.isArray(body.items) ? body.items : [];
+      const items = buildTrustedOrderItems(db, body.items);
       const customerName = String(body.customerName || user?.name || '').trim();
       const customerEmail = String(body.customerEmail || user?.email || '').trim().toLowerCase();
       const customerPhone = String(body.phone || user?.phone || '').trim();
@@ -4090,8 +4183,8 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
-      const deliveryFee = body.deliveryFee || 0;
+      const subtotal = items.reduce((acc, item) => acc + item.subtotal, 0);
+      const deliveryFee = subtotal > 50000 ? 0 : 3500;
       const totalAmount = subtotal + deliveryFee;
       const firstProduct = db.products.find((product) => product.id === items[0]?.productId);
       const matchedProducts = items
@@ -4099,10 +4192,7 @@ const server = http.createServer(async (req, res) => {
         .filter(Boolean);
       const merchantIdsInCart = Array.from(
         new Set(
-          [
-            body.merchantId,
-            ...matchedProducts.map((product) => product?.merchantId)
-          ].filter(Boolean)
+          matchedProducts.map((product) => product?.merchantId).filter(Boolean)
         )
       );
 
@@ -4111,11 +4201,11 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const merchantId = body.merchantId || merchantIdsInCart[0] || firstProduct?.merchantId;
+      const merchantId = merchantIdsInCart[0] || firstProduct?.merchantId;
       const merchantUser = merchantId
         ? db.users.find((entry) => entry.id === merchantId && entry.role === 'MERCHANT')
         : null;
-      const merchantName = body.merchantName || firstProduct?.merchantName || merchantUser?.name;
+      const merchantName = firstProduct?.merchantName || merchantUser?.name;
 
       if (!merchantId || !merchantName) {
         sendJson(res, 400, { error: 'Merchant information is required to create this order.' });
@@ -4130,7 +4220,7 @@ const server = http.createServer(async (req, res) => {
         customerEmail,
         merchantId,
         merchantName,
-        items: items.map((item) => ({ ...item, subtotal: item.price * item.quantity })),
+        items,
         status: 'pending_payment',
         paymentStatus: 'PENDING',
         paymentMethod: body.paymentMethod || 'MOMO',
@@ -4140,28 +4230,32 @@ const server = http.createServer(async (req, res) => {
         address: customerAddress,
         phone: customerPhone,
         notes: body.notes,
+        inventoryReservedAt: new Date().toISOString(),
+        inventoryRestockedAt: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
       db.orders.unshift(order);
       invalidatePublicInsightsCache();
-      createNotification(db, {
+      const checkoutNotifications = [];
+      checkoutNotifications.push(createNotification(db, {
         userId: order.customerId,
         role: 'CUSTOMER',
         title: 'Order Placed!',
         message: `Your order ${order.orderNumber} is awaiting payment.`,
         type: 'info',
         metadata: { orderId: order.id }
-      });
-      createNotification(db, {
+      }));
+      checkoutNotifications.push(createNotification(db, {
         userId: order.merchantId,
         role: 'MERCHANT',
         title: 'New Incoming Order!',
         message: `Order ${order.orderNumber} has been placed for RWF ${order.totalAmount.toLocaleString()}.`,
         type: 'success',
         metadata: { orderId: order.id }
-      });
+      }));
+      checkoutNotifications.push(...createLowStockNotifications(db, matchedProducts, items));
       createAuditLog(db, {
         event: `Order placed: ${order.orderNumber}`,
         actor: user?.name || user?.email || order.customerEmail || order.customerName,
@@ -4178,10 +4272,12 @@ const server = http.createServer(async (req, res) => {
       });
       await persistCheckoutBundleRecord({
         orders: [order],
-        notifications: db.notifications.slice(0, 2),
+        notifications: checkoutNotifications,
         auditLogs: db.auditLogs.slice(0, 1),
-        emailLogs: db.emailLogs.slice(0, 2)
+        emailLogs: db.emailLogs.slice(0, 2),
+        inventoryAdjustments: buildInventoryAdjustments(items)
       });
+      invalidateProductsCache();
       sendJson(res, 201, { order });
       return;
     }
@@ -4314,10 +4410,18 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      const shouldRestockInventory =
+        body.status === 'cancelled' &&
+        current.inventoryReservedAt &&
+        !current.inventoryRestockedAt;
+      const notificationCountBefore = db.notifications.length;
+      const auditLogCountBefore = db.auditLogs.length;
+      const emailLogCountBefore = db.emailLogs.length;
       db.orders[index] = {
         ...current,
         status: body.status,
         paymentStatus: body.status === 'paid' ? 'SUCCESS' : current.paymentStatus,
+        inventoryRestockedAt: shouldRestockInventory ? new Date().toISOString() : current.inventoryRestockedAt,
         updatedAt: new Date().toISOString()
       };
 
@@ -4389,7 +4493,19 @@ const server = http.createServer(async (req, res) => {
         })
       });
 
-      await writeDb(db);
+      if (shouldRestockInventory) {
+        await persistCheckoutBundleRecord({
+          orders: [db.orders[index]],
+          notifications: db.notifications.slice(0, db.notifications.length - notificationCountBefore),
+          auditLogs: db.auditLogs.slice(0, db.auditLogs.length - auditLogCountBefore),
+          emailLogs: db.emailLogs.slice(0, db.emailLogs.length - emailLogCountBefore),
+          inventoryReleaseOrderId: current.id,
+          inventoryAdjustments: buildInventoryAdjustments(current.items, 1)
+        });
+        invalidateProductsCache();
+      } else {
+        await writeDb(db);
+      }
       sendJson(res, 200, { order: db.orders[index] });
       return;
     }
@@ -4498,10 +4614,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname.startsWith('/api/orders/') && pathname.endsWith('/cancel') && req.method === 'PUT') {
-      const user = await requireUser(req, res);
-      if (!user) return;
-
+      const user = await getOptionalUser(req);
       const orderId = pathname.split('/')[3];
+      const body = await readBody(req);
       const db = await readDb();
       const index = db.orders.findIndex((order) => order.id === orderId);
 
@@ -4511,13 +4626,22 @@ const server = http.createServer(async (req, res) => {
       }
 
       const current = db.orders[index];
+      const guestEmail = String(body.email || '').trim().toLowerCase();
+      const guestPhone = String(body.phone || '').trim();
+      const guestMatches =
+        String(current.customerId || '').startsWith('GST-') &&
+        (
+          (guestEmail && guestEmail === String(current.customerEmail || '').trim().toLowerCase()) ||
+          (guestPhone && guestPhone === String(current.phone || '').trim())
+        );
       const canCancel =
-        user.role === 'ADMIN' ||
-        current.customerId === user.id ||
-        current.merchantId === user.id;
+        user?.role === 'ADMIN' ||
+        current.customerId === user?.id ||
+        current.merchantId === user?.id ||
+        guestMatches;
 
       if (!canCancel) {
-        sendJson(res, 403, { error: 'Forbidden' });
+        sendJson(res, user ? 403 : 401, { error: user ? 'Forbidden' : 'Tracking email or phone is required.' });
         return;
       }
 
@@ -4527,9 +4651,13 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      const shouldRestockInventory = current.inventoryReservedAt && !current.inventoryRestockedAt;
+      const notificationCountBefore = db.notifications.length;
+      const auditLogCountBefore = db.auditLogs.length;
       db.orders[index] = {
         ...current,
         status: 'cancelled',
+        inventoryRestockedAt: shouldRestockInventory ? new Date().toISOString() : current.inventoryRestockedAt,
         updatedAt: new Date().toISOString()
       };
 
@@ -4543,7 +4671,7 @@ const server = http.createServer(async (req, res) => {
       });
       createAuditLog(db, {
         event: `Order cancelled: ${current.orderNumber}`,
-        actor: user.name || user.email,
+        actor: user?.name || user?.email || current.customerEmail || current.customerName,
         category: 'orders',
         status: 'error',
         metadata: {
@@ -4554,7 +4682,18 @@ const server = http.createServer(async (req, res) => {
         }
       });
 
-      await writeDb(db);
+      if (shouldRestockInventory) {
+        await persistCheckoutBundleRecord({
+          orders: [db.orders[index]],
+          notifications: db.notifications.slice(0, db.notifications.length - notificationCountBefore),
+          auditLogs: db.auditLogs.slice(0, db.auditLogs.length - auditLogCountBefore),
+          inventoryReleaseOrderId: current.id,
+          inventoryAdjustments: buildInventoryAdjustments(current.items, 1)
+        });
+        invalidateProductsCache();
+      } else {
+        await writeDb(db);
+      }
       sendJson(res, 200, { order: db.orders[index] });
       return;
     }
@@ -4571,13 +4710,27 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      const paymentOrder = db.orders[orderIndex];
+      const guestEmail = String(body.customerEmail || '').trim().toLowerCase();
+      const canPay =
+        (user && (user.role === 'ADMIN' || paymentOrder.customerId === user.id)) ||
+        (!user && guestEmail && guestEmail === String(paymentOrder.customerEmail || '').trim().toLowerCase());
+      if (!canPay) {
+        sendJson(res, user ? 403 : 401, { error: user ? 'Forbidden' : 'Order email verification is required.' });
+        return;
+      }
+      if (paymentOrder.status === 'cancelled') {
+        sendJson(res, 409, { error: 'A cancelled order cannot be paid.' });
+        return;
+      }
+
       const txRef = `EMALLA-TX-${body.orderId}-${Date.now()}`;
       const isCashOnDelivery = body.method === 'CASH_ON_DELIVERY';
       const payment = {
         id: `pay-${Date.now()}`,
         orderId: body.orderId,
         userId: user?.id || db.orders[orderIndex].customerId,
-        amount: body.amount,
+        amount: paymentOrder.totalAmount,
         method: body.method,
         status: isCashOnDelivery ? 'PENDING' : 'SUCCESS',
         tx_ref: txRef,
@@ -4599,7 +4752,7 @@ const server = http.createServer(async (req, res) => {
         createTransaction(db, {
           userId: db.orders[orderIndex].customerId,
           orderId: body.orderId,
-          amount: body.amount,
+          amount: paymentOrder.totalAmount,
           type: 'payment',
           status: 'success',
           method: body.method,

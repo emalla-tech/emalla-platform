@@ -247,9 +247,10 @@ export const apiClient = {
     });
   },
 
-  async cancelOrder(orderId: string) {
+  async cancelOrder(orderId: string, options?: { email?: string; phone?: string }) {
     return request(`/orders/${orderId}/cancel`, {
-      method: 'PUT'
+      method: 'PUT',
+      body: JSON.stringify(options || {})
     });
   },
 

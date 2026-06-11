@@ -136,8 +136,9 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
     localStorage.removeItem(RECENT_SEARCHES_KEY);
   };
 
-  const handleAddToCart = (e: React.MouseEvent, productId: string) => {
+  const handleAddToCart = (e: React.MouseEvent, productId: string, stock: number) => {
     e.stopPropagation();
+    if (stock <= 0) return;
     if (onAddToCart) onAddToCart({ productId, quantity: 1 });
     setAddedItems(prev => new Set(prev).add(productId));
     
@@ -430,14 +431,19 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                           <span className="text-2xl font-black text-gray-900">RWF {product.price.toLocaleString()}</span>
                         </div>
                         <button 
-                          onClick={(e) => handleAddToCart(e, product.id)} 
+                          onClick={(e) => handleAddToCart(e, product.id, product.stock)}
+                          disabled={product.stock <= 0}
                           className={`w-full py-4 rounded-2xl text-sm font-black transition-all flex items-center justify-center shadow-lg active:scale-[0.98] ${
-                            addedItems.has(product.id) 
+                            product.stock <= 0
+                            ? 'cursor-not-allowed bg-gray-200 text-gray-500 shadow-none'
+                            : addedItems.has(product.id)
                             ? 'bg-emerald-500 text-white shadow-emerald-200' 
                             : 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-200'
                           }`}
                         >
-                          {addedItems.has(product.id) ? (
+                          {product.stock <= 0 ? (
+                            <>Out of Stock</>
+                          ) : addedItems.has(product.id) ? (
                             <><Check size={18} className="mr-2" /> Added to Bag</>
                           ) : (
                             <><ShoppingBag size={18} className="mr-2" /> Add to Cart</>

@@ -33,8 +33,9 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
   const { t } = useLanguage();
   const featuredProducts = [...products].sort((left, right) => Number(Boolean(right.featured)) - Number(Boolean(left.featured))).slice(0, 8);
 
-  const handleAddToCart = (e: React.MouseEvent, productId: string) => {
+  const handleAddToCart = (e: React.MouseEvent, productId: string, stock: number) => {
     e.stopPropagation();
+    if (stock <= 0) return;
     onAddToCart({ productId, quantity: 1 });
     setAddedItems(prev => new Set(prev).add(productId));
     setTimeout(() => setAddedItems(prev => {
@@ -212,14 +213,19 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
                       <span className="text-orange-600 font-black text-xl">RWF {product.price.toLocaleString()}</span>
                     </div>
                     <button 
-                      onClick={(e) => handleAddToCart(e, product.id)}
+                      onClick={(e) => handleAddToCart(e, product.id, product.stock)}
+                      disabled={product.stock <= 0}
                       className={`w-full py-3 rounded-xl text-xs font-black transition-all flex items-center justify-center shadow-lg active:scale-[0.98] ${
-                        addedItems.has(product.id) 
+                        product.stock <= 0
+                        ? 'cursor-not-allowed bg-gray-200 text-gray-500 shadow-none'
+                        : addedItems.has(product.id)
                         ? 'bg-emerald-500 text-white shadow-emerald-200' 
                         : 'bg-black text-white hover:bg-orange-600 shadow-black/10'
                       }`}
                     >
-                      {addedItems.has(product.id) ? (
+                      {product.stock <= 0 ? (
+                        <>Out of Stock</>
+                      ) : addedItems.has(product.id) ? (
                         <><Check size={14} className="mr-2" /> {t.home.added}</>
                       ) : (
                         <><ShoppingBag size={14} className="mr-2" /> {t.home.addToCart}</>

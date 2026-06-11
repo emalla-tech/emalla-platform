@@ -1995,10 +1995,7 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        const db = await readDb();
-        delete db.tokens[token];
-        db.sessions = (db.sessions || []).filter((entry) => entry.token !== token);
-        await saveRiderApplicationRecord(savedApplication);
+        await deleteAuthTokenRecord(token);
         sendJson(res, 200, { success: true });
         return;
       }

@@ -225,7 +225,7 @@ const CustomerDashboard: React.FC = () => {
             <h4 className="font-black text-lg mb-4">Need help?</h4>
             <p className="text-gray-400 text-sm mb-8">Chat with our 24/7 Rwandan support team for help with any order.</p>
             <button
-              onClick={() => navigate('/contact')}
+              onClick={() => navigate('/buyer/support')}
               className="w-full py-4 bg-white text-gray-900 rounded-2xl font-black text-sm hover:bg-orange-500 hover:text-white transition-all"
             >
               Open Support Ticket
@@ -256,7 +256,7 @@ const CustomerDashboard: React.FC = () => {
                 <span>Track Order</span>
                 <Truck size={16} />
               </button>
-              <button onClick={() => navigate('/contact')} className="flex items-center justify-between rounded-2xl bg-gray-100 px-4 py-4 text-sm font-black text-gray-700 transition-colors hover:bg-gray-200">
+              <button onClick={() => navigate('/buyer/support')} className="flex items-center justify-between rounded-2xl bg-gray-100 px-4 py-4 text-sm font-black text-gray-700 transition-colors hover:bg-gray-200">
                 <span>Contact Support</span>
                 <ChevronRight size={16} />
               </button>

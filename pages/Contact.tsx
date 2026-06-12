@@ -101,6 +101,19 @@ const Contact: React.FC = () => {
                 <li className="flex justify-between"><span>Sunday:</span> <span>Closed</span></li>
               </ul>
             </div>
+
+            <a
+              href="https://wa.me/250784352174?text=Hello%20E-Malla%20Support%2C%20I%20need%20help."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-5 rounded-3xl border border-emerald-200 bg-emerald-500 p-7 text-white shadow-xl shadow-emerald-100 transition-all hover:-translate-y-1 hover:bg-emerald-600"
+            >
+              <span className="rounded-2xl bg-white/20 p-4"><MessageSquare size={24} /></span>
+              <span>
+                <span className="block text-xs font-black uppercase tracking-widest text-emerald-100">Instant support</span>
+                <span className="mt-1 block text-lg font-black">Chat on WhatsApp</span>
+              </span>
+            </a>
           </div>
 
           {/* Contact Form */}

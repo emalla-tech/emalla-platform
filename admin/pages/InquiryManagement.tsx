@@ -8,7 +8,8 @@ type InquiryStatus = 'new' | 'replied' | 'resolved';
 
 type Inquiry = {
   id: string;
-  type: 'contact' | 'investor';
+  ticketNumber?: string;
+  type: 'contact' | 'investor' | 'support' | 'return' | 'refund';
   name: string;
   email: string;
   subject: string;
@@ -21,9 +22,13 @@ type Inquiry = {
   assignedAdminId?: string | null;
   assignedAdminName?: string | null;
   internalNotes?: string;
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  orderNumber?: string | null;
+  reason?: string;
+  requestedAmount?: number;
 };
 
-const FILTERS = ['all', 'contact', 'investor'] as const;
+const FILTERS = ['all', 'support', 'return', 'refund', 'contact', 'investor'] as const;
 
 const STATUS_STYLES: Record<InquiryStatus, string> = {
   new: 'bg-amber-100 text-amber-700',
@@ -41,6 +46,7 @@ const InquiryManagement: React.FC = () => {
   const [toastTone, setToastTone] = useState<'success' | 'error' | 'info'>('success');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [responseDrafts, setResponseDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const load = async () => {
@@ -138,13 +144,33 @@ const InquiryManagement: React.FC = () => {
     }
   };
 
+  const handleSendResponse = async (inquiryId: string) => {
+    const responseMessage = (responseDrafts[inquiryId] || '').trim();
+    if (!responseMessage) {
+      showToast('Write a customer response before sending.', 'error');
+      return;
+    }
+
+    setBusyId(inquiryId);
+    try {
+      const updated = await AdminService.updateInquiry(inquiryId, { responseMessage });
+      syncInquiry(updated);
+      setResponseDrafts((current) => ({ ...current, [inquiryId]: '' }));
+      showToast('Response sent to the customer by email and notification.', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to send response.', 'error');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <AdminToast message={toast} tone={toastTone} />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
           <h1 className="text-3xl font-black text-gray-900">Inquiries Desk</h1>
-          <p className="text-gray-500">Review contact messages and investor interest submitted through the public website.</p>
+          <p className="text-gray-500">Manage customer support tickets, returns, refunds, contact messages, and investor inquiries.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {FILTERS.map((item) => (
@@ -192,10 +218,23 @@ const InquiryManagement: React.FC = () => {
                     <div className="flex items-center gap-3 flex-wrap">
                       <h3 className="text-xl font-black text-gray-900">{entry.name}</h3>
                       <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                        entry.type === 'investor' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                        entry.type === 'investor'
+                          ? 'bg-purple-100 text-purple-700'
+                          : entry.type === 'refund'
+                            ? 'bg-rose-100 text-rose-700'
+                            : entry.type === 'return'
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-blue-100 text-blue-700'
                       }`}>
                         {entry.type}
                       </span>
+                      {entry.priority ? (
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                          entry.priority === 'urgent' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {entry.priority} priority
+                        </span>
+                      ) : null}
                       <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${STATUS_STYLES[entry.status]}`}>
                         {entry.status}
                       </span>
@@ -227,6 +266,22 @@ const InquiryManagement: React.FC = () => {
                       <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Message</p>
                       <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{entry.message}</p>
                     </div>
+                    {entry.orderNumber || entry.reason ? (
+                      <div className="grid gap-3 rounded-2xl border border-orange-100 bg-orange-50 p-4 sm:grid-cols-2">
+                        {entry.orderNumber ? (
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-orange-500">Related Order</p>
+                            <p className="mt-1 text-sm font-black text-gray-900">{entry.orderNumber}</p>
+                          </div>
+                        ) : null}
+                        {entry.reason ? (
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-orange-500">Request Reason</p>
+                            <p className="mt-1 text-sm font-black text-gray-900">{entry.reason.replaceAll('_', ' ')}</p>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
 
                     <div className="bg-gray-50 border border-gray-100 rounded-[28px] p-5">
                       <div className="flex items-center justify-between gap-3 mb-3">
@@ -268,6 +323,25 @@ const InquiryManagement: React.FC = () => {
                         </button>
                       </div>
                     </div>
+                    <div className="rounded-[28px] border border-blue-100 bg-blue-50 p-5">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-blue-500">Customer Response</p>
+                      <p className="mt-1 text-xs font-medium text-blue-700">This message will be sent by email and shown as a support update.</p>
+                      <textarea
+                        value={responseDrafts[entry.id] || ''}
+                        onChange={(event) => setResponseDrafts((current) => ({ ...current, [entry.id]: event.target.value }))}
+                        rows={4}
+                        className="mt-4 w-full resize-none rounded-2xl border border-blue-100 bg-white px-4 py-3 text-sm text-gray-700 outline-none"
+                        placeholder="Write a clear response or resolution for the customer..."
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSendResponse(entry.id)}
+                        disabled={isBusy}
+                        className="mt-3 rounded-2xl bg-blue-600 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-60"
+                      >
+                        Send Customer Response
+                      </button>
+                    </div>
                   </div>
 
                   <div className="xl:min-w-[260px] rounded-3xl bg-gray-50 border border-gray-100 p-5">
@@ -277,7 +351,7 @@ const InquiryManagement: React.FC = () => {
                     </div>
                     <p className="text-sm font-black text-gray-900">{new Date(entry.createdAt).toLocaleString()}</p>
                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mt-4">Inquiry ID</p>
-                    <p className="text-xs font-bold text-gray-600 mt-1 break-all">{entry.id}</p>
+                    <p className="text-xs font-bold text-gray-600 mt-1 break-all">{entry.ticketNumber || entry.id}</p>
                     <div className="mt-4 flex items-start gap-2 text-sm text-gray-600">
                       <UserCheck size={16} className="mt-0.5 text-gray-400" />
                       <div>

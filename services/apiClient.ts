@@ -226,6 +226,17 @@ export const apiClient = {
     });
   },
 
+  async getSupportTickets() {
+    return request('/support/tickets');
+  },
+
+  async createSupportTicket(params: object) {
+    return request('/support/tickets', {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+  },
+
   async updateOrderStatus(orderId: string, status: string) {
     return request(`/orders/${orderId}/status`, {
       method: 'PUT',
@@ -438,7 +449,7 @@ export const apiClient = {
 
   async updateAdminInquiry(
     inquiryId: string,
-    params: { status?: 'new' | 'replied' | 'resolved'; internalNotes?: string; assignToSelf?: boolean }
+    params: { status?: 'new' | 'replied' | 'resolved'; internalNotes?: string; responseMessage?: string; assignToSelf?: boolean }
   ) {
     return request(`/admin/inquiries/${inquiryId}`, {
       method: 'PUT',

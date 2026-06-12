@@ -444,6 +444,12 @@ const MyOrders: React.FC = () => {
                        <Printer size={18} />
                        <span>Download Invoice PDF</span>
                     </button>
+                    <Link
+                      to={`/buyer/support?type=${[OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(selectedOrder.status) ? 'return' : 'support'}&orderId=${selectedOrder.id}`}
+                      className="flex w-full items-center justify-center space-x-2 rounded-2xl border-2 border-blue-100 bg-blue-50 py-4 text-sm font-black text-blue-600 transition-all hover:bg-blue-100"
+                    >
+                      <span>{[OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(selectedOrder.status) ? 'Return or Refund Help' : 'Get Support for This Order'}</span>
+                    </Link>
                     {['pending_payment', 'paid', 'confirmed'].includes(selectedOrder.status) && (
                        <button 
                         onClick={() => handleCancel(selectedOrder.id)}

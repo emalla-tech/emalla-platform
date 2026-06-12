@@ -14,7 +14,8 @@ import {
   Bell,
   LogOut,
   Settings,
-  ChevronUp
+  ChevronUp,
+  LifeBuoy
 } from 'lucide-react';
 
 // Components
@@ -70,6 +71,7 @@ const MerchantWallet = lazy(() => import('./merchant/pages/Wallet'));
 const MerchantSettings = lazy(() => import('./merchant/pages/Settings'));
 const CustomerDashboard = lazy(() => import('./customer/pages/CustomerDashboard'));
 const MyOrders = lazy(() => import('./customer/pages/MyOrders'));
+const SupportCenter = lazy(() => import('./customer/pages/SupportCenter'));
 const AddressBook = lazy(() => import('./customer/pages/AddressBook'));
 const Wishlist = lazy(() => import('./customer/pages/Wishlist'));
 const RiderDashboard = lazy(() => import('./delivery/pages/RiderDashboard'));
@@ -411,6 +413,7 @@ const App: React.FC = () => {
                       <Routes>
                       <Route index element={withSuspense(<CustomerDashboard />)} />
                       <Route path="orders" element={withSuspense(<MyOrders />)} />
+                      <Route path="support" element={withSuspense(<SupportCenter />)} />
                       <Route path="wishlist" element={withSuspense(<Wishlist onAddToCart={addItem} />)} />
                       <Route path="orders/:id/track" element={withSuspense(<OrderTracking />)} />
                       <Route path="settings" element={withSuspense(<AddressBook />)} />
@@ -575,6 +578,10 @@ const CustomerSidebar = ({ onLogout }: { onLogout: () => void }) => (
       <Link to="/buyer/notifications" className="flex items-center space-x-3 p-4 hover:bg-blue-50 rounded-2xl font-bold text-gray-600 hover:text-blue-600 transition-all group">
         <Bell size={20} className="group-hover:scale-110 transition-transform" />
         <span>Inbox</span>
+      </Link>
+      <Link to="/buyer/support" className="flex items-center space-x-3 p-4 hover:bg-blue-50 rounded-2xl font-bold text-gray-600 hover:text-blue-600 transition-all group">
+        <LifeBuoy size={20} className="group-hover:scale-110 transition-transform" />
+        <span>Support Center</span>
       </Link>
       <Link to="/buyer/settings" className="flex items-center space-x-3 p-4 hover:bg-blue-50 rounded-2xl font-bold text-gray-600 hover:text-blue-600 transition-all group">
         <MapPin size={20} className="group-hover:scale-110 transition-transform" />

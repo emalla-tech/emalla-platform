@@ -852,6 +852,45 @@ const normalizeInquiryStatus = (value) => {
   return ['new', 'replied', 'resolved'].includes(normalized) ? normalized : 'new';
 };
 
+const generateSupportTicketNumber = () =>
+  `SUP-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+
+const getReturnEligibility = (order) => {
+  const eligibleStatuses = ['delivered', 'completed'];
+  const deliveredAt = new Date(order.updatedAt || order.createdAt || 0).getTime();
+  const expiresAt = deliveredAt + 7 * 24 * 60 * 60 * 1000;
+  const eligible = eligibleStatuses.includes(order.status) && Date.now() <= expiresAt;
+
+  return {
+    eligible,
+    expiresAt: new Date(expiresAt).toISOString(),
+    reason: eligible
+      ? ''
+      : !eligibleStatuses.includes(order.status)
+        ? 'Returns can be requested after an order is delivered.'
+        : 'The 7-day return request window has closed.'
+  };
+};
+
+const getRefundEligibility = (order) => {
+  const refundableStatuses = ['cancelled', 'rejected', 'delivered', 'completed'];
+  const paid = order.paymentStatus === 'SUCCESS';
+  const expiresAt = new Date(order.updatedAt || order.createdAt || 0).getTime() + 30 * 24 * 60 * 60 * 1000;
+  const eligible = paid && refundableStatuses.includes(order.status) && Date.now() <= expiresAt;
+
+  return {
+    eligible,
+    expiresAt: new Date(expiresAt).toISOString(),
+    reason: eligible
+      ? ''
+      : !paid
+        ? 'Refund requests are available for successfully paid orders.'
+        : !refundableStatuses.includes(order.status)
+          ? 'This order is not yet eligible for a refund review.'
+          : 'The 30-day refund request window has closed.'
+  };
+};
+
 const formatTrend = (currentValue, previousValue) => {
   if (!previousValue) return currentValue > 0 ? 100 : 0;
   return Number((((currentValue - previousValue) / previousValue) * 100).toFixed(1));
@@ -2236,6 +2275,174 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/support/tickets' && req.method === 'GET') {
+      const user = await requireUser(req, res);
+      if (!user) return;
+
+      const db = await readDb();
+      const tickets = (db.contactSubmissions || [])
+        .filter((entry) =>
+          user.role === 'ADMIN' ||
+          entry.customerId === user.id ||
+          String(entry.email || '').toLowerCase() === String(user.email || '').toLowerCase()
+        )
+        .map((entry) => {
+          if (user.role === 'ADMIN') return entry;
+          const { internalNotes, assignedAdminId, updatedBy, ...safeTicket } = entry;
+          return safeTicket;
+        })
+        .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime());
+
+      sendJson(res, 200, { tickets });
+      return;
+    }
+
+    if (pathname === '/api/support/tickets' && req.method === 'POST') {
+      const user = await requireRole(req, res, ['CUSTOMER', 'ADMIN']);
+      if (!user) return;
+
+      const body = await readBody(req);
+      const db = await readDb();
+      const requestType = ['support', 'return', 'refund'].includes(String(body.type || '').toLowerCase())
+        ? String(body.type).toLowerCase()
+        : 'support';
+      const orderId = String(body.orderId || '').trim();
+      const order = orderId ? (db.orders || []).find((entry) => entry.id === orderId || entry.orderNumber === orderId) : null;
+      const subject = String(body.subject || '').trim();
+      const message = String(body.message || '').trim();
+      const reason = String(body.reason || '').trim();
+      const priority = ['low', 'normal', 'high', 'urgent'].includes(String(body.priority || '').toLowerCase())
+        ? String(body.priority).toLowerCase()
+        : requestType === 'support' ? 'normal' : 'high';
+
+      if (!subject || message.length < 10) {
+        sendJson(res, 400, { error: 'Subject and a message of at least 10 characters are required.' });
+        return;
+      }
+
+      if (requestType !== 'support') {
+        if (!order || (user.role !== 'ADMIN' && order.customerId !== user.id)) {
+          sendJson(res, 404, { error: 'Order not found for this request.' });
+          return;
+        }
+        const eligibility = requestType === 'return' ? getReturnEligibility(order) : getRefundEligibility(order);
+        if (!eligibility.eligible) {
+          sendJson(res, 409, { error: eligibility.reason });
+          return;
+        }
+        if (!reason) {
+          sendJson(res, 400, { error: 'Please select a reason for this request.' });
+          return;
+        }
+        const duplicate = (db.contactSubmissions || []).find((entry) =>
+          entry.orderId === order.id &&
+          entry.type === requestType &&
+          entry.status !== 'resolved'
+        );
+        if (duplicate) {
+          sendJson(res, 409, { error: `An active ${requestType} request already exists for this order.` });
+          return;
+        }
+      }
+
+      const now = new Date().toISOString();
+      const ticket = {
+        id: `st-${Date.now()}`,
+        ticketNumber: generateSupportTicketNumber(),
+        type: requestType,
+        name: user.name || body.name || 'E-Malla Customer',
+        email: user.email || String(body.email || '').trim().toLowerCase(),
+        customerId: user.id,
+        subject,
+        company: '',
+        message,
+        reason,
+        priority,
+        orderId: order?.id || null,
+        orderNumber: order?.orderNumber || null,
+        merchantId: order?.merchantId || null,
+        merchantName: order?.merchantName || null,
+        requestedAmount: requestType === 'refund' ? Number(order?.totalAmount || 0) : 0,
+        status: 'new',
+        assignedAdminId: null,
+        assignedAdminName: null,
+        internalNotes: '',
+        repliedAt: null,
+        resolvedAt: null,
+        updatedAt: now,
+        updatedBy: user.id,
+        createdAt: now
+      };
+
+      db.contactSubmissions = db.contactSubmissions || [];
+      db.contactSubmissions.unshift(ticket);
+
+      createNotification(db, {
+        userId: user.id,
+        role: 'CUSTOMER',
+        title: `${requestType === 'support' ? 'Support Ticket' : requestType === 'return' ? 'Return Request' : 'Refund Request'} Received`,
+        message: `${ticket.ticketNumber} has been received. Our support team will review it.`,
+        type: 'success',
+        metadata: { ticketId: ticket.id, ticketNumber: ticket.ticketNumber, orderId: ticket.orderId }
+      });
+      for (const admin of (db.users || []).filter((entry) => entry.role === 'ADMIN' && entry.status === 'active')) {
+        createNotification(db, {
+          userId: admin.id,
+          role: 'ADMIN',
+          title: `New ${requestType === 'support' ? 'Support Ticket' : `${requestType} Request`}`,
+          message: `${ticket.ticketNumber}: ${ticket.subject}`,
+          type: priority === 'urgent' ? 'warning' : 'info',
+          metadata: { ticketId: ticket.id, ticketNumber: ticket.ticketNumber, orderId: ticket.orderId }
+        });
+      }
+      if (order?.merchantId) {
+        createNotification(db, {
+          userId: order.merchantId,
+          role: 'MERCHANT',
+          title: `Customer ${requestType === 'refund' ? 'Refund' : 'Return'} Request`,
+          message: `${ticket.ticketNumber} was opened for ${order.orderNumber}. Support will review it.`,
+          type: 'warning',
+          metadata: { ticketId: ticket.id, orderId: order.id }
+        });
+      }
+
+      await sendPlatformEmail(db, {
+        to: ticket.email,
+        subject: `${ticket.ticketNumber} - E-Malla Support Request Received`,
+        template: 'support_ticket_confirmation',
+        body: `We received ${ticket.ticketNumber} and our support team will review it.`,
+        html: createEmailHtml({
+          title: 'Support request received',
+          intro: `Muraho ${ticket.name}, twakiriye request yawe kandi support team yacu igiye kuyisuzuma.`,
+          sections: [
+            { label: 'Ticket', value: ticket.ticketNumber },
+            { label: 'Type', value: ticket.type },
+            { label: 'Subject', value: ticket.subject },
+            { label: 'Order', value: ticket.orderNumber || 'Not linked to an order' },
+            { label: 'Status', value: 'Received' }
+          ],
+          closing: 'Ushobora gukurikirana iyi request muri Buyer Hub Support Center.'
+        })
+      });
+      createAuditLog(db, {
+        event: `${requestType} request created: ${ticket.ticketNumber}`,
+        actor: user.name || user.email,
+        category: 'system',
+        status: 'info',
+        metadata: {
+          ticketId: ticket.id,
+          ticketNumber: ticket.ticketNumber,
+          requestType,
+          orderId: ticket.orderId,
+          priority
+        }
+      });
+
+      await writeDb(db);
+      sendJson(res, 201, { ticket });
+      return;
+    }
+
     if (pathname === '/api/contact' && req.method === 'POST') {
       const body = await readBody(req);
       const db = await readDb();
@@ -2702,15 +2909,19 @@ const server = http.createServer(async (req, res) => {
       const nextStatus = body.status !== undefined ? normalizeInquiryStatus(body.status) : currentInquiry.status;
       const shouldAssignToSelf = Boolean(body.assignToSelf);
       const nextNotes = body.internalNotes !== undefined ? String(body.internalNotes || '').trim() : currentInquiry.internalNotes || '';
+      const responseMessage = body.responseMessage !== undefined ? String(body.responseMessage || '').trim() : '';
       const now = new Date().toISOString();
+      const effectiveStatus = responseMessage ? 'replied' : nextStatus;
 
       const updatedInquiry = {
         ...currentInquiry,
-        status: nextStatus,
+        status: effectiveStatus,
         assignedAdminId: shouldAssignToSelf ? user.id : currentInquiry.assignedAdminId || null,
         assignedAdminName: shouldAssignToSelf ? (user.name || user.email) : currentInquiry.assignedAdminName || null,
         internalNotes: nextNotes,
-        repliedAt: nextStatus === 'replied' ? currentInquiry.repliedAt || now : nextStatus === 'new' ? null : currentInquiry.repliedAt || null,
+        lastResponse: responseMessage || currentInquiry.lastResponse || '',
+        repliedAt: effectiveStatus === 'replied' ? currentInquiry.repliedAt || now : effectiveStatus === 'new' ? null : currentInquiry.repliedAt || null,
+        resolvedAt: effectiveStatus === 'resolved' ? currentInquiry.resolvedAt || now : effectiveStatus === 'new' ? null : currentInquiry.resolvedAt || null,
         updatedAt: now,
         updatedBy: user.id
       };
@@ -2746,43 +2957,54 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
-      if (nextStatus !== currentInquiry.status) {
+      if (effectiveStatus !== currentInquiry.status || responseMessage) {
         createAuditLog(db, {
-          event: `Inquiry status updated to ${nextStatus}: ${updatedInquiry.name}`,
+          event: `Inquiry status updated to ${effectiveStatus}: ${updatedInquiry.name}`,
           actor: user.name || user.email,
           category: 'system',
-          status: nextStatus === 'resolved' ? 'success' : 'info',
+          status: effectiveStatus === 'resolved' ? 'success' : 'info',
           metadata: {
             inquiryId: updatedInquiry.id,
             inquiryType: updatedInquiry.type,
             email: updatedInquiry.email,
             previousStatus: currentInquiry.status,
-            status: nextStatus,
+            status: effectiveStatus,
             repliedAt: updatedInquiry.repliedAt
           }
         });
-        if (nextStatus === 'replied' || nextStatus === 'resolved') {
+        if (updatedInquiry.customerId) {
+          createNotification(db, {
+            userId: updatedInquiry.customerId,
+            role: 'CUSTOMER',
+            title: effectiveStatus === 'resolved' ? 'Support Request Resolved' : 'Support Team Replied',
+            message: `${updatedInquiry.ticketNumber || updatedInquiry.id} has a new ${effectiveStatus === 'resolved' ? 'resolution' : 'response'}.`,
+            type: effectiveStatus === 'resolved' ? 'success' : 'info',
+            metadata: { ticketId: updatedInquiry.id, ticketNumber: updatedInquiry.ticketNumber, orderId: updatedInquiry.orderId }
+          });
+        }
+        if (effectiveStatus === 'replied' || effectiveStatus === 'resolved') {
           await sendPlatformEmail(db, {
             to: updatedInquiry.email,
-            subject: nextStatus === 'resolved' ? 'Your E-Malla Inquiry Was Resolved' : 'Update on Your E-Malla Inquiry',
-            template: nextStatus === 'resolved' ? 'inquiry_resolved' : 'inquiry_replied',
+            subject: `${updatedInquiry.ticketNumber ? `${updatedInquiry.ticketNumber} - ` : ''}${effectiveStatus === 'resolved' ? 'Your E-Malla Request Was Resolved' : 'Update on Your E-Malla Request'}`,
+            template: effectiveStatus === 'resolved' ? 'inquiry_resolved' : 'inquiry_replied',
             body:
-              nextStatus === 'resolved'
+              effectiveStatus === 'resolved'
                 ? `Hello ${updatedInquiry.name}, your inquiry has been resolved by the E-Malla team.`
                 : `Hello ${updatedInquiry.name}, there is an update on your inquiry from the E-Malla team.`,
             html: createEmailHtml({
-              title: nextStatus === 'resolved' ? 'Inquiry resolved' : 'Inquiry updated',
+              title: effectiveStatus === 'resolved' ? 'Support request resolved' : 'Support request updated',
               intro:
-                nextStatus === 'resolved'
+                effectiveStatus === 'resolved'
                   ? `Muraho ${updatedInquiry.name}, ikibazo cyangwa request mwaduhaye cyamaze gukemurwa.`
                   : `Muraho ${updatedInquiry.name}, support team yacu yashyizeho update kuri inquiry yanyu.`,
               sections: [
+                { label: 'Ticket', value: updatedInquiry.ticketNumber || updatedInquiry.id },
                 { label: 'Inquiry Type', value: updatedInquiry.type },
                 { label: 'Email', value: updatedInquiry.email },
-                { label: 'Status', value: nextStatus },
+                { label: 'Status', value: effectiveStatus },
                 { label: 'Assigned Admin', value: updatedInquiry.assignedAdminName || 'E-Malla Team' }
               ],
-              closing: nextNotes || 'Murakoze gukoresha E-Malla Rwanda.'
+              closing: responseMessage || 'Murakoze gukoresha E-Malla Rwanda.'
             })
           });
         }

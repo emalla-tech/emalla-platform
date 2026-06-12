@@ -116,6 +116,34 @@ export interface Order {
   updatedAt: string;
 }
 
+export type SupportTicketType = 'support' | 'return' | 'refund';
+export type SupportTicketStatus = 'new' | 'replied' | 'resolved';
+
+export interface SupportTicket {
+  id: string;
+  ticketNumber: string;
+  type: SupportTicketType;
+  name: string;
+  email: string;
+  customerId: string;
+  subject: string;
+  message: string;
+  reason?: string;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  orderId?: string | null;
+  orderNumber?: string | null;
+  merchantId?: string | null;
+  merchantName?: string | null;
+  requestedAmount?: number;
+  status: SupportTicketStatus;
+  assignedAdminName?: string | null;
+  lastResponse?: string;
+  repliedAt?: string | null;
+  resolvedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ProductVariant {
   sizes?: string[];
   colors?: { name: string; hex: string }[];

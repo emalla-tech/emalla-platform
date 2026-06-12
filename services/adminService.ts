@@ -209,7 +209,7 @@ export const AdminService = {
 
   updateInquiry: async (
     inquiryId: string,
-    params: { status?: 'new' | 'replied' | 'resolved'; internalNotes?: string; assignToSelf?: boolean }
+    params: { status?: 'new' | 'replied' | 'resolved'; internalNotes?: string; responseMessage?: string; assignToSelf?: boolean }
   ) => {
     const response = await apiClient.updateAdminInquiry(inquiryId, params);
     return response.inquiry;

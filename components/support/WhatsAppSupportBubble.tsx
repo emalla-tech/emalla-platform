@@ -38,7 +38,7 @@ const WhatsAppSupportBubble: React.FC = () => {
 
   return (
     <aside
-      className="fixed bottom-[calc(7.1rem+env(safe-area-inset-bottom,0px))] left-4 z-[75] flex flex-col items-start gap-3 md:bottom-6 md:left-auto md:right-6 md:items-end"
+      className="fixed bottom-[calc(7.1rem+env(safe-area-inset-bottom,0px))] left-4 z-[75] flex flex-col items-start gap-3 md:bottom-24 md:left-auto md:right-6 md:items-end"
       aria-label="WhatsApp customer support"
     >
       {showWelcome && (
@@ -86,11 +86,10 @@ const WhatsAppSupportBubble: React.FC = () => {
         target="_blank"
         rel="noopener noreferrer"
         onClick={() => setShowWelcome(false)}
-        className="support-bubble-enter group relative flex h-14 items-center gap-2 rounded-full bg-emerald-500 px-4 text-white shadow-[0_18px_44px_rgba(16,185,129,0.38)] transition-all hover:bg-emerald-600 hover:shadow-[0_20px_48px_rgba(16,185,129,0.48)] active:scale-95"
+        className="support-bubble-enter group relative flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_18px_44px_rgba(16,185,129,0.38)] transition-all hover:bg-emerald-600 hover:shadow-[0_20px_48px_rgba(16,185,129,0.48)] active:scale-95"
         aria-label="Chat with E-Malla support on WhatsApp"
       >
         <MessageCircle size={23} fill="currentColor" />
-        <span className="hidden text-xs font-black uppercase tracking-widest sm:inline">WhatsApp Support</span>
         <span className="absolute -right-0.5 top-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-orange-400" aria-hidden="true" />
       </a>
     </aside>

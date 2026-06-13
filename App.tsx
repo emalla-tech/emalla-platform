@@ -24,6 +24,7 @@ import Footer from './components/Footer';
 import InstallPrompt from './components/pwa/InstallPrompt';
 import MobileBottomNav from './components/pwa/MobileBottomNav';
 import CustomerMobileChrome from './components/pwa/CustomerMobileChrome';
+import WhatsAppSupportBubble from './components/support/WhatsAppSupportBubble';
 import { LanguageProvider } from './i18n/LanguageContext';
 
 import NotificationList from './components/notifications/NotificationList';
@@ -313,7 +314,7 @@ const App: React.FC = () => {
           <Route path="/unauthorized" element={withSuspense(<Unauthorized />)} />
 
           {/* Public Wrapper with Nav/Footer */}
-          <Route element={<><Navbar cartCount={itemCount} /><PublicOutlet /><CustomerMobileChrome cartCount={itemCount} /><Footer /></>}>
+          <Route element={<><Navbar cartCount={itemCount} /><PublicOutlet /><CustomerMobileChrome cartCount={itemCount} /><WhatsAppSupportBubble /><Footer /></>}>
             <Route path="/" element={withSuspense(<Home onAddToCart={addItem} />)} />
             <Route path="/shop" element={withSuspense(<Shop onAddToCart={addItem} />)} />
             <Route path="/product/:id" element={withSuspense(<ProductDetails onAddToCart={addItem} />)} />

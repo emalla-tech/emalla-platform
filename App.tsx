@@ -25,6 +25,7 @@ import InstallPrompt from './components/pwa/InstallPrompt';
 import MobileBottomNav from './components/pwa/MobileBottomNav';
 import CustomerMobileChrome from './components/pwa/CustomerMobileChrome';
 import WhatsAppSupportBubble from './components/support/WhatsAppSupportBubble';
+import CookieConsent from './components/legal/CookieConsent';
 import { LanguageProvider } from './i18n/LanguageContext';
 
 import NotificationList from './components/notifications/NotificationList';
@@ -40,6 +41,10 @@ const ProductDetails = lazy(() => import('./pages/ProductDetails'));
 const FAQ = lazy(() => import('./pages/FAQ'));
 const ShippingPolicy = lazy(() => import('./pages/ShippingPolicy'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const ReturnsPolicy = lazy(() => import('./pages/ReturnsPolicy'));
+const SellerAgreement = lazy(() => import('./pages/SellerAgreement'));
+const CompanyInformation = lazy(() => import('./pages/CompanyInformation'));
 const Contact = lazy(() => import('./pages/Contact'));
 const HowItWorks = lazy(() => import('./pages/HowItWorks'));
 const Cart = lazy(() => import('./pages/Cart'));
@@ -177,6 +182,22 @@ const buildSeoConfig = (pathname: string) => {
       title: 'Terms of Service | E-Malla Rwanda',
       description: 'Read the terms and conditions for using E-Malla Rwanda services and marketplace features.',
     },
+    '/privacy': {
+      title: 'Privacy Policy | E-Malla Rwanda',
+      description: 'Learn how E-Malla Rwanda collects, uses and protects personal information.',
+    },
+    '/returns': {
+      title: 'Returns & Refunds Policy | E-Malla Rwanda',
+      description: 'Review return eligibility, refund processing and customer protection on E-Malla Rwanda.',
+    },
+    '/seller-agreement': {
+      title: 'Seller Agreement | E-Malla Rwanda',
+      description: 'Review the standards and responsibilities for sellers operating on E-Malla Rwanda.',
+    },
+    '/company-information': {
+      title: 'Company Information | E-Malla Rwanda',
+      description: 'View official platform operator and contact information for E-Malla Rwanda.',
+    },
     '/contact': {
       title: 'Contact Us | E-Malla Rwanda',
       description: 'Contact E-Malla Rwanda for support, partnership opportunities and customer assistance.',
@@ -303,6 +324,7 @@ const App: React.FC = () => {
         <ScrollToTop />
         <SeoMetaUpdater />
         <BackToTop />
+        <CookieConsent />
         <div className="min-h-screen flex flex-col app-shell">
           <InstallPrompt />
           <Routes>
@@ -324,6 +346,10 @@ const App: React.FC = () => {
             <Route path="/faq" element={withSuspense(<FAQ />)} />
             <Route path="/shipping" element={withSuspense(<ShippingPolicy />)} />
             <Route path="/terms" element={withSuspense(<TermsOfService />)} />
+            <Route path="/privacy" element={withSuspense(<PrivacyPolicy />)} />
+            <Route path="/returns" element={withSuspense(<ReturnsPolicy />)} />
+            <Route path="/seller-agreement" element={withSuspense(<SellerAgreement />)} />
+            <Route path="/company-information" element={withSuspense(<CompanyInformation />)} />
             <Route path="/contact" element={withSuspense(<Contact />)} />
             <Route path="/how-it-works" element={withSuspense(<HowItWorks />)} />
             <Route path="/become-seller" element={withSuspense(<BecomeSeller />)} />

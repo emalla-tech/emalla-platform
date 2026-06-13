@@ -25,6 +25,10 @@ const Footer: React.FC = () => {
   const linkClass = (path: string, accent = false) =>
     `${isActiveLink(path) ? 'text-white' : accent ? 'text-orange-400 hover:text-white' : 'hover:text-white'} transition-colors flex items-center group`;
 
+  const openCookiePreferences = () => {
+    window.dispatchEvent(new Event('emalla:open-cookie-preferences'));
+  };
+
   return (
     <footer className="bg-black text-white pt-20 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -126,11 +130,28 @@ const Footer: React.FC = () => {
                 <ArrowRight size={12} className="mr-2 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-orange-500" />
                 {t.footer.terms}
               </Link></li>
+              <li><Link to="/company-information" className={linkClass('/company-information')}>
+                <ArrowRight size={12} className="mr-2 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-orange-500" />
+                Company Information
+              </Link></li>
             </ul>
           </div>
         </div>
 
-        <div className="border-t border-white/10 pt-12 flex justify-center">
+        <div className="border-t border-white/10 py-8">
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-3 text-[10px] font-black uppercase tracking-[0.15em] text-gray-500">
+            <Link to="/privacy" className="hover:text-white">Privacy Policy</Link>
+            <Link to="/returns" className="hover:text-white">Returns & Refunds</Link>
+            <Link to="/seller-agreement" className="hover:text-white">Seller Agreement</Link>
+            <Link to="/terms" className="hover:text-white">Terms</Link>
+            <button type="button" onClick={openCookiePreferences} className="hover:text-white">Cookie Preferences</button>
+          </div>
+          <p className="mt-6 text-center text-xs font-semibold text-gray-500">
+            Operated by E-Malla Technologies · Kigali, Rwanda · support@emallarwanda.com
+          </p>
+        </div>
+
+        <div className="border-t border-white/10 pt-8 flex justify-center">
           <p className="text-gray-500 text-[10px] font-black uppercase tracking-[3px] text-center">
             &copy; {new Date().getFullYear()} E-Malla Rwanda Powered By E-Malla Technologies
           </p>

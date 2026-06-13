@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 72" role="img" aria-labelledby="title">
+  <title id="title">D-Link</title>
+  <path fill="#0088c8" d="M18 18h27c18 0 29 7 29 18S63 54 45 54H18V18Zm16 10v16h11c9 0 14-3 14-8s-5-8-14-8H34Z"/>
+  <rect x="78" y="31" width="24" height="10" rx="5" fill="#0088c8"/>
+  <text x="112" y="51" fill="#0088c8" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="700" letter-spacing="-2">Link</text>
+</svg>

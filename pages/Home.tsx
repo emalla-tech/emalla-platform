@@ -20,6 +20,12 @@ const TRUSTED_BRANDS = [
   { name: 'Samsung', logo: '/brands/samsung.svg', wordmark: true },
   { name: 'Cisco', logo: '/brands/cisco.svg', wordmark: true },
   { name: 'TP-Link', logo: '/brands/tplink.svg' },
+  { name: 'Canon', logo: '/brands/canon.svg', wordmark: true },
+  { name: 'Hikvision', logo: '/brands/hikvision.svg', wordmark: true },
+  { name: 'D-Link', logo: '/brands/dlink.svg', wordmark: true },
+  { name: 'OfficePoint', logo: '/brands/officepoint.svg', wordmark: true },
+  { name: 'Brother', logo: '/brands/brother.svg', wordmark: true },
+  { name: 'Lightwave', logo: '/brands/lightwave.svg', wordmark: true },
 ];
 
 const Home: React.FC<HomeProps> = ({ onAddToCart }) => {

@@ -14,7 +14,7 @@ const READ_COLUMNS = {
   products: "id, merchant_id, name, description, specifications, category, price, stock, CASE WHEN COALESCE(image, '') LIKE 'data:%' THEN NULL ELSE image END AS image, CASE WHEN COALESCE(images::text, '') LIKE '%data:%' THEN '[]'::jsonb ELSE images END AS images, status, featured, rating, reviews, created_at, updated_at, metadata",
   product_reviews: 'id, product_id, user_id, rating, comment, created_at',
   addresses: 'id, user_id, name, district, sector, street, is_default, created_at, updated_at',
-  orders: 'id, order_number, user_id, merchant_id, rider_id, customer_name, merchant_name, rider_name, status, payment_status, payment_method, items, shipping_address, address, phone, subtotal, delivery_fee, total, notes, created_at, updated_at',
+  orders: 'id, order_number, user_id, merchant_id, rider_id, customer_name, merchant_name, rider_name, status, payment_status, payment_method, items, shipping_address, address, phone, subtotal, delivery_fee, total, notes, created_at, updated_at, metadata',
   order_items: 'id, order_id, product_id, merchant_id, product_name, variant, quantity, price, subtotal',
   deliveries: 'id, order_id, rider_id, rider_name, status, pickup_notes, delivery_notes, assigned_at, picked_up_at, delivered_at, failed_at',
   seller_applications: "id, business_name, category, email, phone, CASE WHEN COALESCE(logo_url, '') LIKE 'data:%' THEN NULL ELSE logo_url END AS logo_url, CASE WHEN COALESCE(supporting_document_url, '') LIKE 'data:%' THEN NULL ELSE supporting_document_url END AS supporting_document_url, status, merchant_id, temporary_username, rejected_reason, created_at, updated_at, approved_at, approved_by, rejected_at, rejected_by",
@@ -332,14 +332,19 @@ const mapOrder = (row) => ({
   orderNumber: row.order_number,
   userId: row.user_id || row.metadata?.customerId || undefined,
   customerId: row.user_id || row.metadata?.customerId || undefined,
+  customerName: row.customer_name || row.metadata?.customerName || '',
+  customerEmail: row.metadata?.customerEmail || '',
   merchantId: row.merchant_id || undefined,
+  merchantName: row.merchant_name || row.metadata?.merchantName || '',
   riderId: row.rider_id || undefined,
+  riderName: row.rider_name || row.metadata?.riderName || undefined,
   status: row.status,
   paymentStatus: row.payment_status,
   paymentMethod: row.payment_method || '',
   items: json(row.items, []),
   shippingAddress: json(row.shipping_address, {}),
-  address: row.metadata?.address || row.shipping_address?.street || '',
+  address: row.address || row.metadata?.address || row.shipping_address?.street || '',
+  phone: row.phone || row.metadata?.phone || '',
   subtotal: toNumber(row.subtotal),
   deliveryFee: toNumber(row.delivery_fee),
   total: toNumber(row.total),
@@ -543,6 +548,26 @@ export const createPostgresAdapter = () => {
           delivery: delivery || undefined
         };
       });
+    },
+
+    async readCheckoutData(options = {}) {
+      const users = await readRows('users');
+      const orderId = String(options.orderId || '').trim();
+      const orders = orderId
+        ? (await query(`SELECT ${READ_COLUMNS.orders} FROM orders WHERE id = $1 LIMIT 1`, [orderId])).rows
+        : [];
+      const products = orderId ? [] : await readRows('products');
+
+      return {
+        users: users.map(mapUser),
+        products: products.map(mapProduct),
+        orders: orders.map(mapOrder),
+        payments: [],
+        transactions: [],
+        notifications: [],
+        auditLogs: [],
+        emailLogs: []
+      };
     },
 
     async readPublicInsightsData() {

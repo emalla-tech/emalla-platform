@@ -55,6 +55,17 @@ const getJsonAdapter = () => {
       const snapshot = await jsonDb.readDb();
       return snapshot.orders || [];
     },
+    readCheckoutData: async (options = {}) => {
+      const snapshot = await jsonDb.readDb();
+      if (!options.orderId) {
+        return snapshot;
+      }
+
+      return {
+        ...snapshot,
+        orders: (snapshot.orders || []).filter((entry) => entry.id === options.orderId)
+      };
+    },
     readPublicInsightsData: async () => {
       const snapshot = await jsonDb.readDb();
       return {
@@ -309,6 +320,7 @@ const createActiveAdapter = () => {
       readDb: () => callWithFallback('readDb'),
       readProducts: () => callWithFallback('readProducts'),
       readOrders: () => callWithFallback('readOrders'),
+      readCheckoutData: (options) => callWithFallback('readCheckoutData', options),
       readPublicInsightsData: () => callWithFallback('readPublicInsightsData'),
       readAdminStatsData: () => callWithFallback('readAdminStatsData'),
       readAdminRidersData: () => callWithFallback('readAdminRidersData'),
@@ -385,6 +397,15 @@ export const readOrders = async () => {
 
   const snapshot = await adapter.readDb();
   return snapshot.orders || [];
+};
+
+export const readCheckoutData = async (options = {}) => {
+  const adapter = getAdapter();
+  if (typeof adapter.readCheckoutData === 'function') {
+    return adapter.readCheckoutData(options);
+  }
+
+  return adapter.readDb();
 };
 
 export const readPublicInsightsData = async () => {

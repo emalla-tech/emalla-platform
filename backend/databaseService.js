@@ -3,6 +3,7 @@ import {
   readDb,
   readProducts,
   readOrders,
+  readCheckoutData,
   readPublicInsightsData,
   readAdminStatsData,
   readAdminRidersData,
@@ -44,6 +45,7 @@ export const databaseService = {
   readSnapshot: () => readDb(),
   readProducts: () => readProducts(),
   readOrders: () => readOrders(),
+  readCheckoutData: (options) => readCheckoutData(options),
   readPublicInsightsData: () => readPublicInsightsData(),
   readAdminStatsData: () => readAdminStatsData(),
   readAdminRidersData: () => readAdminRidersData(),
@@ -68,6 +70,7 @@ export const getDatabaseServiceStatus = () => databaseService.getStatus();
 export const readDatabaseSnapshot = () => databaseService.readSnapshot();
 export const readProductRecords = () => databaseService.readProducts();
 export const readOrderRecords = () => databaseService.readOrders();
+export const readCheckoutSnapshot = (options) => databaseService.readCheckoutData(options);
 export const readPublicInsightsRecords = () => databaseService.readPublicInsightsData();
 export const readAdminStatsRecords = () => databaseService.readAdminStatsData();
 export const readAdminRiderRecords = () => databaseService.readAdminRidersData();

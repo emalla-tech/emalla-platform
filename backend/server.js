@@ -6,6 +6,7 @@ import {
   readDatabaseSnapshot as readDb,
   readProductRecords,
   readOrderRecords,
+  readCheckoutSnapshot,
   readPublicInsightsRecords,
   readAdminStatsRecords,
   readAdminRiderRecords,
@@ -4418,7 +4419,7 @@ const server = http.createServer(async (req, res) => {
       const customerUser = user?.role === 'CUSTOMER' ? user : null;
 
       const body = await readBody(req);
-      const db = await readDb();
+      const db = await readCheckoutSnapshot();
       const items = buildTrustedOrderItems(db, body.items);
       const customerName = String(body.customerName || customerUser?.name || '').trim();
       const customerEmail = String(body.customerEmail || customerUser?.email || '').trim().toLowerCase();
@@ -4949,7 +4950,7 @@ const server = http.createServer(async (req, res) => {
       const user = await getOptionalUser(req);
 
       const body = await readBody(req);
-      const db = await readDb();
+      const db = await readCheckoutSnapshot({ orderId: body.orderId });
       const orderIndex = db.orders.findIndex((order) => order.id === body.orderId);
 
       if (orderIndex === -1) {

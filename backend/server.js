@@ -642,6 +642,30 @@ const sendPlatformEmailSafely = async (email) => {
   }
 };
 
+const sendPlatformEmailsInBackground = (emails = [], context = {}) => {
+  const emailDb = { emailLogs: [] };
+
+  void Promise.allSettled(
+    emails.filter((email) => email?.to).map((email) => sendPlatformEmail(emailDb, email))
+  )
+    .then(async () => {
+      if (emailDb.emailLogs.length > 0) {
+        await persistCheckoutBundleRecord({ emailLogs: emailDb.emailLogs });
+      }
+
+      structuredLog('info', 'background_emails_completed', {
+        ...context,
+        emailCount: emailDb.emailLogs.length
+      });
+    })
+    .catch((error) => {
+      structuredLog('error', 'background_emails_failed', {
+        ...context,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    });
+};
+
 const formatOrderStatusLabel = (status = '') => String(status || '').replaceAll('_', ' ');
 
 const getOrderStatusNotification = (order, status) => {
@@ -4948,6 +4972,8 @@ const server = http.createServer(async (req, res) => {
 
       const txRef = `EMALLA-TX-${body.orderId}-${Date.now()}`;
       const isCashOnDelivery = body.method === 'CASH_ON_DELIVERY';
+      let postResponseEmails = [];
+      let postResponseEmailContext = {};
       const payment = {
         id: `pay-${Date.now()}`,
         orderId: body.orderId,
@@ -5001,8 +5027,8 @@ const server = http.createServer(async (req, res) => {
           type: 'info',
           metadata: { orderId: order.id }
         });
-        await Promise.allSettled([
-          sendPlatformEmail(db, {
+        postResponseEmails = [
+          {
             to: body.customerEmail || order.customerEmail || user?.email,
             template: 'order_confirmation',
             ...buildPlatformEmail('order_confirmation', {
@@ -5017,8 +5043,8 @@ const server = http.createServer(async (req, res) => {
               itemCount: (order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
               trackingUrl: buildCustomerTrackingUrl(order)
             })
-          }),
-          sendPlatformEmail(db, {
+          },
+          {
             to: merchant?.email,
             template: 'seller_order_notification',
             ...buildPlatformEmail('seller_order_notification', {
@@ -5028,8 +5054,13 @@ const server = http.createServer(async (req, res) => {
               paymentMethod: order.paymentMethod,
               customerName: order.customerName
             })
-          })
-        ]);
+          }
+        ];
+        postResponseEmailContext = {
+          event: 'cash_on_delivery_confirmation',
+          orderId: order.id,
+          orderNumber: order.orderNumber
+        };
       }
 
       createAuditLog(db, {
@@ -5054,7 +5085,7 @@ const server = http.createServer(async (req, res) => {
         transactions: isCashOnDelivery ? [] : db.transactions.slice(0, 1),
         notifications: isCashOnDelivery ? db.notifications.slice(0, 2) : [],
         auditLogs: db.auditLogs.slice(0, 1),
-        emailLogs: db.emailLogs.slice(0, 2)
+        emailLogs: []
       });
       sendJson(res, 200, {
         status: 'success',
@@ -5063,6 +5094,9 @@ const server = http.createServer(async (req, res) => {
         paymentStatus: isCashOnDelivery ? 'PENDING' : 'SUCCESS',
         mode: isCashOnDelivery ? 'cod' : 'gateway'
       });
+      if (postResponseEmails.length > 0) {
+        sendPlatformEmailsInBackground(postResponseEmails, postResponseEmailContext);
+      }
       return;
     }
 
@@ -5093,6 +5127,23 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      if (payment.verifiedAt) {
+        sendJson(res, 200, {
+          status: 'SUCCESS',
+          amount: payment.amount,
+          currency: payment.currency || 'RWF',
+          id: payment.id,
+          tx_ref: payment.tx_ref,
+          orderId: payment.orderId
+        });
+        return;
+      }
+
+      let postResponseEmails = [];
+      let postResponseEmailContext = {};
+      payment.verifiedAt = new Date().toISOString();
+      payment.updatedAt = payment.verifiedAt;
+
       if (orderIndex !== -1) {
         db.orders[orderIndex] = {
           ...db.orders[orderIndex],
@@ -5120,8 +5171,8 @@ const server = http.createServer(async (req, res) => {
           metadata: { orderId: order.id }
         });
         const merchant = (db.users || []).find((entry) => entry.id === order.merchantId && entry.role === 'MERCHANT');
-        await Promise.allSettled([
-          sendPlatformEmail(db, {
+        postResponseEmails = [
+          {
             to: order.customerEmail || user?.email,
             template: 'order_confirmation',
             ...buildPlatformEmail('order_confirmation', {
@@ -5136,8 +5187,8 @@ const server = http.createServer(async (req, res) => {
               itemCount: (order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
               trackingUrl: buildCustomerTrackingUrl(order)
             })
-          }),
-          sendPlatformEmail(db, {
+          },
+          {
             to: merchant?.email,
             template: 'seller_order_notification',
             ...buildPlatformEmail('seller_order_notification', {
@@ -5147,8 +5198,14 @@ const server = http.createServer(async (req, res) => {
               paymentMethod: order.paymentMethod,
               customerName: order.customerName
             })
-          })
-        ]);
+          }
+        ];
+        postResponseEmailContext = {
+          event: 'payment_verified',
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          txRef
+        };
         createTransaction(db, {
           userId: order.merchantId,
           orderId: order.id,
@@ -5191,7 +5248,7 @@ const server = http.createServer(async (req, res) => {
         transactions: db.transactions.slice(0, 1),
         notifications: orderIndex !== -1 ? db.notifications.slice(0, 2) : [],
         auditLogs: orderIndex !== -1 ? db.auditLogs.slice(0, 1) : [],
-        emailLogs: db.emailLogs.slice(0, 2)
+        emailLogs: []
       });
       sendJson(res, 200, {
         status: 'SUCCESS',
@@ -5201,6 +5258,9 @@ const server = http.createServer(async (req, res) => {
         tx_ref: payment.tx_ref,
         orderId: payment.orderId
       });
+      if (postResponseEmails.length > 0) {
+        sendPlatformEmailsInBackground(postResponseEmails, postResponseEmailContext);
+      }
       return;
     }
 

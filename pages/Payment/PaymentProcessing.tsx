@@ -31,7 +31,7 @@ const PaymentProcessing: React.FC = () => {
 
           if (result.status === PaymentStatus.SUCCESS) {
             setStatus('success');
-            setTimeout(() => navigate(`/payment/success?order_id=${result.orderId || orderId || ''}`), 1000);
+            navigate(`/payment/success?order_id=${result.orderId || orderId || ''}`);
             return;
           }
         } catch (err) {

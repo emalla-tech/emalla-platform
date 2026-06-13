@@ -122,15 +122,13 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
       });
 
       clearCart();
-      setTimeout(() => {
-        if (formData.paymentMethod === PaymentMethod.CASH_ON_DELIVERY) {
-          navigate(`/payment/success?order_id=${order.id}&mode=cod`);
-          return;
-        }
+      if (formData.paymentMethod === PaymentMethod.CASH_ON_DELIVERY) {
+        navigate(`/payment/success?order_id=${order.id}&mode=cod`);
+        return;
+      }
 
-        const emailParam = encodeURIComponent(formData.email);
-        navigate(`/payment/processing?tx_ref=${paymentInit.tx_ref}&order_id=${order.id}&email=${emailParam}`);
-      }, 1000);
+      const emailParam = encodeURIComponent(formData.email);
+      navigate(`/payment/processing?tx_ref=${paymentInit.tx_ref}&order_id=${order.id}&email=${emailParam}`);
 
     } catch (err) {
       if (createdOrderId) {

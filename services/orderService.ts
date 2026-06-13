@@ -1,33 +1,11 @@
-import { Order, OrderStatus, UserRole } from '../types';
+import { Order, OrderStatus } from '../types';
 import { apiClient } from './apiClient';
-import { NotificationService } from './NotificationService';
 
 export const OrderService = {
   createOrder: async (data: Partial<Order>): Promise<Order> => {
     const response = await apiClient.createOrder(data);
-    const order = response.order as Order;
-
-    try {
-      if (!order.customerId?.startsWith('GST-')) {
-        await NotificationService.send({
-          userId: order.customerId,
-          role: UserRole.CUSTOMER,
-          title: 'Order Placed!',
-          message: `Your order ${order.orderNumber} is awaiting payment.`
-        });
-      }
-
-      await NotificationService.send({
-        userId: order.merchantId,
-        role: UserRole.MERCHANT,
-        title: 'New Incoming Order!',
-        message: `Order ${order.orderNumber} has been placed for RWF ${order.totalAmount.toLocaleString()}.`
-      });
-    } catch {
-      // Backend already creates the required notifications, so checkout should not fail here.
-    }
-
-    return order;
+    // The order endpoint persists customer and merchant notifications atomically.
+    return response.order as Order;
   },
 
   getAllOrders: async (): Promise<Order[]> => {

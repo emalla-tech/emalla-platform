@@ -1,6 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 330 72" role="img" aria-labelledby="title">
-  <title id="title">Lightwave</title>
-  <path d="M12 42c15-24 29-24 44 0s29 24 44 0" fill="none" stroke="#f97316" stroke-linecap="round" stroke-width="9"/>
-  <path d="M16 28c11-14 21-14 32 0s21 14 32 0" fill="none" stroke="#ef4444" stroke-linecap="round" stroke-width="6"/>
-  <text x="112" y="50" fill="#202938" font-family="Arial, Helvetica, sans-serif" font-size="39" font-weight="800" letter-spacing="-2">LIGHTWAVE</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 150" role="img" aria-labelledby="title">
+  <title id="title">Lightwave Technology</title>
+  <g fill="#101f91">
+    <path d="M24 47 38 39v51l31 18 14-8-31-18V31l14-8v51l17 10V23l14 8v53l17-10V39l14 8v51l-45 26-59-34V47Z"/>
+    <path d="m69 108 14 8 31-18 14 8-45 26-38-22 14-8 10 6Z"/>
+    <text x="151" y="94" font-family="Arial, Helvetica, sans-serif" font-size="55" font-weight="700" letter-spacing="1">LIG&#72;TWAVE</text>
+    <text x="154" y="124" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" letter-spacing="12">TECHNOLOGY</text>
+  </g>
 </svg>

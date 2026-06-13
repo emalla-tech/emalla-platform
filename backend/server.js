@@ -4415,13 +4415,14 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === '/api/orders' && req.method === 'POST') {
       const user = await getOptionalUser(req);
+      const customerUser = user?.role === 'CUSTOMER' ? user : null;
 
       const body = await readBody(req);
       const db = await readDb();
       const items = buildTrustedOrderItems(db, body.items);
-      const customerName = String(body.customerName || user?.name || '').trim();
-      const customerEmail = String(body.customerEmail || user?.email || '').trim().toLowerCase();
-      const customerPhone = String(body.phone || user?.phone || '').trim();
+      const customerName = String(body.customerName || customerUser?.name || '').trim();
+      const customerEmail = String(body.customerEmail || customerUser?.email || '').trim().toLowerCase();
+      const customerPhone = String(body.phone || customerUser?.phone || '').trim();
       const customerAddress = String(body.address || '').trim();
 
       if (!customerName || !customerEmail || !customerPhone || !customerAddress) {
@@ -4461,7 +4462,7 @@ const server = http.createServer(async (req, res) => {
       const order = {
         id: `o-${Date.now()}`,
         orderNumber: generateOrderNumber(),
-        customerId: user?.id || `GST-${Date.now()}`,
+        customerId: customerUser?.id || `GST-${Date.now()}`,
         customerName,
         customerEmail,
         merchantId,
@@ -4957,10 +4958,12 @@ const server = http.createServer(async (req, res) => {
       }
 
       const paymentOrder = db.orders[orderIndex];
-      const guestEmail = String(body.customerEmail || '').trim().toLowerCase();
+      const checkoutEmail = String(body.customerEmail || '').trim().toLowerCase();
+      const orderEmail = String(paymentOrder.customerEmail || '').trim().toLowerCase();
+      const emailMatches = !!checkoutEmail && checkoutEmail === orderEmail;
       const canPay =
         (user && (user.role === 'ADMIN' || paymentOrder.customerId === user.id)) ||
-        (!user && guestEmail && guestEmail === String(paymentOrder.customerEmail || '').trim().toLowerCase());
+        emailMatches;
       if (!canPay) {
         sendJson(res, user ? 403 : 401, { error: user ? 'Forbidden' : 'Order email verification is required.' });
         return;
@@ -4977,7 +4980,7 @@ const server = http.createServer(async (req, res) => {
       const payment = {
         id: `pay-${Date.now()}`,
         orderId: body.orderId,
-        userId: user?.id || db.orders[orderIndex].customerId,
+        userId: db.orders[orderIndex].customerId,
         amount: paymentOrder.totalAmount,
         method: body.method,
         status: isCashOnDelivery ? 'PENDING' : 'SUCCESS',
@@ -5113,16 +5116,17 @@ const server = http.createServer(async (req, res) => {
 
       const orderIndex = db.orders.findIndex((order) => order.id === payment.orderId);
       const order = orderIndex !== -1 ? db.orders[orderIndex] : null;
-      const guestEmail = String(url.searchParams.get('email') || '').trim().toLowerCase();
+      const checkoutEmail = String(url.searchParams.get('email') || '').trim().toLowerCase();
+      const orderEmail = String(order?.customerEmail || '').trim().toLowerCase();
       const canVerify =
         !!user && !!order && (
           user.role === 'ADMIN' ||
           order.customerId === user.id ||
           order.merchantId === user.id
         );
-      const guestMatches = !user && !!order && guestEmail && guestEmail === String(order.customerEmail || '').trim().toLowerCase();
+      const emailMatches = !!order && !!checkoutEmail && checkoutEmail === orderEmail;
 
-      if (!canVerify && !guestMatches) {
+      if (!canVerify && !emailMatches) {
         sendJson(res, user ? 403 : 401, { error: user ? 'Forbidden' : 'Unauthorized' });
         return;
       }

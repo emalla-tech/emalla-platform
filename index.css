@@ -195,10 +195,19 @@ button {
   transition: color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
-.trusted-brand-card span {
-  font-size: 1.05rem;
-  font-weight: 900;
-  letter-spacing: -0.03em;
+.trusted-brand-logo {
+  display: block;
+  width: auto;
+  height: 2.15rem;
+  max-width: 7.5rem;
+  object-fit: contain;
+  filter: grayscale(1);
+  opacity: 0.58;
+  transition: filter 180ms ease, opacity 180ms ease, transform 180ms ease;
+}
+
+.trusted-brand-logo--wordmark {
+  transform: scale(1.45);
 }
 
 .trusted-brand-card:hover,
@@ -208,6 +217,18 @@ button {
   box-shadow: 0 16px 36px rgba(249, 115, 22, 0.12);
   transform: translateY(-2px);
   outline: none;
+}
+
+.trusted-brand-card:hover .trusted-brand-logo,
+.trusted-brand-card:focus-visible .trusted-brand-logo {
+  filter: grayscale(0);
+  opacity: 1;
+  transform: scale(1.04);
+}
+
+.trusted-brand-card:hover .trusted-brand-logo--wordmark,
+.trusted-brand-card:focus-visible .trusted-brand-logo--wordmark {
+  transform: scale(1.52);
 }
 
 @keyframes app-shell-enter {

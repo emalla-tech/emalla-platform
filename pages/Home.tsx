@@ -12,18 +12,14 @@ interface HomeProps {
 }
 
 const TRUSTED_BRANDS = [
-  'HP',
-  'Dell',
-  'Lenovo',
-  'APC',
-  'Apple',
-  'Epson',
-  'Canon',
-  'Samsung',
-  'Cisco',
-  'TP-Link',
-  'Microsoft',
-  'Logitech',
+  { name: 'HP', logo: '/brands/hp.svg' },
+  { name: 'Dell', logo: '/brands/dell.svg' },
+  { name: 'Lenovo', logo: '/brands/lenovo.svg', wordmark: true },
+  { name: 'Apple', logo: '/brands/apple.svg' },
+  { name: 'Epson', logo: '/brands/epson.svg', wordmark: true },
+  { name: 'Samsung', logo: '/brands/samsung.svg', wordmark: true },
+  { name: 'Cisco', logo: '/brands/cisco.svg', wordmark: true },
+  { name: 'TP-Link', logo: '/brands/tplink.svg' },
 ];
 
 const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
@@ -113,13 +109,13 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
         </div>
       </section>
 
-      {/* Trusted Brands */}
+      {/* Popular Brands */}
       <section className="trusted-brands-section" aria-labelledby="trusted-brands-title">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-7">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-orange-500 mb-2">Shop with confidence</p>
-              <h2 id="trusted-brands-title" className="text-2xl md:text-3xl font-black text-gray-900">Brands shoppers know and trust</h2>
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-orange-500 mb-2">Popular brands</p>
+              <h2 id="trusted-brands-title" className="text-2xl md:text-3xl font-black text-gray-900">Explore brands shoppers know</h2>
             </div>
             <p className="max-w-md text-sm text-gray-500 font-medium md:text-right">
               Explore the marketplace by brand and discover current listings from sellers across Rwanda.
@@ -131,14 +127,20 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
           <div className="trusted-brands-track">
             {[...TRUSTED_BRANDS, ...TRUSTED_BRANDS].map((brand, index) => (
               <Link
-                key={`${brand}-${index}`}
-                to={`/shop?search=${encodeURIComponent(brand)}`}
+                key={`${brand.name}-${index}`}
+                to={`/shop?search=${encodeURIComponent(brand.name)}`}
                 className="trusted-brand-card"
-                aria-label={`Shop ${brand} products`}
+                aria-label={`Shop ${brand.name} products`}
                 aria-hidden={index >= TRUSTED_BRANDS.length}
                 tabIndex={index >= TRUSTED_BRANDS.length ? -1 : 0}
               >
-                <span>{brand}</span>
+                <img
+                  src={brand.logo}
+                  alt={brand.name}
+                  loading="lazy"
+                  decoding="async"
+                  className={`trusted-brand-logo${brand.wordmark ? ' trusted-brand-logo--wordmark' : ''}`}
+                />
               </Link>
             ))}
           </div>

@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   Clock,
   DollarSign,
+  AlertTriangle,
   Navigation,
   Package,
   Plus,
@@ -29,6 +30,23 @@ const ACTIVE_STATUSES = [
   OrderStatus.PICKED_UP,
   OrderStatus.ON_THE_WAY,
   OrderStatus.OUT_FOR_DELIVERY
+];
+
+const FULFILLMENT_STATUSES = [
+  OrderStatus.PAID,
+  OrderStatus.CONFIRMED,
+  OrderStatus.PREPARING,
+  OrderStatus.PROCESSING,
+  OrderStatus.READY_FOR_PICKUP,
+  ...ACTIVE_STATUSES
+];
+
+const CLOSED_STATUSES = [
+  OrderStatus.DELIVERED,
+  OrderStatus.COMPLETED,
+  OrderStatus.CANCELLED,
+  OrderStatus.REJECTED,
+  OrderStatus.REFUNDED
 ];
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -54,6 +72,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 const MerchantDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [productCount, setProductCount] = useState(0);
+  const [lowStockCount, setLowStockCount] = useState(0);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +100,7 @@ const MerchantDashboard: React.FC = () => {
         ]);
 
         setProductCount(products.length);
+        setLowStockCount(products.filter((product) => Number(product.stock || 0) <= 5).length);
         setOrders(merchantOrders);
         setProfile({
           businessName: merchantProfile.businessName,
@@ -107,7 +127,7 @@ const MerchantDashboard: React.FC = () => {
     const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const buckets = labels.map((name) => ({ name, sales: 0, orders: 0 }));
 
-    orders.forEach((order) => {
+    orders.filter((order) => order.paymentStatus === 'SUCCESS').forEach((order) => {
       const dayIndex = (new Date(order.createdAt).getDay() + 6) % 7;
       buckets[dayIndex].orders += 1;
       buckets[dayIndex].sales += Math.max(order.totalAmount - order.deliveryFee, 0);
@@ -122,16 +142,25 @@ const MerchantDashboard: React.FC = () => {
   );
 
   const stats = useMemo(() => {
-    const codOrders = orders.filter((order) => order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY);
-    const onlineOrders = orders.filter((order) => order.paymentMethod !== PaymentMethod.CASH_ON_DELIVERY);
+    const activeOrders = orders.filter((order) => !CLOSED_STATUSES.includes(order.status));
+    const codOrders = activeOrders.filter((order) => order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY);
+    const onlineOrders = orders.filter(
+      (order) => order.paymentMethod !== PaymentMethod.CASH_ON_DELIVERY && order.paymentStatus === 'SUCCESS'
+    );
+    const pendingRevenueOrders = orders.filter((order) =>
+      !CLOSED_STATUSES.includes(order.status) && order.paymentStatus !== 'SUCCESS'
+    );
+    const expectedRevenue = pendingRevenueOrders.reduce(
+      (sum, order) => sum + Math.max(order.totalAmount - order.deliveryFee, 0),
+      0
+    );
 
     return {
       revenue: profile?.totalSales || 0,
       grossSales: profile?.grossSales || 0,
       commissionAmount: profile?.commissionAmount || 0,
-      pendingDelivery: orders.filter((order) =>
-        [OrderStatus.READY_FOR_PICKUP, ...ACTIVE_STATUSES].includes(order.status)
-      ).length,
+      expectedRevenue,
+      pendingDelivery: orders.filter((order) => FULFILLMENT_STATUSES.includes(order.status)).length,
       codOrders: codOrders.length,
       codValue: codOrders.reduce((sum, order) => sum + order.totalAmount, 0),
       onlineOrders: onlineOrders.length,
@@ -140,6 +169,37 @@ const MerchantDashboard: React.FC = () => {
       revenueGrowth: orders.filter((order) => order.paymentStatus === 'SUCCESS').length
     };
   }, [orders, profile]);
+
+  const urgentActions = useMemo(() => [
+    {
+      label: 'Orders to accept',
+      value: orders.filter((order) => [OrderStatus.PAID, OrderStatus.CONFIRMED].includes(order.status)).length,
+      detail: 'Start preparing confirmed orders',
+      icon: Package,
+      color: 'text-blue-600 bg-blue-50'
+    },
+    {
+      label: 'In preparation',
+      value: orders.filter((order) => [OrderStatus.PREPARING, OrderStatus.PROCESSING].includes(order.status)).length,
+      detail: 'Complete packing for rider pickup',
+      icon: Clock,
+      color: 'text-orange-600 bg-orange-50'
+    },
+    {
+      label: 'Ready for pickup',
+      value: orders.filter((order) => order.status === OrderStatus.READY_FOR_PICKUP).length,
+      detail: 'Waiting for an available rider',
+      icon: Truck,
+      color: 'text-emerald-600 bg-emerald-50'
+    },
+    {
+      label: 'Low stock products',
+      value: lowStockCount,
+      detail: 'Restock products with 5 or fewer units',
+      icon: AlertTriangle,
+      color: 'text-red-600 bg-red-50'
+    }
+  ], [lowStockCount, orders]);
 
   const recentActivity = useMemo(() => {
     return orders
@@ -198,10 +258,10 @@ const MerchantDashboard: React.FC = () => {
           </div>
           <div className="flex w-full md:w-auto flex-col sm:flex-row gap-3">
             <button
-              onClick={() => navigate('/seller/settings')}
+              onClick={() => navigate('/seller/orders')}
               className="w-full sm:w-auto bg-white/12 hover:bg-white/20 text-white border border-white/15 px-5 py-3 rounded-2xl font-black text-sm transition-all"
             >
-              Store Settings
+              View Orders
             </button>
             <button
               onClick={() => navigate('/seller/products')}
@@ -221,6 +281,7 @@ const MerchantDashboard: React.FC = () => {
           </div>
           <h3 className="text-gray-500 text-sm font-medium">Net Revenue</h3>
           <p className="text-2xl font-black">RWF {stats.revenue.toLocaleString()}</p>
+          <p className="mt-2 text-xs font-bold text-gray-400">Confirmed payments after commission</p>
         </div>
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-start mb-4">
@@ -250,8 +311,43 @@ const MerchantDashboard: React.FC = () => {
             <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><Banknote size={24} /></div>
             <span className="text-orange-500 text-xs font-bold">COD</span>
           </div>
-          <h3 className="text-gray-500 text-sm font-medium">COD Orders</h3>
+          <h3 className="text-gray-500 text-sm font-medium">Active COD Orders</h3>
           <p className="text-2xl font-black">{stats.codOrders}</p>
+        </div>
+      </div>
+
+      <div className="rounded-[32px] border border-orange-100 bg-orange-50/60 p-6 md:p-8">
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-orange-600">Expected Revenue</p>
+            <h2 className="mt-2 text-3xl font-black text-gray-950">RWF {stats.expectedRevenue.toLocaleString()}</h2>
+            <p className="mt-1 text-sm font-medium text-gray-600">Value awaiting payment confirmation or successful COD delivery.</p>
+          </div>
+          <button onClick={() => navigate('/seller/orders')} className="rounded-2xl bg-gray-950 px-6 py-4 text-xs font-black uppercase tracking-widest text-white">
+            Review Pending Orders
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-5 flex items-end justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-orange-500">Action Center</p>
+            <h2 className="mt-2 text-2xl font-black text-gray-950">Needs your attention</h2>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {urgentActions.map((action) => {
+            const ActionIcon = action.icon;
+            return (
+              <button key={action.label} onClick={() => navigate(action.label === 'Low stock products' ? '/seller/products' : '/seller/orders')} className="rounded-3xl border border-gray-100 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-1 hover:border-orange-200 hover:shadow-lg">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${action.color}`}><ActionIcon size={20} /></div>
+                <p className="mt-5 text-3xl font-black text-gray-950">{action.value}</p>
+                <p className="mt-1 text-sm font-black text-gray-800">{action.label}</p>
+                <p className="mt-2 text-xs font-medium leading-5 text-gray-500">{action.detail}</p>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -265,8 +361,9 @@ const MerchantDashboard: React.FC = () => {
           <p className="text-2xl font-black mt-2">RWF {stats.commissionAmount.toLocaleString()}</p>
         </div>
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h3 className="text-gray-500 text-sm font-medium">Average Commission</h3>
+          <h3 className="text-gray-500 text-sm font-medium">Effective Commission</h3>
           <p className="text-2xl font-black mt-2">{profile.commissionRate.toFixed(1)}%</p>
+          <p className="mt-2 text-xs font-bold text-gray-400">Weighted rate on successfully paid sales</p>
         </div>
       </div>
 
@@ -323,7 +420,7 @@ const MerchantDashboard: React.FC = () => {
             <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">COD Mix</span>
           </div>
           <h3 className="text-lg font-black text-gray-900">Cash on Delivery</h3>
-          <p className="text-sm text-gray-500 mt-1">Orders waiting for cash collection at handoff.</p>
+          <p className="text-sm text-gray-500 mt-1">Active orders waiting for cash collection or fulfillment.</p>
           <div className="mt-6 flex items-end justify-between">
             <div>
               <p className="text-3xl font-black text-gray-900">{stats.codOrders}</p>

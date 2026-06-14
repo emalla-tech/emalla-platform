@@ -984,31 +984,29 @@ export const createPostgresAdapter = () => {
     },
 
     async persistAuthLogin({ userId, token, userAgent, timestamp, passwordHash }) {
-      await tx(async (client) => {
-        if (passwordHash) {
-          await client.query(
-            'UPDATE users SET password = $2, last_login_at = $3, updated_at = $3 WHERE id = $1',
-            [userId, passwordHash, timestamp]
-          );
-        } else {
-          await client.query(
-            'UPDATE users SET last_login_at = $2, updated_at = $2 WHERE id = $1',
-            [userId, timestamp]
-          );
-        }
-
-        await client.query(
-          'INSERT INTO auth_tokens (token, user_id, created_at) VALUES ($1, $2, $3) ON CONFLICT (token) DO UPDATE SET user_id = EXCLUDED.user_id, created_at = EXCLUDED.created_at',
-          [token, userId, timestamp]
-        );
-
-        await client.query(
-          `INSERT INTO sessions (id, token_hash, user_id, created_at, last_seen_at, user_agent)
-           VALUES ($1, $2, $3, $4, $4, $5)
-           ON CONFLICT (id) DO UPDATE SET token_hash = EXCLUDED.token_hash, user_id = EXCLUDED.user_id, created_at = EXCLUDED.created_at, last_seen_at = EXCLUDED.last_seen_at, user_agent = EXCLUDED.user_agent`,
-          [`SES-${Date.now()}`, token, userId, timestamp, userAgent || 'Unknown device']
-        );
-      });
+      await query(
+        `WITH updated_user AS (
+           UPDATE users
+           SET password = COALESCE($2, password), last_login_at = $3, updated_at = $3
+           WHERE id = $1
+           RETURNING id
+         ),
+         upserted_token AS (
+           INSERT INTO auth_tokens (token, user_id, created_at)
+           SELECT $4, id, $3 FROM updated_user
+           ON CONFLICT (token) DO UPDATE SET user_id = EXCLUDED.user_id, created_at = EXCLUDED.created_at
+           RETURNING user_id
+         )
+         INSERT INTO sessions (id, token_hash, user_id, created_at, last_seen_at, user_agent)
+         SELECT $5, $4, user_id, $3, $3, $6 FROM upserted_token
+         ON CONFLICT (id) DO UPDATE SET
+           token_hash = EXCLUDED.token_hash,
+           user_id = EXCLUDED.user_id,
+           created_at = EXCLUDED.created_at,
+           last_seen_at = EXCLUDED.last_seen_at,
+           user_agent = EXCLUDED.user_agent`,
+        [userId, passwordHash || null, timestamp, token, `SES-${Date.now()}`, userAgent || 'Unknown device']
+      );
     },
 
     async readAuthUserByToken(token) {

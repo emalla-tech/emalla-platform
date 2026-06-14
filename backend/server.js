@@ -1512,13 +1512,20 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/health' && req.method === 'GET') {
+      const warmDatabase = url.searchParams.get('warm') === '1';
+      if (warmDatabase) {
+        await ensureDb();
+      }
       sendJson(res, 200, {
         status: 'ok',
         environment: {
           nodeEnv: runtime.nodeEnv,
           trustProxy: runtime.trustProxy
         },
-        database: getDatabaseStatus(),
+        database: {
+          ...getDatabaseStatus(),
+          ...(warmDatabase ? { ready: true } : {})
+        },
         email: getEmailDeliveryStatus(),
         storage: getStorageHealth()
       });

@@ -42,6 +42,10 @@ const request = async (path: string, init: RequestInit = {}) => {
 };
 
 export const apiClient = {
+  async warmBackend() {
+    return request('/health?warm=1');
+  },
+
   async login(email: string, password: string) {
     return request('/auth/login', {
       method: 'POST',

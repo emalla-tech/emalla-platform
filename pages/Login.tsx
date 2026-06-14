@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, Eye, EyeOff, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { UserRole } from '../types';
 import { useAuth } from '../auth/AuthContext';
 import { useLanguage } from '../i18n/LanguageContext';
+import { apiClient } from '../services/apiClient';
 
 interface LoginProps {
   onLoginSuccess?: (role: UserRole) => void;
@@ -22,6 +23,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const nextPath = searchParams.get('next') || '';
   const reason = searchParams.get('reason');
   const { t } = useLanguage();
+
+  useEffect(() => {
+    apiClient.warmBackend().catch(() => undefined);
+  }, []);
 
   const canAccessPath = (role: UserRole, targetPath: string) => {
     if (!targetPath) return false;

@@ -25,20 +25,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const verifyToken = async () => {
-      if (token) {
+    const verifyStoredToken = async () => {
+      const storedToken = localStorage.getItem('emalla_token');
+      if (storedToken) {
         try {
-          const verifiedUser = await authService.verifyToken(token);
+          const verifiedUser = await authService.verifyToken(storedToken);
           setUser(verifiedUser);
           localStorage.setItem('emalla_user', JSON.stringify(verifiedUser));
-        } catch (err) {
-          logout();
+        } catch {
+          setToken(null);
+          setUser(null);
+          localStorage.removeItem('emalla_token');
+          localStorage.removeItem('emalla_user');
         }
       }
       setIsLoading(false);
     };
-    verifyToken();
-  }, [token]);
+    verifyStoredToken();
+  }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);

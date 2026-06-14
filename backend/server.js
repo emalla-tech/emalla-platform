@@ -4578,8 +4578,21 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      const shouldInitializePayment = body.initializePayment === true;
+      const paymentMethod = body.paymentMethod || 'MOMO';
+      if (shouldInitializePayment && !['GTBANK_MOMO_PAY', 'CASH_ON_DELIVERY'].includes(paymentMethod)) {
+        sendJson(res, 400, { error: 'Please select GTBank MoMo Pay or Cash on Delivery.' });
+        return;
+      }
+
+      const createdAt = new Date().toISOString();
+      const orderId = `o-${Date.now()}`;
+      const txRef = shouldInitializePayment
+        ? `EMALLA-TX-${orderId}-${Date.now()}`
+        : body.tx_ref || `TX-${Date.now()}`;
+      const isCashOnDelivery = shouldInitializePayment && paymentMethod === 'CASH_ON_DELIVERY';
       const order = {
-        id: `o-${Date.now()}`,
+        id: orderId,
         orderNumber: generateOrderNumber(),
         customerId: customerUser?.id || `GST-${Date.now()}`,
         customerName,
@@ -4587,20 +4600,31 @@ const server = http.createServer(async (req, res) => {
         merchantId,
         merchantName,
         items,
-        status: 'pending_payment',
+        status: isCashOnDelivery ? 'confirmed' : 'pending_payment',
         paymentStatus: 'PENDING',
-        paymentMethod: body.paymentMethod || 'MOMO',
+        paymentMethod,
         deliveryFee,
         totalAmount,
-        tx_ref: body.tx_ref || `TX-${Date.now()}`,
+        tx_ref: txRef,
         address: customerAddress,
         phone: customerPhone,
         notes: body.notes,
-        inventoryReservedAt: new Date().toISOString(),
+        inventoryReservedAt: createdAt,
         inventoryRestockedAt: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdAt,
+        updatedAt: createdAt
       };
+      const payment = shouldInitializePayment ? {
+        id: `pay-${Date.now()}`,
+        orderId: order.id,
+        userId: order.customerId,
+        amount: order.totalAmount,
+        method: paymentMethod,
+        status: 'PENDING',
+        tx_ref: txRef,
+        currency: 'RWF',
+        createdAt
+      } : null;
 
       db.orders.unshift(order);
       invalidatePublicInsightsCache();
@@ -4608,16 +4632,20 @@ const server = http.createServer(async (req, res) => {
       checkoutNotifications.push(createNotification(db, {
         userId: order.customerId,
         role: 'CUSTOMER',
-        title: 'Order Placed!',
-        message: `Your order ${order.orderNumber} is awaiting payment.`,
-        type: 'info',
+        title: isCashOnDelivery ? 'Cash on Delivery Confirmed' : 'Order Placed!',
+        message: isCashOnDelivery
+          ? `Your order ${order.orderNumber} is confirmed. Please prepare cash for delivery.`
+          : `Your order ${order.orderNumber} is awaiting payment.`,
+        type: isCashOnDelivery ? 'success' : 'info',
         metadata: { orderId: order.id }
       }));
       checkoutNotifications.push(createNotification(db, {
         userId: order.merchantId,
         role: 'MERCHANT',
-        title: 'New Incoming Order!',
-        message: `Order ${order.orderNumber} has been placed for RWF ${order.totalAmount.toLocaleString()}.`,
+        title: isCashOnDelivery ? 'New Cash on Delivery Order' : 'New Incoming Order!',
+        message: isCashOnDelivery
+          ? `${order.orderNumber} was placed with Cash on Delivery. Start preparing the package.`
+          : `Order ${order.orderNumber} has been placed for RWF ${order.totalAmount.toLocaleString()}.`,
         type: 'success',
         metadata: { orderId: order.id }
       }));
@@ -4638,13 +4666,63 @@ const server = http.createServer(async (req, res) => {
       });
       await persistCheckoutBundleRecord({
         orders: [order],
+        payments: payment ? [payment] : [],
         notifications: checkoutNotifications,
         auditLogs: db.auditLogs.slice(0, 1),
         emailLogs: db.emailLogs.slice(0, 2),
         inventoryAdjustments: buildInventoryAdjustments(items)
       });
       invalidateProductsCache();
-      sendJson(res, 201, { order });
+      sendJson(res, 201, {
+        order,
+        paymentInit: payment ? {
+          status: 'success',
+          link: null,
+          tx_ref: txRef,
+          paymentStatus: 'PENDING',
+          mode: isCashOnDelivery ? 'cod' : 'manual',
+          paymentInstructions: paymentMethod === 'GTBANK_MOMO_PAY' ? {
+            merchantCode: getPaymentConfig().gtbankMerchantCode,
+            recipientName: getPaymentConfig().gtbankRecipientName,
+            ussdCode: `*549*8*${getPaymentConfig().gtbankMerchantCode}*${Math.round(order.totalAmount)}#`
+          } : null
+        } : null
+      });
+      if (isCashOnDelivery) {
+        sendPlatformEmailsInBackground([
+          {
+            to: order.customerEmail || user?.email,
+            template: 'order_confirmation',
+            ...buildPlatformEmail('order_confirmation', {
+              customerName: order.customerName || user?.name,
+              orderNumber: order.orderNumber,
+              totalAmount: order.totalAmount,
+              paymentMethod: order.paymentMethod,
+              address: order.address,
+              phone: order.phone,
+              txRef: order.tx_ref,
+              merchantName: order.merchantName,
+              itemCount: (order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+              trackingUrl: buildCustomerTrackingUrl(order)
+            })
+          },
+          {
+            to: merchantUser?.email,
+            template: 'seller_order_notification',
+            ...buildPlatformEmail('seller_order_notification', {
+              merchantName: order.merchantName || merchantUser?.name,
+              orderNumber: order.orderNumber,
+              totalAmount: order.totalAmount,
+              paymentMethod: order.paymentMethod,
+              customerName: order.customerName
+            })
+          }
+        ], {
+          event: 'cash_on_delivery_confirmation',
+          orderId: order.id,
+          orderNumber: order.orderNumber
+        });
+      }
       return;
     }
 

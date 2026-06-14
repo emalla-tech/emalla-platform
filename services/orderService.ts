@@ -8,6 +8,17 @@ export const OrderService = {
     return response.order as Order;
   },
 
+  createCheckoutOrder: async (data: Partial<Order>): Promise<{ order: Order; paymentInit?: Record<string, unknown> }> => {
+    const response = await apiClient.createOrder({
+      ...data,
+      initializePayment: true
+    });
+    return {
+      order: response.order as Order,
+      paymentInit: response.paymentInit
+    };
+  },
+
   getAllOrders: async (): Promise<Order[]> => {
     const response = await apiClient.getOrders();
     return response.orders || [];

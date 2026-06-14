@@ -91,7 +91,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
     let createdOrderId: string | null = null;
     try {
       const primaryMerchant = cartItems[0]?.product;
-      const order = await OrderService.createOrder({
+      const checkoutResult = await OrderService.createCheckoutOrder({
         customerId: user?.id || '',
         customerName: formData.fullName,
         customerEmail: formData.email,
@@ -111,15 +111,17 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
         paymentMethod: formData.paymentMethod,
         notes: formData.notes
       });
+      const order = checkoutResult.order;
       createdOrderId = order.id;
 
-      const paymentInit = await PaymentService.initializePayment({
-        orderId: order.id,
-        amount: finalTotal,
-        customerEmail: formData.email,
-        customerName: formData.fullName,
-        method: formData.paymentMethod
-      });
+      // Keep the legacy initiation call as a safe deployment-order fallback.
+      const paymentInit = checkoutResult.paymentInit || await PaymentService.initializePayment({
+          orderId: order.id,
+          amount: finalTotal,
+          customerEmail: formData.email,
+          customerName: formData.fullName,
+          method: formData.paymentMethod
+        });
 
       clearCart();
       if (formData.paymentMethod === PaymentMethod.CASH_ON_DELIVERY) {
@@ -128,7 +130,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
       }
 
       const emailParam = encodeURIComponent(formData.email);
-      navigate(`/payment/processing?tx_ref=${paymentInit.tx_ref}&order_id=${order.id}&email=${emailParam}&amount=${finalTotal}`);
+      navigate(`/payment/processing?tx_ref=${String(paymentInit.tx_ref)}&order_id=${order.id}&email=${emailParam}&amount=${finalTotal}`);
 
     } catch (err) {
       if (createdOrderId) {

@@ -70,18 +70,21 @@ const chartColors = ['#f97316', '#0f766e', '#2563eb', '#eab308', '#db2777', '#7c
 const FinanceOverview: React.FC = () => {
   const [summary, setSummary] = useState<FinanceSummary>(defaultSummary);
   const [payouts, setPayouts] = useState<any[]>([]);
+  const [paymentClaims, setPaymentClaims] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [messageTone, setMessageTone] = useState<'success' | 'error' | 'info'>('success');
   const [busyPayoutId, setBusyPayoutId] = useState<string | null>(null);
+  const [busyClaimId, setBusyClaimId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        const [data, payoutData] = await Promise.all([
+        const [data, payoutData, claimData] = await Promise.all([
           AdminService.getFinanceSummary(),
-          AdminService.getPayouts()
+          AdminService.getPayouts(),
+          AdminService.getPaymentClaims()
         ]);
         setSummary({
           overview: data.overview || defaultSummary.overview,
@@ -90,6 +93,7 @@ const FinanceOverview: React.FC = () => {
           payoutSummary: data.payoutSummary || defaultSummary.payoutSummary
         });
         setPayouts(payoutData);
+        setPaymentClaims(claimData);
       } finally {
         setLoading(false);
       }
@@ -131,6 +135,23 @@ const FinanceOverview: React.FC = () => {
       window.setTimeout(() => setMessage(null), 3000);
     } finally {
       setBusyPayoutId(null);
+    }
+  };
+
+  const handlePaymentClaimReview = async (paymentId: string, status: 'approved' | 'rejected') => {
+    setBusyClaimId(paymentId);
+    try {
+      const updated = await AdminService.reviewPaymentClaim(paymentId, status);
+      setPaymentClaims((current) => current.map((entry) => (entry.id === paymentId ? updated : entry)));
+      setMessageTone(status === 'approved' ? 'success' : 'info');
+      setMessage(status === 'approved' ? 'GTBank payment approved.' : 'GTBank payment rejected.');
+      window.setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      setMessageTone('error');
+      setMessage(error instanceof Error ? error.message : 'Unable to review GTBank payment.');
+      window.setTimeout(() => setMessage(null), 3000);
+    } finally {
+      setBusyClaimId(null);
     }
   };
 
@@ -572,6 +593,40 @@ const FinanceOverview: React.FC = () => {
                     </div>
                   </div>
                   <p className="text-lg font-black text-gray-900">{money(item.value)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-8 py-6 border-b border-gray-100">
+              <h2 className="text-xl font-black text-gray-900">GTBank Payment Verification Queue</h2>
+              <p className="text-sm text-gray-500 mt-1">Confirm the bank reference and amount before releasing an order to the seller.</p>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {paymentClaims.length === 0 ? (
+                <div className="px-8 py-10 text-sm text-gray-500">No GTBank payments are waiting for verification.</div>
+              ) : paymentClaims.map((claim) => (
+                <div key={claim.id} className="px-8 py-5 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-black text-gray-900">{claim.orderNumber} · {claim.customerName}</p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-gray-400">{claim.customerEmail}</p>
+                    <p className="mt-2 text-xs font-bold text-gray-600">Bank reference: {claim.bankReference || 'Not supplied'} · Phone: {claim.payerPhone || 'Not supplied'}</p>
+                  </div>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="rounded-2xl bg-gray-50 border border-gray-100 px-5 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Amount</p>
+                      <p className="mt-1 text-sm font-black text-gray-900">{money(claim.orderTotal || claim.amount)}</p>
+                    </div>
+                    {claim.status === 'VERIFICATION_PENDING' ? (
+                      <>
+                        <button onClick={() => handlePaymentClaimReview(claim.id, 'approved')} disabled={busyClaimId === claim.id} className="rounded-2xl bg-emerald-500 px-5 py-4 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-60">Approve</button>
+                        <button onClick={() => handlePaymentClaimReview(claim.id, 'rejected')} disabled={busyClaimId === claim.id} className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-[10px] font-black uppercase tracking-widest text-red-500 disabled:opacity-60">Reject</button>
+                      </>
+                    ) : (
+                      <span className="rounded-2xl bg-red-50 px-5 py-4 text-[10px] font-black uppercase tracking-widest text-red-500">Rejected</span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

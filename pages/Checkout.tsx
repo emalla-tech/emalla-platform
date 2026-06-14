@@ -50,7 +50,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
     district: 'Gasabo',
     sector: 'Kimironko',
     street: 'KG 11 St, House 4',
-    paymentMethod: PaymentMethod.MOMO,
+    paymentMethod: PaymentMethod.GTBANK_MOMO_PAY,
     notes: ''
   });
 
@@ -128,7 +128,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
       }
 
       const emailParam = encodeURIComponent(formData.email);
-      navigate(`/payment/processing?tx_ref=${paymentInit.tx_ref}&order_id=${order.id}&email=${emailParam}`);
+      navigate(`/payment/processing?tx_ref=${paymentInit.tx_ref}&order_id=${order.id}&email=${emailParam}&amount=${finalTotal}`);
 
     } catch (err) {
       if (createdOrderId) {

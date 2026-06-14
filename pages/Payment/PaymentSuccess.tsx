@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CheckCircle2, Package, ArrowRight, Share2, Star, Printer, UserPlus } from 'lucide-react';
+import { CheckCircle2, Clock3, Package, ArrowRight, Share2, Star, Printer, UserPlus } from 'lucide-react';
 import { Order, PaymentMethod } from '../../types';
 import { OrderService } from '../../services/orderService';
 import { html, printPdfDocument, renderTableRows } from '../../lib/documentExport';
@@ -12,6 +12,8 @@ const PaymentSuccess: React.FC = () => {
   const [order, setOrder] = useState<Order | null>(null);
   const orderId = searchParams.get('order_id');
   const mode = searchParams.get('mode');
+  const email = searchParams.get('email') || undefined;
+  const isVerificationPending = mode === 'verification_pending';
   const isGuestOrder = !!order?.customerId?.startsWith('GST-');
   const guestTrackingUrl =
     order && order.customerEmail
@@ -26,8 +28,8 @@ const PaymentSuccess: React.FC = () => {
 
   useEffect(() => {
     if (!orderId) return;
-    OrderService.getOrderById(orderId).then(setOrder);
-  }, [orderId]);
+    OrderService.getOrderById(orderId, { email }).then(setOrder);
+  }, [orderId, email]);
 
   const handleDownloadInvoice = () => {
     if (!order) return;
@@ -52,7 +54,7 @@ const PaymentSuccess: React.FC = () => {
           <div class="meta">
             <div><strong>Order:</strong> ${html.escape(order.orderNumber)}</div>
             <div><strong>Generated:</strong> ${html.escape(new Date().toLocaleString())}</div>
-            <div><strong>Status:</strong> <span class="pill">${html.escape(mode === 'cod' ? 'cod_confirmed' : 'payment_confirmed')}</span></div>
+            <div><strong>Status:</strong> <span class="pill">${html.escape(mode === 'cod' ? 'cod_confirmed' : isVerificationPending ? 'verification_pending' : 'payment_confirmed')}</span></div>
           </div>
         </div>
 
@@ -123,7 +125,7 @@ const PaymentSuccess: React.FC = () => {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-2 bg-emerald-500 rounded-b-full"></div>
         
         <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-10 shadow-xl shadow-emerald-100">
-          <CheckCircle2 size={56} />
+          {isVerificationPending ? <Clock3 size={52} /> : <CheckCircle2 size={56} />}
         </div>
 
         <div className="space-y-4 mb-12">
@@ -131,6 +133,8 @@ const PaymentSuccess: React.FC = () => {
           <p className="text-gray-500 font-medium text-lg">
             {mode === 'cod'
               ? <>Your order <span className="text-gray-900 font-black">{order?.orderNumber || '#Pending'}</span> is confirmed with <span className="text-orange-600 font-black">Cash on Delivery</span>. Please pay when it arrives.</>
+              : isVerificationPending
+                ? <>Your GTBank payment details for order <span className="text-gray-900 font-black">{order?.orderNumber || '#Pending'}</span> were submitted. E-Malla Finance will verify them before the seller starts preparing your order.</>
               : <>Payment confirmed. Your order <span className="text-gray-900 font-black">{order?.orderNumber || '#Pending'}</span> is being processed by <span className="text-orange-600 font-black">{order?.merchantName || 'E-Malla'}</span>.</>}
           </p>
         </div>

@@ -32,6 +32,7 @@ import {
   getEmailConfig,
   getAppConfig,
   getStorageConfig,
+  getPaymentConfig,
   getRuntimeConfig,
   getAuthConfig,
   assertProductionEnv
@@ -1298,6 +1299,7 @@ const buildAdminFinanceSummary = (db) => {
     },
     categoryCommission,
     paymentBreakdown: [
+      { label: 'GTBank MoMo Pay', method: 'GTBANK_MOMO_PAY' },
       { label: 'MoMo', method: 'MOMO' },
       { label: 'Airtel', method: 'AIRTEL' },
       { label: 'Cards', method: 'CARD' },
@@ -3151,6 +3153,122 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/admin/payment-claims' && req.method === 'GET') {
+      const user = await requireRole(req, res, ['ADMIN']);
+      if (!user) return;
+
+      const db = await readDb();
+      const orderMap = new Map((db.orders || []).map((order) => [order.id, order]));
+      const claims = (db.payments || [])
+        .filter((payment) => payment.method === 'GTBANK_MOMO_PAY' && ['VERIFICATION_PENDING', 'FAILED'].includes(payment.status))
+        .map((payment) => {
+          const order = orderMap.get(payment.orderId);
+          return {
+            ...payment,
+            orderNumber: order?.orderNumber || payment.orderId,
+            customerName: order?.customerName || '',
+            customerEmail: order?.customerEmail || '',
+            orderTotal: order?.totalAmount || payment.amount
+          };
+        })
+        .sort((left, right) => new Date(right.submittedAt || right.updatedAt || right.createdAt || 0).getTime() - new Date(left.submittedAt || left.updatedAt || left.createdAt || 0).getTime());
+
+      sendJson(res, 200, { claims });
+      return;
+    }
+
+    if (pathname.startsWith('/api/admin/payment-claims/') && pathname.endsWith('/status') && req.method === 'PUT') {
+      const user = await requireRole(req, res, ['ADMIN']);
+      if (!user) return;
+
+      const paymentId = pathname.split('/')[4];
+      const body = await readBody(req);
+      const decision = String(body.status || '').trim().toLowerCase();
+      const db = await readDb();
+      const paymentIndex = (db.payments || []).findIndex((entry) => entry.id === paymentId && entry.method === 'GTBANK_MOMO_PAY');
+      if (paymentIndex === -1) {
+        sendJson(res, 404, { error: 'GTBank payment claim not found.' });
+        return;
+      }
+      if (!['approved', 'rejected'].includes(decision)) {
+        sendJson(res, 400, { error: 'Payment decision must be approved or rejected.' });
+        return;
+      }
+
+      const payment = db.payments[paymentIndex];
+      if (payment.status !== 'VERIFICATION_PENDING') {
+        sendJson(res, 409, { error: 'Only pending GTBank payment claims can be reviewed.' });
+        return;
+      }
+      const orderIndex = (db.orders || []).findIndex((entry) => entry.id === payment.orderId);
+      if (orderIndex === -1) {
+        sendJson(res, 404, { error: 'Order for this payment was not found.' });
+        return;
+      }
+
+      const reviewedAt = new Date().toISOString();
+      const approved = decision === 'approved';
+      db.payments[paymentIndex] = {
+        ...payment,
+        status: approved ? 'SUCCESS' : 'FAILED',
+        reviewedAt,
+        reviewedBy: user.id,
+        updatedAt: reviewedAt
+      };
+      const order = db.orders[orderIndex];
+      db.orders[orderIndex] = {
+        ...order,
+        paymentStatus: approved ? 'SUCCESS' : 'FAILED',
+        paymentVerificationStatus: decision,
+        status: approved && order.status === 'pending_payment' ? 'paid' : order.status,
+        updatedAt: reviewedAt
+      };
+
+      createNotification(db, {
+        userId: order.customerId,
+        role: 'CUSTOMER',
+        title: approved ? 'GTBank Payment Confirmed' : 'GTBank Payment Could Not Be Verified',
+        message: approved
+          ? `Payment confirmed for ${order.orderNumber}. The seller can now prepare your order.`
+          : `We could not verify the submitted payment for ${order.orderNumber}. Please contact support or submit the correct reference.`,
+        type: approved ? 'success' : 'warning',
+        metadata: { orderId: order.id, paymentId: payment.id }
+      });
+      if (approved) {
+        createNotification(db, {
+          userId: order.merchantId,
+          role: 'MERCHANT',
+          title: 'Payment Confirmed',
+          message: `GTBank payment confirmed for ${order.orderNumber}. Start preparing the package.`,
+          type: 'success',
+          metadata: { orderId: order.id, paymentId: payment.id }
+        });
+      }
+      createAuditLog(db, {
+        event: `GTBank payment ${decision} for ${order.orderNumber}`,
+        actor: user.name || user.email,
+        category: 'payments',
+        status: approved ? 'success' : 'error',
+        metadata: { orderId: order.id, paymentId: payment.id, bankReference: payment.bankReference, decision }
+      });
+      await persistCheckoutBundleRecord({
+        orders: [db.orders[orderIndex]],
+        payments: [db.payments[paymentIndex]],
+        notifications: db.notifications.slice(0, approved ? 2 : 1),
+        auditLogs: db.auditLogs.slice(0, 1)
+      });
+      sendJson(res, 200, {
+        claim: {
+          ...db.payments[paymentIndex],
+          orderNumber: order.orderNumber,
+          customerName: order.customerName,
+          customerEmail: order.customerEmail,
+          orderTotal: order.totalAmount
+        }
+      });
+      return;
+    }
+
     if (pathname === '/api/admin/seller-applications' && req.method === 'GET') {
       const user = await requireRole(req, res, ['ADMIN']);
       if (!user) return;
@@ -4974,8 +5092,14 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      if (!['GTBANK_MOMO_PAY', 'CASH_ON_DELIVERY'].includes(body.method)) {
+        sendJson(res, 400, { error: 'Please select GTBank MoMo Pay or Cash on Delivery.' });
+        return;
+      }
+
       const txRef = `EMALLA-TX-${body.orderId}-${Date.now()}`;
       const isCashOnDelivery = body.method === 'CASH_ON_DELIVERY';
+      const isManualPayment = body.method === 'GTBANK_MOMO_PAY';
       let postResponseEmails = [];
       let postResponseEmailContext = {};
       const payment = {
@@ -4984,7 +5108,7 @@ const server = http.createServer(async (req, res) => {
         userId: db.orders[orderIndex].customerId,
         amount: paymentOrder.totalAmount,
         method: body.method,
-        status: isCashOnDelivery ? 'PENDING' : 'SUCCESS',
+        status: 'PENDING',
         tx_ref: txRef,
         currency: 'RWF',
         createdAt: new Date().toISOString()
@@ -4995,12 +5119,12 @@ const server = http.createServer(async (req, res) => {
         ...db.orders[orderIndex],
         tx_ref: txRef,
         paymentMethod: body.method,
-        paymentStatus: isCashOnDelivery ? 'PENDING' : db.orders[orderIndex].paymentStatus,
+        paymentStatus: 'PENDING',
         status: isCashOnDelivery ? 'confirmed' : db.orders[orderIndex].status,
         updatedAt: new Date().toISOString()
       };
 
-      if (!isCashOnDelivery) {
+      if (!isCashOnDelivery && !isManualPayment) {
         createTransaction(db, {
           userId: db.orders[orderIndex].customerId,
           orderId: body.orderId,
@@ -5086,21 +5210,120 @@ const server = http.createServer(async (req, res) => {
       await persistCheckoutBundleRecord({
         orders: [db.orders[orderIndex]],
         payments: [payment],
-        transactions: isCashOnDelivery ? [] : db.transactions.slice(0, 1),
+        transactions: [],
         notifications: isCashOnDelivery ? db.notifications.slice(0, 2) : [],
         auditLogs: db.auditLogs.slice(0, 1),
         emailLogs: []
       });
       sendJson(res, 200, {
         status: 'success',
-        link: isCashOnDelivery ? null : `https://checkout.flutterwave.com/v3/hosted/pay/${txRef}`,
+        link: null,
         tx_ref: txRef,
-        paymentStatus: isCashOnDelivery ? 'PENDING' : 'SUCCESS',
-        mode: isCashOnDelivery ? 'cod' : 'gateway'
+        paymentStatus: 'PENDING',
+        mode: isCashOnDelivery ? 'cod' : 'manual',
+        paymentInstructions: isManualPayment ? {
+          merchantCode: getPaymentConfig().gtbankMerchantCode,
+          recipientName: getPaymentConfig().gtbankRecipientName,
+          ussdCode: `*549*8*${getPaymentConfig().gtbankMerchantCode}*${Math.round(paymentOrder.totalAmount)}#`
+        } : null
       });
       if (postResponseEmails.length > 0) {
         sendPlatformEmailsInBackground(postResponseEmails, postResponseEmailContext);
       }
+      return;
+    }
+
+    if (pathname === '/api/payments/manual/submit' && req.method === 'POST') {
+      const user = await getOptionalUser(req);
+      const body = await readBody(req);
+      const db = await readDb();
+      const txRef = String(body.txRef || '').trim();
+      const orderId = String(body.orderId || '').trim();
+      const bankReference = String(body.bankReference || '').trim();
+      const payerPhone = String(body.payerPhone || '').trim();
+      const checkoutEmail = String(body.email || '').trim().toLowerCase();
+      const paymentIndex = (db.payments || []).findIndex((entry) => entry.tx_ref === txRef && entry.orderId === orderId);
+      const orderIndex = (db.orders || []).findIndex((entry) => entry.id === orderId);
+
+      if (paymentIndex === -1 || orderIndex === -1) {
+        sendJson(res, 404, { error: 'Payment session not found.' });
+        return;
+      }
+
+      const payment = db.payments[paymentIndex];
+      const order = db.orders[orderIndex];
+      const emailMatches = checkoutEmail && checkoutEmail === String(order.customerEmail || '').trim().toLowerCase();
+      const customerMatches = user?.role === 'CUSTOMER' && order.customerId === user.id;
+      if (!emailMatches && !customerMatches && user?.role !== 'ADMIN') {
+        sendJson(res, user ? 403 : 401, { error: user ? 'Forbidden' : 'Order email verification is required.' });
+        return;
+      }
+      if (payment.method !== 'GTBANK_MOMO_PAY') {
+        sendJson(res, 400, { error: 'This payment does not use GTBank MoMo Pay.' });
+        return;
+      }
+      if (payment.status === 'SUCCESS') {
+        sendJson(res, 409, { error: 'This payment is already confirmed.' });
+        return;
+      }
+      if (bankReference.length < 4 || payerPhone.length < 9) {
+        sendJson(res, 400, { error: 'Phone number and GTBank transaction reference are required.' });
+        return;
+      }
+
+      const duplicateReference = (db.payments || []).some(
+        (entry, index) => index !== paymentIndex && String(entry.bankReference || '').toLowerCase() === bankReference.toLowerCase()
+      );
+      if (duplicateReference) {
+        sendJson(res, 409, { error: 'This GTBank transaction reference has already been submitted.' });
+        return;
+      }
+
+      const submittedAt = new Date().toISOString();
+      db.payments[paymentIndex] = {
+        ...payment,
+        status: 'VERIFICATION_PENDING',
+        bankReference,
+        payerPhone,
+        submittedAt,
+        updatedAt: submittedAt
+      };
+      db.orders[orderIndex] = {
+        ...order,
+        paymentStatus: 'PENDING',
+        paymentVerificationStatus: 'pending',
+        updatedAt: submittedAt
+      };
+      createNotification(db, {
+        userId: order.customerId,
+        role: 'CUSTOMER',
+        title: 'Payment Submitted for Verification',
+        message: `E-Malla Finance is reviewing your GTBank payment for ${order.orderNumber}.`,
+        type: 'info',
+        metadata: { orderId: order.id, paymentId: payment.id }
+      });
+      createNotification(db, {
+        userId: 'broadcast_ADMIN',
+        role: 'ADMIN',
+        title: 'GTBank Payment Needs Verification',
+        message: `${order.orderNumber} submitted GTBank reference ${bankReference}.`,
+        type: 'warning',
+        metadata: { orderId: order.id, paymentId: payment.id }
+      });
+      createAuditLog(db, {
+        event: `GTBank payment submitted for ${order.orderNumber}`,
+        actor: user?.name || user?.email || order.customerEmail || order.customerName,
+        category: 'payments',
+        status: 'info',
+        metadata: { orderId: order.id, paymentId: payment.id, bankReference, payerPhone }
+      });
+      await persistCheckoutBundleRecord({
+        orders: [db.orders[orderIndex]],
+        payments: [db.payments[paymentIndex]],
+        notifications: db.notifications.slice(0, 2),
+        auditLogs: db.auditLogs.slice(0, 1)
+      });
+      sendJson(res, 200, { payment: db.payments[paymentIndex], order: db.orders[orderIndex] });
       return;
     }
 
@@ -5112,6 +5335,17 @@ const server = http.createServer(async (req, res) => {
 
       if (!payment) {
         sendJson(res, 404, { error: 'Payment not found' });
+        return;
+      }
+      if (payment.method === 'GTBANK_MOMO_PAY' && user?.role !== 'ADMIN') {
+        sendJson(res, 200, {
+          status: payment.status,
+          amount: payment.amount,
+          currency: payment.currency || 'RWF',
+          id: payment.id,
+          tx_ref: payment.tx_ref,
+          orderId: payment.orderId
+        });
         return;
       }
 

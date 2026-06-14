@@ -135,6 +135,11 @@ export const getStorageConfig = () => ({
   maxDocumentUploadMb: parsePositiveNumber(process.env.MAX_DOCUMENT_UPLOAD_MB, 12)
 });
 
+export const getPaymentConfig = () => ({
+  gtbankMerchantCode: String(process.env.GTBANK_MERCHANT_CODE || '551000093').trim(),
+  gtbankRecipientName: String(process.env.GTBANK_RECIPIENT_NAME || 'Perfect Technologies Ltd').trim()
+});
+
 export const getDatabaseConfig = () => {
   const runtime = getRuntimeConfig();
   const requestedProvider = String(process.env.DB_PROVIDER || (runtime.isProduction ? 'postgres' : 'json')).toLowerCase();

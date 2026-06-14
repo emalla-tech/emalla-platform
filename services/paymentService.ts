@@ -14,5 +14,15 @@ export const PaymentService = {
 
   verifyPayment: async (tx_ref: string, options?: { orderId?: string; email?: string }): Promise<PaymentVerificationResult> => {
     return apiClient.verifyPayment(tx_ref, options);
+  },
+
+  submitManualPayment: async (params: {
+    txRef: string;
+    orderId: string;
+    email: string;
+    payerPhone: string;
+    bankReference: string;
+  }) => {
+    return apiClient.submitManualPayment(params);
   }
 };

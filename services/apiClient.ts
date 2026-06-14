@@ -285,6 +285,13 @@ export const apiClient = {
     return request(`/payments/verify/${encodeURIComponent(txRef)}${query ? `?${query}` : ''}`);
   },
 
+  async submitManualPayment(params: { txRef: string; orderId: string; email: string; payerPhone: string; bankReference: string }) {
+    return request('/payments/manual/submit', {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+  },
+
   async getNotifications() {
     return request('/notifications');
   },
@@ -392,6 +399,17 @@ export const apiClient = {
 
   async getAdminFinance() {
     return request('/admin/finance');
+  },
+
+  async getAdminPaymentClaims() {
+    return request('/admin/payment-claims');
+  },
+
+  async reviewAdminPaymentClaim(paymentId: string, status: 'approved' | 'rejected') {
+    return request(`/admin/payment-claims/${paymentId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status })
+    });
   },
 
   async getAdminPayouts() {

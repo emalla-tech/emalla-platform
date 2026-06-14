@@ -144,6 +144,16 @@ export const AdminService = {
     return apiClient.getAdminFinance();
   },
 
+  getPaymentClaims: async (): Promise<any[]> => {
+    const response = await apiClient.getAdminPaymentClaims();
+    return response.claims || [];
+  },
+
+  reviewPaymentClaim: async (paymentId: string, status: 'approved' | 'rejected') => {
+    const response = await apiClient.reviewAdminPaymentClaim(paymentId, status);
+    return response.claim;
+  },
+
   getPayouts: async (): Promise<AdminPayout[]> => {
     const response = await apiClient.getAdminPayouts();
     return response.payouts || [];

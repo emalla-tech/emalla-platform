@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { CreditCard, Smartphone, CheckCircle2, Banknote } from 'lucide-react';
+import { Building2, CheckCircle2, Banknote } from 'lucide-react';
 import { PaymentMethod } from '../../types';
 
 interface PaymentMethodSelectorProps {
@@ -11,31 +11,13 @@ interface PaymentMethodSelectorProps {
 const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({ selected, onSelect }) => {
   const methods = [
     {
-      id: PaymentMethod.MOMO,
-      name: 'MTN Mobile Money',
-      desc: 'Instant prompt on your phone',
-      icon: <Smartphone className="text-yellow-600" />,
-      color: 'border-yellow-400 bg-yellow-50/50',
-      activeColor: 'border-yellow-500 bg-yellow-50 ring-yellow-100',
-      badge: 'MTN MoMo'
-    },
-    {
-      id: PaymentMethod.AIRTEL,
-      name: 'Airtel Money',
-      desc: 'Secure mobile payment',
-      icon: <Smartphone className="text-red-600" />,
+      id: PaymentMethod.GTBANK_MOMO_PAY,
+      name: 'GTBank MoMo Pay',
+      desc: 'Pay free by dialing a secure USSD code',
+      icon: <Building2 className="text-red-600" />,
       color: 'border-red-100 bg-red-50/30',
       activeColor: 'border-red-500 bg-red-50 ring-red-100',
-      badge: 'Airtel'
-    },
-    {
-      id: PaymentMethod.CARD,
-      name: 'Bank Card',
-      desc: 'Visa, Mastercard & Amex',
-      icon: <CreditCard className="text-blue-600" />,
-      color: 'border-blue-100 bg-blue-50/30',
-      activeColor: 'border-blue-500 bg-blue-50 ring-blue-100',
-      badge: 'International'
+      badge: 'Recommended'
     },
     {
       id: PaymentMethod.CASH_ON_DELIVERY,
@@ -63,7 +45,7 @@ const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({ selected,
             onClick={() => onSelect(method.id)}
             className={`relative p-6 border-2 rounded-[32px] transition-all flex items-center justify-between text-left group ${
               selected === method.id 
-              ? `${method.activeColor} shadow-xl shadow-gray-100 ring-4` 
+              ? `${method.activeColor} shadow-xl shadow-gray-100 ring-4`
               : 'border-gray-100 bg-white hover:border-orange-200'
             }`}
           >

@@ -84,6 +84,12 @@ const JSON_COLUMNS = {
   admin_settings: new Set(['preferences', 'category_commission_rates', 'metadata']),
   password_reset_tokens: new Set(['metadata'])
 };
+const databaseUserRef = (value) => {
+  const normalized = String(value || '');
+  return normalized && !normalized.startsWith('GST-') && !normalized.startsWith('broadcast_')
+    ? normalized
+    : null;
+};
 const dedupeById = (items = []) => {
   const seen = new Set();
   return items.filter((item) => {
@@ -210,14 +216,16 @@ const upsertOrderRecord = async (client, order) => {
 const upsertNotificationRecord = async (client, notification) =>
   upsert(client, 'notifications', {
     id: notification.id,
-    user_id: notification.userId && !String(notification.userId).startsWith('GST-') ? notification.userId : null,
+    user_id: databaseUserRef(notification.userId),
     role: notification.role || null,
     title: notification.title || 'Notification',
     message: notification.message || '',
     type: notification.type || 'info',
     read: Boolean(notification.read),
     created_at: notification.createdAt || new Date().toISOString(),
-    metadata: notification.metadata || notification
+    metadata: databaseUserRef(notification.userId)
+      ? notification.metadata || notification
+      : { ...notification, metadata: notification.metadata || {} }
   });
 
 const upsertTransactionRecord = async (client, transaction) =>
@@ -622,7 +630,7 @@ export const createPostgresAdapter = () => {
         notifications: fallbackNotifications.map((row) => ({
           ...(row.metadata || {}),
           id: row.id,
-          userId: row.user_id || undefined,
+          userId: row.user_id || row.metadata?.userId || undefined,
           role: row.role || '',
           title: row.title,
           message: row.message,
@@ -1263,7 +1271,7 @@ export const createPostgresAdapter = () => {
         notifications: notifications.map((row) => ({
           ...(row.metadata || {}),
           id: row.id,
-          userId: row.user_id || undefined,
+          userId: row.user_id || row.metadata?.userId || undefined,
           role: row.role || '',
           title: row.title,
           message: row.message,

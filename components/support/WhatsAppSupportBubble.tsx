@@ -38,7 +38,7 @@ const WhatsAppSupportBubble: React.FC = () => {
 
   return (
     <aside
-      className="fixed bottom-[calc(7.1rem+env(safe-area-inset-bottom,0px))] left-4 z-[75] flex flex-col items-start gap-3 md:bottom-24 md:left-auto md:right-6 md:items-end"
+      className="whatsapp-support fixed bottom-[calc(7.1rem+env(safe-area-inset-bottom,0px))] left-4 z-[75] flex flex-col items-start gap-3 md:bottom-24 md:left-auto md:right-6 md:items-end"
       aria-label="WhatsApp customer support"
     >
       {showWelcome && (

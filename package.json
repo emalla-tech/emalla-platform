@@ -24,6 +24,7 @@
     "email:check": "node ./scripts/check-email-config.mjs",
     "storage:check": "node ./scripts/check-storage-config.mjs",
     "env:check": "node ./scripts/check-production-env.mjs",
+    "smoke:production": "node ./scripts/smoke-production.mjs",
     "db:schema:path": "node -e \"console.log('backend/sql/migrations')\"",
     "admin:reset-password": "node ./scripts/reset-admin-password.mjs",
     "dev:web": "node ./node_modules/vite/bin/vite.js",

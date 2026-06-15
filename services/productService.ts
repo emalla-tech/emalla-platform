@@ -10,7 +10,7 @@ const productListeners = new Set<(products: Product[]) => void>();
 const request = async (path = '', init: RequestInit = {}) => {
   const token = localStorage.getItem('emalla_token');
   const headers = new Headers(init.headers || {});
-  if (!(init.body instanceof FormData)) {
+  if (init.body != null && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
   if (token) {

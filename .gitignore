@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 backend/data/migrations/*.sql
+.runtime/
 
 # Editor directories and files
 .vscode/*

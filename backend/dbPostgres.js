@@ -1093,7 +1093,10 @@ export const createPostgresAdapter = () => {
 
     async touchSessionByToken(token, timestamp) {
       await query(
-        'UPDATE sessions SET last_seen_at = $2 WHERE token_hash = $1',
+        `UPDATE sessions
+         SET last_seen_at = $2
+         WHERE token_hash = $1
+           AND (last_seen_at IS NULL OR last_seen_at < $2::timestamptz - interval '5 minutes')`,
         [token, timestamp]
       );
     },
@@ -1349,6 +1352,8 @@ export const createPostgresAdapter = () => {
       ]);
 
       await tx(async (client) => {
+        // Serialize legacy snapshot rewrites until every mutation uses targeted SQL.
+        await client.query('SELECT pg_advisory_xact_lock($1)', [6082026]);
         await client.query('DELETE FROM wishlists');
         await client.query('DELETE FROM product_reviews');
         await client.query('DELETE FROM deliveries');

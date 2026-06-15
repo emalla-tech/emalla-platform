@@ -148,6 +148,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   />
                   <input
                     type="text"
+                    autoComplete="username"
                     value={email}
                     required
                     onChange={(e) => setEmail(e.target.value)}
@@ -171,6 +172,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   />
                   <input
                     type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
                     value={password}
                     required
                     onChange={(e) => setPassword(e.target.value)}

@@ -94,6 +94,21 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
   }, [id, products]);
 
   useEffect(() => {
+    if (!product) return;
+
+    const title = `${product.name} | E-Malla Rwanda`;
+    const description = String(product.description || `Buy ${product.name} from a trusted seller on E-Malla Rwanda.`)
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 160);
+
+    document.title = title;
+    document.querySelector('meta[name="description"]')?.setAttribute('content', description);
+    document.querySelector('meta[property="og:title"]')?.setAttribute('content', title);
+    document.querySelector('meta[property="og:description"]')?.setAttribute('content', description);
+  }, [product]);
+
+  useEffect(() => {
     if (!product) {
       setReviews([]);
       return;
@@ -536,13 +551,15 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
                       </div>
                       <h4 className="font-bold text-gray-900 text-sm">AI Recommendation</h4>
                     </div>
-                    <button 
-                      onClick={generateAIDescription}
-                      disabled={isGenerating}
-                      className="text-[10px] font-black tracking-widest text-orange-500 hover:text-orange-600 uppercase transition-colors disabled:opacity-50"
-                    >
-                      {isGenerating ? 'Synthesizing...' : 'Summarize details'}
-                    </button>
+                    {user && (
+                      <button
+                        onClick={generateAIDescription}
+                        disabled={isGenerating}
+                        className="text-[10px] font-black tracking-widest text-orange-500 hover:text-orange-600 uppercase transition-colors disabled:opacity-50"
+                      >
+                        {isGenerating ? 'Synthesizing...' : 'Summarize details'}
+                      </button>
+                    )}
                  </div>
                  <div className="min-h-[60px] flex items-center">
                     <p className="text-sm text-gray-600 leading-relaxed italic">
@@ -855,7 +872,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
         )}
       </div>
 
-      <div className="md:hidden fixed inset-x-0 bottom-[calc(5.3rem+env(safe-area-inset-bottom,0px))] z-[65] px-4">
+      <div className="mobile-product-action-bar md:hidden fixed inset-x-0 bottom-[calc(5.3rem+env(safe-area-inset-bottom,0px))] z-[65] px-4">
         <div className="mx-auto max-w-lg rounded-[28px] border border-gray-200 bg-white/96 p-3 shadow-2xl backdrop-blur-xl">
           <div className="mb-3 flex items-center justify-between gap-4 px-2">
             <div>

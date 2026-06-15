@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useRef, useDeferredValue } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { CATEGORIES } from '../constants';
 import { ShoppingBag, Search, Filter, Star, ChevronRight, Check, Clock, X, TrendingUp, Heart } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
@@ -388,9 +388,9 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
             {filteredProducts.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
                 {filteredProducts.map((product) => (
-                  <div key={product.id} onClick={() => navigate(`/product/${product.id}`)} className="bg-white rounded-[40px] overflow-hidden shadow-sm hover:shadow-2xl transition-all group border border-gray-100 flex flex-col cursor-pointer">
+                  <article key={product.id} className="bg-white rounded-[40px] overflow-hidden shadow-sm hover:shadow-2xl transition-all group border border-gray-100 flex flex-col">
                     <div className="h-72 relative overflow-hidden bg-gray-50 p-4">
-                      <div className="w-full h-full rounded-[32px] overflow-hidden">
+                      <Link to={`/product/${product.id}`} aria-label={`View ${product.name}`} className="block w-full h-full rounded-[32px] overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500">
                         <img
                           src={getProductPrimaryImage(product)}
                           alt={product.name}
@@ -399,10 +399,11 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                           decoding="async"
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                         />
-                      </div>
+                      </Link>
                       <div className="absolute top-8 left-8 flex flex-col space-y-3">
                          <button 
                            onClick={(e) => handleToggleWishlist(e, product.id)}
+                           aria-label={wishlistIds.has(product.id) ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
                            className={`p-3 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl transition-all hover:scale-110 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 ${
                              wishlistIds.has(product.id) ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
                            }`}
@@ -425,7 +426,11 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                           <span className="ml-1 text-gray-900 font-black">{product.rating}</span>
                         </div>
                       </div>
-                      <h3 className="font-bold text-gray-900 mb-6 group-hover:text-orange-600 transition-colors text-lg leading-tight line-clamp-2 h-14">{product.name}</h3>
+                      <h3 className="mb-6 h-14 text-lg font-bold leading-tight text-gray-900 transition-colors group-hover:text-orange-600">
+                        <Link to={`/product/${product.id}`} className="line-clamp-2 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500">
+                          {product.name}
+                        </Link>
+                      </h3>
                       <div className="mt-auto">
                         <div className="flex items-baseline space-x-2 mb-6">
                           <span className="text-2xl font-black text-gray-900">RWF {product.price.toLocaleString()}</span>
@@ -451,7 +456,7 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                         </button>
                       </div>
                     </div>
-                  </div>
+                  </article>
                 ))}
               </div>
             ) : (

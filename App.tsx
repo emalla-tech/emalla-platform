@@ -92,6 +92,7 @@ const AdminPortal = lazy(() => import('./pages/auth/AdminPortal'));
 const SellerPasswordReset = lazy(() => import('./pages/auth/SellerPasswordReset'));
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 const RouteLoader = () => (
   <div className="min-h-[40vh] flex items-center justify-center">
@@ -265,7 +266,7 @@ const SeoMetaUpdater = () => {
     const canonicalUrl =
       location.pathname === '/'
         ? `${SEO_BASE_URL}/`
-        : `${SEO_BASE_URL}/#${location.pathname}`;
+        : `${SEO_BASE_URL}${location.pathname}`;
 
     document.title = title;
     updateMetaTag('meta[name="description"]', 'content', description);
@@ -369,6 +370,7 @@ const App: React.FC = () => {
                 />
               )}
             />
+            <Route path="*" element={withSuspense(<NotFound />)} />
           </Route>
 
           {/* Direct Admin Access */}

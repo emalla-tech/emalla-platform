@@ -436,6 +436,30 @@ const sanitizeUser = (user) => {
   return safeUser;
 };
 
+const isValidEmail = (value) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(String(value || '').trim()) &&
+  String(value || '').trim().length <= 254;
+
+const isValidPhone = (value) => {
+  const normalized = String(value || '').replace(/[\s()-]/g, '');
+  return /^\+?\d{7,15}$/.test(normalized);
+};
+
+const isValidDisplayName = (value, maxLength = 120) => {
+  const normalized = String(value || '').trim();
+  return normalized.length >= 2 && normalized.length <= maxLength;
+};
+
+const isValidPassword = (value) => {
+  const normalized = String(value || '');
+  return normalized.length >= 8 && normalized.length <= 128;
+};
+
+const parseNonNegativeMoney = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+};
+
 const slugify = (value = '') =>
   String(value)
     .toLowerCase()
@@ -1533,6 +1557,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/ai/generate-description' && req.method === 'POST') {
+      const user = await requireUser(req, res);
+      if (!user) return;
       if (!enforceAiRateLimit(req, res)) return;
       const body = await readBody(req);
       const productName = String(body.productName || '').trim();
@@ -1563,6 +1589,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/ai/summarize-reviews' && req.method === 'POST') {
+      const user = await requireUser(req, res);
+      if (!user) return;
       if (!enforceAiRateLimit(req, res)) return;
       const body = await readBody(req);
       const reviews = Array.isArray(body.reviews)
@@ -1694,8 +1722,8 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        if (newPassword.length < 8) {
-          sendJson(res, 400, { error: 'New password must be at least 8 characters long.' });
+        if (!isValidPassword(newPassword)) {
+          sendJson(res, 400, { error: 'New password must be between 8 and 128 characters long.' });
           return;
         }
 
@@ -1748,8 +1776,8 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        if (password.length < 8) {
-          sendJson(res, 400, { error: 'New password must be at least 8 characters long.' });
+        if (!isValidPassword(password)) {
+          sendJson(res, 400, { error: 'New password must be between 8 and 128 characters long.' });
           return;
         }
 
@@ -1803,15 +1831,24 @@ const server = http.createServer(async (req, res) => {
       }
 
       const password = String(body.password || '');
-      if (password.length < 8) {
-        sendJson(res, 400, { error: 'Password must be at least 8 characters long.' });
+      const name = String(body.name || '').trim();
+      if (!isValidEmail(email)) {
+        sendJson(res, 400, { error: 'Please provide a valid email address.' });
+        return;
+      }
+      if (!isValidDisplayName(name)) {
+        sendJson(res, 400, { error: 'Please provide a valid name between 2 and 120 characters.' });
+        return;
+      }
+      if (!isValidPassword(password)) {
+        sendJson(res, 400, { error: 'Password must be between 8 and 128 characters long.' });
         return;
       }
 
       const user = {
         id: role === 'MERCHANT' ? `MCH-${Date.now()}` : `USR-${Date.now()}`,
-        name: body.name,
-        username: await makeUniqueUsernameByLookup(body.name || email.split('@')[0] || role),
+        name,
+        username: await makeUniqueUsernameByLookup(name || email.split('@')[0] || role),
         email,
         password: hashPassword(password),
         role,
@@ -1884,6 +1921,10 @@ const server = http.createServer(async (req, res) => {
 
         if (!application.businessName || !application.phone || !application.email) {
           sendJson(res, 400, { error: 'Business name, email, and phone are required' });
+          return;
+        }
+        if (!isValidDisplayName(application.businessName, 160) || !isValidEmail(application.email) || !isValidPhone(application.phone)) {
+          sendJson(res, 400, { error: 'Please provide a valid business name, email address, and phone number.' });
           return;
         }
 
@@ -2004,6 +2045,10 @@ const server = http.createServer(async (req, res) => {
 
         if (!application.name || !application.email || !application.phone || !application.vehicleNumber) {
           sendJson(res, 400, { error: 'Name, email, contact, and plate number are required.' });
+          return;
+        }
+        if (!isValidDisplayName(application.name) || !isValidEmail(application.email) || !isValidPhone(application.phone) || application.vehicleNumber.length > 32) {
+          sendJson(res, 400, { error: 'Please provide valid rider contact and vehicle information.' });
           return;
         }
 
@@ -4082,16 +4127,26 @@ const server = http.createServer(async (req, res) => {
 
       const body = await readBody(req);
       const stock = Number(body.stock ?? 0);
+      const price = parseNonNegativeMoney(body.price);
+      const productName = String(body.name || '').trim();
       if (!Number.isInteger(stock) || stock < 0) {
         sendJson(res, 400, { error: 'Stock must be a non-negative whole number.' });
+        return;
+      }
+      if (!isValidDisplayName(productName, 180)) {
+        sendJson(res, 400, { error: 'Product name must be between 2 and 180 characters.' });
+        return;
+      }
+      if (price === null) {
+        sendJson(res, 400, { error: 'Price must be a valid non-negative amount.' });
         return;
       }
       const db = await readDb();
       const canControlApproval = user.role === 'ADMIN';
       const product = normalizeProductMedia({
         id: `p${Date.now()}`,
-        name: body.name || 'Unnamed Product',
-        price: body.price || 0,
+        name: productName,
+        price,
         category: body.category || '1',
         image: body.image || '/catalog/electronics.svg',
         images: body.images || [],
@@ -4155,6 +4210,18 @@ const server = http.createServer(async (req, res) => {
           return;
         }
         body.stock = stock;
+      }
+      if (body.price !== undefined) {
+        const price = parseNonNegativeMoney(body.price);
+        if (price === null) {
+          sendJson(res, 400, { error: 'Price must be a valid non-negative amount.' });
+          return;
+        }
+        body.price = price;
+      }
+      if (body.name !== undefined && !isValidDisplayName(body.name, 180)) {
+        sendJson(res, 400, { error: 'Product name must be between 2 and 180 characters.' });
+        return;
       }
 
       const previousMediaUrls = getProductMediaUrls(existing);
@@ -4553,6 +4620,10 @@ const server = http.createServer(async (req, res) => {
 
       if (!customerName || !customerEmail || !customerPhone || !customerAddress) {
         sendJson(res, 400, { error: 'Customer name, email, phone, and address are required.' });
+        return;
+      }
+      if (!isValidDisplayName(customerName) || !isValidEmail(customerEmail) || !isValidPhone(customerPhone) || customerAddress.length > 500) {
+        sendJson(res, 400, { error: 'Please provide valid customer contact and delivery information.' });
         return;
       }
 
@@ -5422,23 +5493,10 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 404, { error: 'Payment not found' });
         return;
       }
-      if (payment.method === 'GTBANK_MOMO_PAY' && user?.role !== 'ADMIN') {
-        sendJson(res, 200, {
-          status: payment.status,
-          amount: payment.amount,
-          currency: payment.currency || 'RWF',
-          id: payment.id,
-          tx_ref: payment.tx_ref,
-          orderId: payment.orderId
-        });
-        return;
-      }
-
-      const orderIndex = db.orders.findIndex((order) => order.id === payment.orderId);
-      const order = orderIndex !== -1 ? db.orders[orderIndex] : null;
+      const order = db.orders.find((entry) => entry.id === payment.orderId) || null;
       const checkoutEmail = String(url.searchParams.get('email') || '').trim().toLowerCase();
       const orderEmail = String(order?.customerEmail || '').trim().toLowerCase();
-      const canVerify =
+      const canView =
         !!user && !!order && (
           user.role === 'ADMIN' ||
           order.customerId === user.id ||
@@ -5446,145 +5504,19 @@ const server = http.createServer(async (req, res) => {
         );
       const emailMatches = !!order && !!checkoutEmail && checkoutEmail === orderEmail;
 
-      if (!canVerify && !emailMatches) {
+      if (!canView && !emailMatches) {
         sendJson(res, user ? 403 : 401, { error: user ? 'Forbidden' : 'Unauthorized' });
         return;
       }
 
-      if (payment.verifiedAt) {
-        sendJson(res, 200, {
-          status: 'SUCCESS',
-          amount: payment.amount,
-          currency: payment.currency || 'RWF',
-          id: payment.id,
-          tx_ref: payment.tx_ref,
-          orderId: payment.orderId
-        });
-        return;
-      }
-
-      let postResponseEmails = [];
-      let postResponseEmailContext = {};
-      payment.verifiedAt = new Date().toISOString();
-      payment.updatedAt = payment.verifiedAt;
-
-      if (orderIndex !== -1) {
-        db.orders[orderIndex] = {
-          ...db.orders[orderIndex],
-          paymentStatus: 'SUCCESS',
-          status: db.orders[orderIndex].status === 'pending_payment' ? 'paid' : db.orders[orderIndex].status,
-          tx_ref: txRef,
-          updatedAt: new Date().toISOString()
-        };
-
-        const order = db.orders[orderIndex];
-        createNotification(db, {
-          userId: order.customerId,
-          role: 'CUSTOMER',
-          title: 'Payment Success!',
-          message: `We have received your payment for ${order.orderNumber}.`,
-          type: 'success',
-          metadata: { orderId: order.id }
-        });
-        createNotification(db, {
-          userId: order.merchantId,
-          role: 'MERCHANT',
-          title: 'Payment Confirmed',
-          message: `Payment confirmed for ${order.orderNumber}. Start preparing the package.`,
-          type: 'success',
-          metadata: { orderId: order.id }
-        });
-        const merchant = (db.users || []).find((entry) => entry.id === order.merchantId && entry.role === 'MERCHANT');
-        postResponseEmails = [
-          {
-            to: order.customerEmail || user?.email,
-            template: 'order_confirmation',
-            ...buildPlatformEmail('order_confirmation', {
-              customerName: order.customerName || user?.name,
-              orderNumber: order.orderNumber,
-              totalAmount: order.totalAmount,
-              paymentMethod: order.paymentMethod,
-              address: order.address,
-              phone: order.phone,
-              txRef: order.tx_ref,
-              merchantName: order.merchantName,
-              itemCount: (order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
-              trackingUrl: buildCustomerTrackingUrl(order)
-            })
-          },
-          {
-            to: merchant?.email,
-            template: 'seller_order_notification',
-            ...buildPlatformEmail('seller_order_notification', {
-              merchantName: order.merchantName || merchant?.name,
-              orderNumber: order.orderNumber,
-              totalAmount: order.totalAmount,
-              paymentMethod: order.paymentMethod,
-              customerName: order.customerName
-            })
-          }
-        ];
-        postResponseEmailContext = {
-          event: 'payment_verified',
-          orderId: order.id,
-          orderNumber: order.orderNumber,
-          txRef
-        };
-        createTransaction(db, {
-          userId: order.merchantId,
-          orderId: order.id,
-          amount: buildMerchantCommissionSummary(db, order.merchantId).netRevenue >= 0
-            ? Math.max(
-                Math.round(
-                  (order.items || []).reduce((sum, item) => {
-                    const product = (db.products || []).find((entry) => entry.id === item.productId);
-                    const rate = getCategoryCommissionRate(db, product?.category || '1');
-                    const subtotal = Number(item.subtotal || item.price * item.quantity || 0);
-                    return sum + subtotal - (subtotal * rate) / 100;
-                  }, 0)
-                ),
-                0
-              )
-            : 0,
-          type: 'payment',
-          status: 'success',
-          method: 'Sale Proceeds (Category Commission Applied)',
-          tx_ref: txRef
-        });
-        createAuditLog(db, {
-          event: `Payment verified for ${order.orderNumber}`,
-          actor: user?.name || user?.email || order.customerEmail || order.customerName,
-          category: 'payments',
-          status: 'success',
-          metadata: {
-            orderId: order.id,
-            orderNumber: order.orderNumber,
-            paymentId: payment.id,
-            txRef,
-            amount: payment.amount,
-            currency: payment.currency || 'RWF'
-          }
-        });
-      }
-      await persistCheckoutBundleRecord({
-        orders: orderIndex !== -1 ? [db.orders[orderIndex]] : [],
-        payments: [payment],
-        transactions: db.transactions.slice(0, 1),
-        notifications: orderIndex !== -1 ? db.notifications.slice(0, 2) : [],
-        auditLogs: orderIndex !== -1 ? db.auditLogs.slice(0, 1) : [],
-        emailLogs: []
-      });
       sendJson(res, 200, {
-        status: 'SUCCESS',
+        status: payment.status,
         amount: payment.amount,
         currency: payment.currency || 'RWF',
         id: payment.id,
         tx_ref: payment.tx_ref,
         orderId: payment.orderId
       });
-      if (postResponseEmails.length > 0) {
-        sendPlatformEmailsInBackground(postResponseEmails, postResponseEmailContext);
-      }
       return;
     }
 
@@ -5627,8 +5559,16 @@ const server = http.createServer(async (req, res) => {
 
       const notificationId = pathname.split('/')[3];
       const db = await readDb();
-      db.notifications = db.notifications.map((notification) =>
-        notification.id === notificationId ? { ...notification, read: true } : notification
+      const notification = (db.notifications || []).find((entry) => entry.id === notificationId);
+      const canReadNotification =
+        notification &&
+        (notification.userId === user.id || (!notification.userId && notification.role === user.role));
+      if (!canReadNotification) {
+        sendJson(res, notification ? 403 : 404, { error: notification ? 'Forbidden' : 'Notification not found' });
+        return;
+      }
+      db.notifications = db.notifications.map((entry) =>
+        entry.id === notificationId ? { ...entry, read: true } : entry
       );
       await writeDb(db);
       sendJson(res, 200, { success: true });

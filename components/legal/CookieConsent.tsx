@@ -19,6 +19,11 @@ const CookieConsent: React.FC = () => {
     return () => window.removeEventListener('emalla:open-cookie-preferences', openPreferences);
   }, []);
 
+  useEffect(() => {
+    document.documentElement.classList.toggle('cookie-consent-open', isOpen);
+    return () => document.documentElement.classList.remove('cookie-consent-open');
+  }, [isOpen]);
+
   const saveChoice = (choice: ConsentChoice) => {
     localStorage.setItem(CONSENT_KEY, JSON.stringify({ choice, updatedAt: new Date().toISOString() }));
     setIsOpen(false);
@@ -28,7 +33,7 @@ const CookieConsent: React.FC = () => {
   if (!isOpen) return null;
 
   return (
-    <aside className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] z-[100] mx-auto max-w-3xl rounded-3xl border border-orange-100 bg-white p-5 shadow-[0_24px_80px_rgba(17,24,39,0.24)] md:bottom-6 md:p-6" aria-label="Cookie and privacy preferences">
+    <aside className="fixed inset-x-4 bottom-[calc(6.5rem+env(safe-area-inset-bottom,0px))] z-[100] mx-auto max-h-[65vh] max-w-3xl overflow-y-auto rounded-3xl border border-orange-100 bg-white p-5 shadow-[0_24px_80px_rgba(17,24,39,0.24)] md:bottom-6 md:max-h-none md:p-6" aria-label="Cookie and privacy preferences">
       <button type="button" onClick={() => setIsOpen(false)} className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:text-gray-950" aria-label="Close cookie preferences">
         <X size={15} />
       </button>

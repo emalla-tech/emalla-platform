@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'e-malla-pwa-v2';
+const CACHE_VERSION = 'e-malla-pwa-v3';
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const OFFLINE_URL = '/offline.html';
@@ -66,18 +66,22 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (url.origin === self.location.origin) {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached;
+    const isStaticAsset = ['style', 'script', 'image', 'font'].includes(request.destination);
 
-        return fetch(request)
-          .then((response) => {
-            const copy = response.clone();
-            caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
-            return response;
+    event.respondWith(
+      isStaticAsset
+        ? caches.match(request).then((cached) => {
+            const networkResponse = fetch(request)
+              .then((response) => {
+                if (response.ok) {
+                  const copy = response.clone();
+                  caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
+                }
+                return response;
+              });
+            return cached || networkResponse;
           })
-          .catch(() => caches.match(OFFLINE_URL));
-      })
+        : fetch(request).catch(async () => (await caches.match(request)) || Response.error())
     );
   }
 });

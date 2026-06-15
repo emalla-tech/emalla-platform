@@ -201,6 +201,7 @@ const Register: React.FC = () => {
           <User className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
+            autoComplete="name"
             required
             value={buyerForm.name}
             className="w-full pl-14 pr-6 py-4 bg-white border border-gray-100 rounded-2xl outline-none font-bold text-gray-900 focus:border-orange-500 transition-all"
@@ -216,6 +217,7 @@ const Register: React.FC = () => {
           <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="email"
+            autoComplete="email"
             required
             value={buyerForm.email}
             className="w-full pl-14 pr-6 py-4 bg-white border border-gray-100 rounded-2xl outline-none font-bold text-gray-900 focus:border-orange-500 transition-all"
@@ -231,6 +233,7 @@ const Register: React.FC = () => {
           <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
             required
             value={buyerForm.password}
             className="w-full pl-14 pr-14 py-4 bg-white border border-gray-100 rounded-2xl outline-none font-bold text-gray-900 focus:border-orange-500 transition-all"
@@ -254,6 +257,7 @@ const Register: React.FC = () => {
           <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type={showConfirmPassword ? 'text' : 'password'}
+            autoComplete="new-password"
             required
             value={buyerForm.confirmPassword}
             className="w-full pl-14 pr-14 py-4 bg-white border border-gray-100 rounded-2xl outline-none font-bold text-gray-900 focus:border-orange-500 transition-all"

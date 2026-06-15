@@ -53,7 +53,7 @@ const CustomerMobileChrome: React.FC<CustomerMobileChromeProps> = ({ cartCount }
         <Link
           to="/cart"
           aria-label="Open shopping cart"
-          className="md:hidden fixed right-4 bottom-[calc(7.1rem+env(safe-area-inset-bottom,0px))] z-[70] flex items-center gap-2 rounded-full bg-orange-500 px-4 py-3 text-white shadow-[0_18px_40px_rgba(249,115,22,0.38)] transition-transform active:scale-95"
+          className="floating-cart md:hidden fixed right-4 bottom-[calc(7.1rem+env(safe-area-inset-bottom,0px))] z-[70] flex items-center gap-2 rounded-full bg-orange-500 px-4 py-3 text-white shadow-[0_18px_40px_rgba(249,115,22,0.38)] transition-transform active:scale-95"
         >
           <ShoppingCart size={18} />
           <span className="text-xs font-black uppercase tracking-widest">Cart</span>

@@ -337,3 +337,11 @@ button {
     overflow-x: auto;
   }
 }
+
+@media (max-width: 767px) {
+  .cookie-consent-open .floating-cart,
+  .cookie-consent-open .mobile-product-action-bar,
+  .cookie-consent-open .whatsapp-support {
+    display: none;
+  }
+}

@@ -1,10 +1,12 @@
 import { apiUrl } from './apiConfig';
 
 const postJson = async (path: string, payload: Record<string, unknown>) => {
+  const token = localStorage.getItem('emalla_token');
   const response = await fetch(apiUrl(path), {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
     },
     body: JSON.stringify(payload)
   });

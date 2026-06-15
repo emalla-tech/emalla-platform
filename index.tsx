@@ -7,6 +7,7 @@ import { pwaService } from './services/pwaService';
 import { notificationPrepService } from './services/notificationPrepService';
 import { monitoringService } from './services/monitoringService';
 import AppErrorBoundary from './components/monitoring/AppErrorBoundary';
+import { apiClient } from './services/apiClient';
 import './index.css';
 
 const rootElement = document.getElementById('root');
@@ -38,3 +39,7 @@ window.setTimeout(() => {
 void pwaService.registerServiceWorker();
 void notificationPrepService.syncWithServiceWorker();
 monitoringService.installGlobalHandlers();
+
+window.setTimeout(() => {
+  void apiClient.warmBackend().catch(() => undefined);
+}, 800);

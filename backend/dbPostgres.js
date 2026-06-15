@@ -1108,6 +1108,26 @@ export const createPostgresAdapter = () => {
       });
     },
 
+    async deleteAuthSessionById(sessionId) {
+      await tx(async (client) => {
+        const result = await client.query(
+          'DELETE FROM sessions WHERE id = $1 RETURNING token_hash',
+          [sessionId]
+        );
+        const token = result.rows[0]?.token_hash;
+        if (token) {
+          await client.query('DELETE FROM auth_tokens WHERE token = $1', [token]);
+        }
+      });
+    },
+
+    async deleteAuthTokensByUserId(userId) {
+      await tx(async (client) => {
+        await client.query('DELETE FROM sessions WHERE user_id = $1', [userId]);
+        await client.query('DELETE FROM auth_tokens WHERE user_id = $1', [userId]);
+      });
+    },
+
     async readDb() {
       const users = await readRows('users');
       const categories = await readRows('categories', 'sort_order ASC, name ASC');
@@ -1360,8 +1380,6 @@ export const createPostgresAdapter = () => {
         await client.query('DELETE FROM order_items');
         await client.query('DELETE FROM support_tickets');
         await client.query('DELETE FROM password_reset_tokens');
-        await client.query('DELETE FROM auth_tokens');
-        await client.query('DELETE FROM sessions');
         await client.query('DELETE FROM payments');
         await client.query('DELETE FROM transactions');
         await client.query('DELETE FROM notifications');
@@ -1378,7 +1396,8 @@ export const createPostgresAdapter = () => {
         await client.query('DELETE FROM seller_profiles');
         await client.query('DELETE FROM admin_settings');
         await client.query('DELETE FROM categories');
-        await client.query('DELETE FROM users');
+        // Users and auth records are maintained with targeted writes. Deleting them
+        // during a stale snapshot rewrite can invalidate a session created moments ago.
 
         for (const category of runtimeCategories) {
           await upsert(client, 'categories', {
@@ -1460,36 +1479,6 @@ export const createPostgresAdapter = () => {
               metadata: user.riderSettings || {}
             }, 'user_id');
           }
-        }
-
-        for (const [token, value] of Object.entries(db.tokens || {})) {
-          const record = value && typeof value === 'object' ? value : { userId: value };
-          const safeUserId = userRef(record.userId, userIds);
-          if (!safeUserId) continue;
-          await upsert(client, 'auth_tokens', {
-            token,
-            user_id: safeUserId,
-            created_at: record.createdAt || new Date().toISOString(),
-            metadata: record
-          }, 'token');
-        }
-
-        for (const session of db.sessions || []) {
-          const safeUserId = userRef(session.userId, userIds);
-          if (!safeUserId) continue;
-          await upsert(client, 'sessions', {
-            id: session.id,
-            token_hash: session.token || session.tokenHash || session.id,
-            user_id: safeUserId,
-            created_at: session.createdAt || new Date().toISOString(),
-            last_seen_at: session.lastSeenAt || session.createdAt || new Date().toISOString(),
-            revoked_at: session.revokedAt || null,
-            user_agent: session.userAgent || null,
-            reviewed_at: session.reviewedAt || null,
-            reviewed_by: userRef(session.reviewedBy, userIds),
-            review_notes: session.reviewNotes || null,
-            metadata: session
-          });
         }
 
         for (const resetToken of db.passwordResetTokens || []) {

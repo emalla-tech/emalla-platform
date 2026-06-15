@@ -214,6 +214,27 @@ const getJsonAdapter = () => {
       snapshot.sessions = (snapshot.sessions || []).filter((entry) => entry.token !== token);
       await jsonDb.writeDb(snapshot);
     },
+    deleteAuthSessionById: async (sessionId) => {
+      const snapshot = await jsonDb.readDb();
+      const session = (snapshot.sessions || []).find((entry) => entry.id === sessionId);
+      if (session?.token && snapshot.tokens?.[session.token]) {
+        delete snapshot.tokens[session.token];
+      }
+      snapshot.sessions = (snapshot.sessions || []).filter((entry) => entry.id !== sessionId);
+      await jsonDb.writeDb(snapshot);
+    },
+    deleteAuthTokensByUserId: async (userId) => {
+      const snapshot = await jsonDb.readDb();
+      Object.keys(snapshot.tokens || {}).forEach((token) => {
+        const tokenRecord = snapshot.tokens[token];
+        const tokenUserId = typeof tokenRecord === 'string' ? tokenRecord : tokenRecord?.userId;
+        if (tokenUserId === userId) {
+          delete snapshot.tokens[token];
+        }
+      });
+      snapshot.sessions = (snapshot.sessions || []).filter((entry) => entry.userId !== userId);
+      await jsonDb.writeDb(snapshot);
+    },
     persistCheckoutBundle: async (bundle = {}) => {
       const snapshot = await jsonDb.readDb();
       const updatedProducts = [];
@@ -335,6 +356,8 @@ const createActiveAdapter = () => {
       readAuthUserByToken: (token) => callWithFallback('readAuthUserByToken', token),
       touchSessionByToken: (token, timestamp) => callWithFallback('touchSessionByToken', token, timestamp),
       deleteAuthToken: (token) => callWithFallback('deleteAuthToken', token),
+      deleteAuthSessionById: (sessionId) => callWithFallback('deleteAuthSessionById', sessionId),
+      deleteAuthTokensByUserId: (userId) => callWithFallback('deleteAuthTokensByUserId', userId),
       persistCheckoutBundle: (bundle) => callWithFallback('persistCheckoutBundle', bundle),
       writeDb: (db) => callWithFallback('writeDb', db)
     };
@@ -551,6 +574,20 @@ export const deleteAuthToken = async (token) => {
   const adapter = getAdapter();
   if (typeof adapter.deleteAuthToken === 'function') {
     return adapter.deleteAuthToken(token);
+  }
+};
+
+export const deleteAuthSessionById = async (sessionId) => {
+  const adapter = getAdapter();
+  if (typeof adapter.deleteAuthSessionById === 'function') {
+    return adapter.deleteAuthSessionById(sessionId);
+  }
+};
+
+export const deleteAuthTokensByUserId = async (userId) => {
+  const adapter = getAdapter();
+  if (typeof adapter.deleteAuthTokensByUserId === 'function') {
+    return adapter.deleteAuthTokensByUserId(userId);
   }
 };
 

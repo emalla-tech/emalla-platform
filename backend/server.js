@@ -21,6 +21,8 @@ import {
   readAuthUserRecordByToken,
   touchAuthSessionByToken,
   deleteAuthTokenRecord,
+  deleteAuthSessionRecordById,
+  deleteAuthTokensForUser,
   persistCheckoutBundleRecord,
   writeDatabaseSnapshot as writeDb,
   updateDatabaseSnapshot,
@@ -2202,14 +2204,7 @@ const server = http.createServer(async (req, res) => {
         if (!user) return;
 
         const db = await readDb();
-        Object.keys(db.tokens || {}).forEach((token) => {
-          const tokenRecord = db.tokens[token];
-          const userId = typeof tokenRecord === 'string' ? tokenRecord : tokenRecord?.userId;
-          if (userId === user.id) {
-            delete db.tokens[token];
-          }
-        });
-        db.sessions = (db.sessions || []).filter((entry) => entry.userId !== user.id);
+        await deleteAuthTokensForUser(user.id);
 
         createAuditLog(db, {
           event: 'All sessions logged out',
@@ -2287,8 +2282,7 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        delete db.tokens[session.token];
-        db.sessions = (db.sessions || []).filter((entry) => entry.id !== sessionId);
+        await deleteAuthSessionRecordById(sessionId);
 
         createAuditLog(db, {
           event: 'Admin revoked session',
@@ -2319,18 +2313,7 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        const targetTokens = new Set(
-          Object.keys(db.tokens || {}).filter((token) => {
-            const tokenRecord = db.tokens[token];
-            const tokenUserId = typeof tokenRecord === 'string' ? tokenRecord : tokenRecord?.userId;
-            return tokenUserId === userId;
-          })
-        );
-
-        targetTokens.forEach((token) => {
-          delete db.tokens[token];
-        });
-        db.sessions = (db.sessions || []).filter((entry) => entry.userId !== userId);
+        await deleteAuthTokensForUser(userId);
 
         createAuditLog(db, {
           event: 'Admin revoked all user sessions',

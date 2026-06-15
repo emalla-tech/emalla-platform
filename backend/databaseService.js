@@ -18,6 +18,8 @@ import {
   readAuthUserByToken,
   touchSessionByToken,
   deleteAuthToken,
+  deleteAuthSessionById,
+  deleteAuthTokensByUserId,
   persistCheckoutBundle,
   writeDb,
   getDatabaseStatus
@@ -60,6 +62,8 @@ export const databaseService = {
   readAuthUserByToken: (token) => readAuthUserByToken(token),
   touchSessionByToken: (token, timestamp) => touchSessionByToken(token, timestamp),
   deleteAuthToken: (token) => deleteAuthToken(token),
+  deleteAuthSessionById: (sessionId) => deleteAuthSessionById(sessionId),
+  deleteAuthTokensByUserId: (userId) => deleteAuthTokensByUserId(userId),
   persistCheckoutBundle: (bundle) => persistCheckoutBundle(bundle),
   writeSnapshot: (snapshot) => writeDb(snapshot),
   updateSnapshot: (mutator) => queueSnapshotMutation(mutator)
@@ -85,6 +89,8 @@ export const persistAuthLoginRecord = (payload) => databaseService.persistAuthLo
 export const readAuthUserRecordByToken = (token) => databaseService.readAuthUserByToken(token);
 export const touchAuthSessionByToken = (token, timestamp) => databaseService.touchSessionByToken(token, timestamp);
 export const deleteAuthTokenRecord = (token) => databaseService.deleteAuthToken(token);
+export const deleteAuthSessionRecordById = (sessionId) => databaseService.deleteAuthSessionById(sessionId);
+export const deleteAuthTokensForUser = (userId) => databaseService.deleteAuthTokensByUserId(userId);
 export const persistCheckoutBundleRecord = (bundle) => databaseService.persistCheckoutBundle(bundle);
 export const writeDatabaseSnapshot = (snapshot) => databaseService.writeSnapshot(snapshot);
 export const updateDatabaseSnapshot = (mutator) => databaseService.updateSnapshot(mutator);

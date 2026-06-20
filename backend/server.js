@@ -1206,7 +1206,7 @@ const purgeAssetUrls = async (urls = []) => {
 };
 
 const buildMerchantCommissionSummary = (db, merchantId) => {
-  const orders = (db.orders || []).filter((order) => order.merchantId === merchantId && order.paymentStatus === 'SUCCESS');
+  const orders = (db.orders || []).filter((order) => order.merchantId === merchantId && isOrderRevenueReleased(order));
   const productMap = new Map((db.products || []).map((product) => [product.id, product]));
 
   let grossSales = 0;
@@ -1238,6 +1238,23 @@ const buildMerchantCommissionSummary = (db, merchantId) => {
     averageCommissionRate,
     successfulOrders: orders.length
   };
+};
+
+const isOrderRevenueReleased = (order = {}) =>
+  order.status === 'completed' &&
+  (order.paymentStatus === 'SUCCESS' || order.paymentMethod === 'CASH_ON_DELIVERY');
+
+const calculateMerchantAvailableBalance = (db, merchantId) => {
+  const commissionSummary = buildMerchantCommissionSummary(db, merchantId);
+  const payoutTotal = (db.transactions || [])
+    .filter((transaction) =>
+      transaction.userId === merchantId &&
+      transaction.type === 'payout' &&
+      ['pending', 'success'].includes(transaction.status)
+    )
+    .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
+
+  return Math.max(0, commissionSummary.netRevenue - payoutTotal);
 };
 
 const CATEGORY_LABELS = {
@@ -4823,8 +4840,22 @@ const server = http.createServer(async (req, res) => {
       db.orders[index] = {
         ...current,
         status: 'completed',
+        paymentStatus: current.paymentMethod === 'CASH_ON_DELIVERY' ? 'SUCCESS' : current.paymentStatus,
         updatedAt: new Date().toISOString()
       };
+
+      if (current.paymentMethod === 'CASH_ON_DELIVERY') {
+        db.payments = (db.payments || []).map((payment) =>
+          payment.orderId === current.id
+            ? {
+                ...payment,
+                status: 'SUCCESS',
+                verifiedAt: payment.verifiedAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              }
+            : payment
+        );
+      }
 
       const customerUpdate = getOrderStatusNotification(db.orders[index], 'completed');
       createNotification(db, {
@@ -5589,15 +5620,10 @@ const server = http.createServer(async (req, res) => {
       const user = await requireRole(req, res, ['MERCHANT', 'ADMIN']);
       if (!user) return;
 
-      const db = await readRiderDashboardRecords(user.id);
+      const db = await readDb();
       const transactions = db.transactions.filter((transaction) => transaction.userId === user.id);
       const commissionSummary = buildMerchantCommissionSummary(db, user.id);
-      const currentBalance = transactions
-        .filter((transaction) => ['payment', 'income'].includes(transaction.type))
-        .reduce((sum, transaction) => sum + transaction.amount, 0) -
-        transactions
-          .filter((transaction) => transaction.type === 'payout' && ['pending', 'success'].includes(transaction.status))
-          .reduce((sum, transaction) => sum + transaction.amount, 0);
+      const currentBalance = calculateMerchantAvailableBalance(db, user.id);
       const pendingPayouts = transactions
         .filter((transaction) => transaction.type === 'payout' && transaction.status === 'pending')
         .reduce((sum, transaction) => sum + transaction.amount, 0);
@@ -5627,12 +5653,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const db = await readDb();
       const existingTransactions = db.transactions.filter((transaction) => transaction.userId === user.id);
-      const currentBalance = existingTransactions
-        .filter((transaction) => ['payment', 'income'].includes(transaction.type))
-        .reduce((sum, transaction) => sum + transaction.amount, 0) -
-        existingTransactions
-          .filter((transaction) => transaction.type === 'payout' && ['pending', 'success'].includes(transaction.status))
-          .reduce((sum, transaction) => sum + transaction.amount, 0);
+      const currentBalance = calculateMerchantAvailableBalance(db, user.id);
       const requestedAmount = Number(body.amount || 0);
 
       if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {

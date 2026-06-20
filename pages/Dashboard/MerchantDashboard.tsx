@@ -49,6 +49,10 @@ const CLOSED_STATUSES = [
   OrderStatus.REFUNDED
 ];
 
+const isReleasedRevenueOrder = (order: Order) =>
+  order.status === OrderStatus.COMPLETED &&
+  (order.paymentStatus === 'SUCCESS' || order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY);
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
 
@@ -127,7 +131,7 @@ const MerchantDashboard: React.FC = () => {
     const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const buckets = labels.map((name) => ({ name, sales: 0, orders: 0 }));
 
-    orders.filter((order) => order.paymentStatus === 'SUCCESS').forEach((order) => {
+    orders.filter(isReleasedRevenueOrder).forEach((order) => {
       const dayIndex = (new Date(order.createdAt).getDay() + 6) % 7;
       buckets[dayIndex].orders += 1;
       buckets[dayIndex].sales += Math.max(order.totalAmount - order.deliveryFee, 0);
@@ -144,11 +148,9 @@ const MerchantDashboard: React.FC = () => {
   const stats = useMemo(() => {
     const activeOrders = orders.filter((order) => !CLOSED_STATUSES.includes(order.status));
     const codOrders = activeOrders.filter((order) => order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY);
-    const onlineOrders = orders.filter(
-      (order) => order.paymentMethod !== PaymentMethod.CASH_ON_DELIVERY && order.paymentStatus === 'SUCCESS'
-    );
+    const onlineOrders = orders.filter((order) => order.paymentMethod !== PaymentMethod.CASH_ON_DELIVERY && isReleasedRevenueOrder(order));
     const pendingRevenueOrders = orders.filter((order) =>
-      !CLOSED_STATUSES.includes(order.status) && order.paymentStatus !== 'SUCCESS'
+      !isReleasedRevenueOrder(order) && ![OrderStatus.CANCELLED, OrderStatus.REJECTED, OrderStatus.REFUNDED].includes(order.status)
     );
     const expectedRevenue = pendingRevenueOrders.reduce(
       (sum, order) => sum + Math.max(order.totalAmount - order.deliveryFee, 0),
@@ -166,7 +168,7 @@ const MerchantDashboard: React.FC = () => {
       onlineOrders: onlineOrders.length,
       onlineValue: onlineOrders.reduce((sum, order) => sum + order.totalAmount, 0),
       storeVisits: orders.length,
-      revenueGrowth: orders.filter((order) => order.paymentStatus === 'SUCCESS').length
+      revenueGrowth: orders.filter(isReleasedRevenueOrder).length
     };
   }, [orders, profile]);
 

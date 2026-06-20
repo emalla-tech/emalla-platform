@@ -84,96 +84,135 @@ export const deliverEmail = async (email) => {
   };
 };
 
-export const createEmailHtml = ({ title, intro, sections = [], closing, highlights = [], primaryAction = null, support = null }) => `
-  <div style="font-family:Segoe UI,Arial,sans-serif;background:#f8fafc;padding:24px;color:#111827;">
-    <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:20px;overflow:hidden;">
-      <div style="padding:20px 24px;background:#111827;color:#ffffff;">
-        <div style="font-size:24px;font-weight:800;">E-<span style="color:#f97316;">Malla</span> Rwanda</div>
-        <div style="font-size:12px;opacity:0.7;margin-top:6px;">Operational email notification</div>
-      </div>
-      <div style="padding:24px;">
-        <h1 style="font-size:22px;margin:0 0 12px;font-weight:800;">${title}</h1>
-        <p style="font-size:14px;line-height:1.7;color:#4b5563;margin:0 0 18px;">${intro}</p>
-        ${
-          highlights.filter((item) => item && item.label && item.value).length > 0
-            ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:separate;border-spacing:0 12px;width:100%;margin:0 0 18px;">
+const escapeHtml = (value = '') =>
+  String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+
+const normalizeEmailItems = (items = []) =>
+  items.filter((item) => item && item.label && item.value !== undefined && item.value !== null && item.value !== '');
+
+const renderHighlights = (highlights = []) => {
+  const safeHighlights = normalizeEmailItems(highlights);
+  if (!safeHighlights.length) return '';
+
+  return `
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:separate;border-spacing:0 12px;width:100%;margin:0 0 18px;">
+      ${safeHighlights.map((item) => `
+        <tr>
+          <td style="background:${item.accentBg || '#fff7ed'};border:1px solid ${item.accentBorder || '#fed7aa'};border-radius:16px;padding:16px;">
+            <div style="font-size:11px;font-weight:800;color:${item.labelColor || '#9a3412'};text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">${escapeHtml(item.label)}</div>
+            <div style="font-size:24px;font-weight:900;color:${item.valueColor || '#111827'};line-height:1.25;">${escapeHtml(item.value)}</div>
+          </td>
+        </tr>
+      `).join('')}
+    </table>
+  `;
+};
+
+const renderSections = (sections = []) => {
+  const safeSections = normalizeEmailItems(sections);
+  if (!safeSections.length) return '';
+
+  return `
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:separate;border-spacing:0 10px;width:100%;margin:0;">
+      ${safeSections.map((section) => `
+        <tr>
+          <td style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:14px;padding:14px 16px;">
+            <div style="font-size:11px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 6px;">
+              ${escapeHtml(section.label)}
+            </div>
+            <div style="font-size:15px;font-weight:800;color:#111827;line-height:1.55;word-break:break-word;">
+              ${escapeHtml(section.value)}
+            </div>
+          </td>
+        </tr>
+      `).join('')}
+    </table>
+  `;
+};
+
+export const createEmailHtml = ({ title, intro, sections = [], closing, highlights = [], primaryAction = null, support = null }) => {
+  const safeTitle = escapeHtml(title || 'E-Malla Rwanda Update');
+  const safeIntro = escapeHtml(intro || '');
+  const safeClosing = escapeHtml(closing || 'Thank you for using E-Malla Rwanda.');
+  const supportEmail = support?.email ? escapeHtml(support.email) : '';
+  const supportUrl = support?.url ? escapeHtml(support.url) : '';
+  const actionUrl = primaryAction?.url ? escapeHtml(primaryAction.url) : '';
+  const actionLabel = primaryAction?.label ? escapeHtml(primaryAction.label) : '';
+
+  return `
+    <!doctype html>
+    <html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>${safeTitle}</title>
+      </head>
+      <body style="margin:0;padding:0;background:#f3f4f6;color:#111827;-webkit-text-size-adjust:100%;text-size-adjust:100%;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;background:#f3f4f6;">
+          <tr>
+            <td align="center" style="padding:24px 12px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:640px;border-collapse:separate;border-spacing:0;background:#ffffff;border:1px solid #e5e7eb;border-radius:22px;overflow:hidden;font-family:Segoe UI,Arial,sans-serif;">
                 <tr>
-                  ${highlights
-                    .filter((item) => item && item.label && item.value)
-                    .map(
-                      (item) => `
-                        <td style="width:${Math.max(100 / highlights.length, 33)}%;padding-right:12px;">
-                          <div style="background:${item.accentBg || '#fff7ed'};border:1px solid ${item.accentBorder || '#fed7aa'};border-radius:16px;padding:16px;">
-                            <div style="font-size:11px;font-weight:800;color:${item.labelColor || '#9a3412'};text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">${item.label}</div>
-                            <div style="font-size:22px;font-weight:900;color:${item.valueColor || '#111827'};line-height:1.2;">${item.value}</div>
-                          </div>
-                        </td>
-                      `
-                    )
-                    .join('')}
+                  <td style="padding:22px 24px;background:#111827;color:#ffffff;">
+                    <div style="font-size:24px;line-height:1.2;font-weight:900;">E-<span style="color:#f97316;">Malla</span> Rwanda</div>
+                    <div style="font-size:12px;line-height:1.5;color:#d1d5db;margin-top:6px;">Secure platform notification</div>
+                  </td>
                 </tr>
-               </table>`
-            : ''
-        }
-        ${
-          sections.filter((section) => section && section.label && section.value).length > 0
-            ? `<div style="border:1px solid #e5e7eb;border-radius:16px;padding:8px 16px;background:#f9fafb;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;width:100%;">
-                  <tbody>
-                    ${sections
-                      .filter((section) => section && section.label && section.value)
-                      .map(
-                        (section, index, list) => `
-                          <tr>
-                            <td style="padding:12px 0;border-bottom:${index === list.length - 1 ? '0' : '1px solid #e5e7eb'};vertical-align:top;width:34%;">
-                              <div style="font-size:11px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;padding-right:12px;">
-                                ${section.label}
-                              </div>
-                            </td>
-                            <td style="padding:12px 0;border-bottom:${index === list.length - 1 ? '0' : '1px solid #e5e7eb'};vertical-align:top;">
-                              <div style="font-size:14px;font-weight:700;color:#111827;line-height:1.6;word-break:break-word;">
-                                ${section.value}
-                              </div>
-                            </td>
-                          </tr>
-                        `
-                      )
-                      .join('')}
-                  </tbody>
-                </table>
-               </div>`
-            : ''
-        }
-        ${
-          primaryAction?.label && primaryAction?.url
-            ? `<div style="margin:20px 0 0;text-align:left;">
-                <a href="${primaryAction.url}" style="display:inline-block;background:#f97316;color:#ffffff;text-decoration:none;font-size:14px;font-weight:800;padding:14px 22px;border-radius:14px;">
-                  ${primaryAction.label}
-                </a>
-               </div>`
-            : ''
-        }
-        <p style="font-size:13px;line-height:1.7;color:#4b5563;margin:18px 0 0;">${closing}</p>
-        ${
-          support?.email || support?.url
-            ? `<div style="margin-top:24px;padding-top:18px;border-top:1px solid #e5e7eb;">
-                <div style="font-size:11px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Need help?</div>
-                <div style="font-size:13px;line-height:1.7;color:#4b5563;">
-                  ${
-                    support?.email
-                      ? `Support email: <a href="mailto:${support.email}" style="color:#2563eb;text-decoration:none;font-weight:700;">${support.email}</a><br/>`
-                      : ''
-                  }
-                  ${
-                    support?.url
-                      ? `Contact us: <a href="${support.url}" style="color:#2563eb;text-decoration:none;font-weight:700;">${support.url}</a>`
-                      : ''
-                  }
-                </div>
-               </div>`
-            : ''
-        }
-      </div>
-    </div>
-  </div>
-`;
+                <tr>
+                  <td style="padding:26px 24px 24px;">
+                    <h1 style="font-size:24px;line-height:1.25;margin:0 0 12px;font-weight:900;color:#111827;">${safeTitle}</h1>
+                    <p style="font-size:15px;line-height:1.75;color:#4b5563;margin:0 0 18px;">${safeIntro}</p>
+                    ${renderHighlights(highlights)}
+                    ${renderSections(sections)}
+                    ${
+                      actionLabel && actionUrl
+                        ? `<table role="presentation" cellspacing="0" cellpadding="0" style="margin:22px 0 0;">
+                            <tr>
+                              <td style="background:#f97316;border-radius:14px;">
+                                <a href="${actionUrl}" style="display:inline-block;color:#ffffff;text-decoration:none;font-size:14px;font-weight:900;padding:14px 22px;">
+                                  ${actionLabel}
+                                </a>
+                              </td>
+                            </tr>
+                           </table>`
+                        : ''
+                    }
+                    <p style="font-size:14px;line-height:1.75;color:#4b5563;margin:20px 0 0;">${safeClosing}</p>
+                    ${
+                      supportEmail || supportUrl
+                        ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;width:100%;margin-top:24px;border-top:1px solid #e5e7eb;">
+                            <tr>
+                              <td style="padding-top:18px;">
+                                <div style="font-size:11px;font-weight:900;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Need help?</div>
+                                <div style="font-size:13px;line-height:1.8;color:#4b5563;">
+                                  ${
+                                    supportEmail
+                                      ? `Support email: <a href="mailto:${supportEmail}" style="color:#2563eb;text-decoration:none;font-weight:800;">${supportEmail}</a><br/>`
+                                      : ''
+                                  }
+                                  ${
+                                    supportUrl
+                                      ? `Contact us: <a href="${supportUrl}" style="color:#2563eb;text-decoration:none;font-weight:800;">${supportUrl}</a>`
+                                      : ''
+                                  }
+                                </div>
+                              </td>
+                            </tr>
+                           </table>`
+                        : ''
+                    }
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+  `;
+};

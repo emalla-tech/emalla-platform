@@ -31,6 +31,8 @@ const OrderManagement: React.FC = () => {
   const [toastTone, setToastTone] = useState<'success' | 'error' | 'info'>('success');
   const [riders, setRiders] = useState<AdminRiderOption[]>([]);
   const [assigningRiderId, setAssigningRiderId] = useState<string | null>(null);
+  const [riderPayoutDrafts, setRiderPayoutDrafts] = useState<Record<string, string>>({});
+  const [savingPayoutOrderId, setSavingPayoutOrderId] = useState<string | null>(null);
   const focusOrderId = searchParams.get('orderId');
   const focusOrderNumber = searchParams.get('orderNumber');
 
@@ -120,6 +122,7 @@ const OrderManagement: React.FC = () => {
 
   const selectedOrderItems = selectedOrder?.items || [];
   const activeRiders = riders.filter((rider) => rider.status === 'active');
+  const getRiderPayoutAmount = (order: Order) => Number(order.riderPayout ?? order.deliveryFee ?? 0);
 
   const handleAssignRider = async (order: Order, rider: AdminRiderOption) => {
     setAssigningRiderId(rider.id);
@@ -135,6 +138,35 @@ const OrderManagement: React.FC = () => {
       setTimeout(() => setToast(null), 3000);
     } finally {
       setAssigningRiderId(null);
+    }
+  };
+
+  const handleSaveRiderPayout = async (order: Order) => {
+    const draft = riderPayoutDrafts[order.id] ?? String(getRiderPayoutAmount(order));
+    const riderPayout = Number(draft);
+
+    if (!Number.isFinite(riderPayout) || riderPayout < 0) {
+      setToastTone('error');
+      setToast('Please enter a valid rider payout amount.');
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
+
+    setSavingPayoutOrderId(order.id);
+    try {
+      const updatedOrder = await AdminService.updateOrderRiderPayout(order.id, Math.round(riderPayout));
+      setOrders((current) => current.map((entry) => entry.id === updatedOrder.id ? updatedOrder : entry));
+      setSelectedOrder(updatedOrder);
+      setRiderPayoutDrafts((current) => ({ ...current, [updatedOrder.id]: String(updatedOrder.riderPayout || 0) }));
+      setToastTone('success');
+      setToast(`Rider payout updated to RWF ${Number(updatedOrder.riderPayout || 0).toLocaleString()}.`);
+      setTimeout(() => setToast(null), 3000);
+    } catch (error) {
+      setToastTone('error');
+      setToast(error instanceof Error ? error.message : 'Failed to update rider payout.');
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setSavingPayoutOrderId(null);
     }
   };
 
@@ -387,6 +419,7 @@ const OrderManagement: React.FC = () => {
                   </div>
                   <p className="text-lg font-black text-gray-900">RWF {selectedOrder.totalAmount.toLocaleString()}</p>
                   <p className="text-xs text-gray-500 mt-1">Delivery Fee: RWF {selectedOrder.deliveryFee.toLocaleString()}</p>
+                  <p className="text-xs text-emerald-600 font-black mt-1">Rider Payout: RWF {getRiderPayoutAmount(selectedOrder).toLocaleString()}</p>
                 </div>
                 <div className="rounded-3xl border border-gray-100 px-5 py-4">
                   <div className="flex items-center gap-2 text-gray-400 mb-3">
@@ -403,6 +436,36 @@ const OrderManagement: React.FC = () => {
                   </div>
                   <p className="text-xs text-gray-600 font-bold">Created: {new Date(selectedOrder.createdAt).toLocaleString()}</p>
                   <p className="text-xs text-gray-600 font-bold mt-2">Updated: {new Date(selectedOrder.updatedAt).toLocaleString()}</p>
+                </div>
+              </div>
+
+              <div className="rounded-[32px] border border-emerald-100 bg-emerald-50/40 overflow-hidden">
+                <div className="px-6 py-4 border-b border-emerald-100 bg-white/70">
+                  <h3 className="text-lg font-black text-gray-900">Rider Payout Control</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Set the delivery fee the rider will see before accepting this job. Customer delivery fee remains separate.
+                  </p>
+                </div>
+                <div className="p-6 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end">
+                  <label className="block">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700">Rider payout amount</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={riderPayoutDrafts[selectedOrder.id] ?? String(getRiderPayoutAmount(selectedOrder))}
+                      onChange={(event) => setRiderPayoutDrafts((current) => ({ ...current, [selectedOrder.id]: event.target.value }))}
+                      disabled={[OrderStatus.COMPLETED, OrderStatus.CANCELLED, OrderStatus.REFUNDED].includes(selectedOrder.status)}
+                      className="mt-2 w-full rounded-2xl border-2 border-transparent bg-white px-5 py-4 font-black text-gray-900 outline-none focus:border-emerald-500 disabled:bg-gray-100 disabled:text-gray-400"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveRiderPayout(selectedOrder)}
+                    disabled={savingPayoutOrderId === selectedOrder.id || [OrderStatus.COMPLETED, OrderStatus.CANCELLED, OrderStatus.REFUNDED].includes(selectedOrder.status)}
+                    className="px-6 py-4 rounded-2xl bg-emerald-600 text-white font-black text-xs uppercase tracking-widest hover:bg-emerald-700 disabled:opacity-50 transition-all"
+                  >
+                    {savingPayoutOrderId === selectedOrder.id ? 'Saving...' : 'Save Payout'}
+                  </button>
                 </div>
               </div>
 

@@ -244,6 +244,9 @@ const RiderDashboard: React.FC = () => {
             </div>
 
             <div className="bg-white rounded-[40px] p-6 border border-gray-100 shadow-xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 bg-emerald-500 text-white px-5 py-2 rounded-bl-3xl text-[10px] font-black uppercase tracking-widest">
+                Payout RWF {Number(activeTask.riderPayout ?? activeTask.deliveryFee ?? 0).toLocaleString()}
+              </div>
               <div className="flex justify-between items-start mb-6">
                 <div className="flex items-center space-x-3">
                   <div className="p-3 bg-orange-50 text-orange-500 rounded-2xl">

@@ -93,10 +93,14 @@ const AvailableJobs: React.FC = () => {
       </div>
 
       <div className="space-y-6">
-        {visibleJobs.map((job) => (
+        {visibleJobs.map((job) => {
+          const riderPayout = Number(job.riderPayout ?? job.deliveryFee ?? 0);
+          const canAccept = riderPayout > 0 && acceptingJobId !== job.id;
+
+          return (
           <div key={job.id} className="bg-white rounded-[40px] p-8 border border-gray-100 shadow-sm hover:border-orange-500/30 transition-all group relative overflow-hidden">
-             <div className="absolute top-0 right-0 bg-orange-500 text-white px-6 py-2 rounded-bl-3xl text-[10px] font-black uppercase tracking-widest">
-               RWF {job.deliveryFee.toLocaleString()}
+             <div className="absolute top-0 right-0 bg-emerald-500 text-white px-6 py-2 rounded-bl-3xl text-[10px] font-black uppercase tracking-widest">
+               Rider Payout • RWF {riderPayout.toLocaleString()}
              </div>
              
              <div className="flex items-center space-x-4 mb-8">
@@ -126,6 +130,16 @@ const AvailableJobs: React.FC = () => {
                       <p className="text-sm font-bold text-gray-700">{job.address}</p>
                    </div>
                 </div>
+                <div className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 border border-gray-100">
+                  <div className="flex items-center space-x-2 text-emerald-600">
+                    <DollarSign size={16} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Your fee</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-black text-gray-900">RWF {riderPayout.toLocaleString()}</p>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase">Customer fee RWF {Number(job.deliveryFee || 0).toLocaleString()}</p>
+                  </div>
+                </div>
              </div>
 
              <div className="grid grid-cols-2 gap-4">
@@ -138,15 +152,16 @@ const AvailableJobs: React.FC = () => {
                 </button>
                 <button 
                   onClick={() => handleAcceptJob(job.id)}
-                  disabled={acceptingJobId === job.id}
-                  className="py-5 bg-black text-white rounded-[24px] font-black text-xs shadow-xl shadow-black/10 active:bg-orange-500 transition-all uppercase tracking-widest active:scale-95 flex items-center justify-center space-x-2"
+                  disabled={!canAccept}
+                  className="py-5 bg-black text-white rounded-[24px] font-black text-xs shadow-xl shadow-black/10 active:bg-orange-500 transition-all uppercase tracking-widest active:scale-95 flex items-center justify-center space-x-2 disabled:opacity-50"
                 >
                   <Navigation size={16} />
-                  <span>{acceptingJobId === job.id ? 'Accepting...' : 'Accept Delivery'}</span>
+                  <span>{acceptingJobId === job.id ? 'Accepting...' : riderPayout > 0 ? `Accept • RWF ${riderPayout.toLocaleString()}` : 'Fee Pending'}</span>
                 </button>
              </div>
           </div>
-        ))}
+          );
+        })}
 
         {visibleJobs.length === 0 && !loading && (
           <div className="bg-white rounded-[40px] p-24 text-center border-2 border-dashed border-gray-100 shadow-sm">

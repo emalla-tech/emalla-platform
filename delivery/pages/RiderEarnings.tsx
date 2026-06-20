@@ -7,9 +7,12 @@ import { Transaction } from '../../types';
 const RiderEarnings: React.FC = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<{
+    today: number;
     week: number;
     walletBalance: number;
     pendingClearance: number;
+    completedDeliveries?: number;
+    assignedDeliveries?: number;
   } | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +80,7 @@ const RiderEarnings: React.FC = () => {
               <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-black uppercase">Verified</span>
             </div>
           </div>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Total Available Balance</p>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Released Rider Earnings</p>
           <h2 className="text-4xl font-black">RWF {stats.walletBalance.toLocaleString()}</h2>
 
           <button
@@ -92,18 +95,29 @@ const RiderEarnings: React.FC = () => {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">This Week</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Released This Week</p>
           <div className="flex items-end justify-between">
             <h3 className="text-xl font-black text-gray-900">RWF {stats.week.toLocaleString()}</h3>
             <TrendingUp size={18} className="text-emerald-500 mb-1" />
           </div>
         </div>
         <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Pending</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Pending Delivery Fees</p>
           <div className="flex items-end justify-between">
             <h3 className="text-xl font-black text-gray-900">RWF {stats.pendingClearance.toLocaleString()}</h3>
             <Clock size={18} className="text-orange-500 mb-1" />
           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-emerald-50 p-5 rounded-[28px] border border-emerald-100">
+          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Completed Jobs</p>
+          <p className="text-2xl font-black text-emerald-700">{stats.completedDeliveries || 0}</p>
+        </div>
+        <div className="bg-orange-50 p-5 rounded-[28px] border border-orange-100">
+          <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-1">In Progress</p>
+          <p className="text-2xl font-black text-orange-700">{stats.assignedDeliveries || 0}</p>
         </div>
       </div>
 

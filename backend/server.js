@@ -613,6 +613,7 @@ const createNotification = (db, notification) => {
 };
 
 const createTransaction = (db, transaction) => {
+  db.transactions = db.transactions || [];
   const nextTransaction = {
     id: `txn-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     timestamp: new Date().toISOString(),
@@ -621,6 +622,68 @@ const createTransaction = (db, transaction) => {
 
   db.transactions.unshift(nextTransaction);
   return nextTransaction;
+};
+
+const DEFAULT_RIDER_PAYOUT_RWF = 2500;
+
+const normalizeMoneyAmount = (value, fallback = 0) => {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? Math.round(amount) : fallback;
+};
+
+const calculateDefaultRiderPayout = (order = {}) => {
+  const deliveryFeeShare = Math.round(normalizeMoneyAmount(order.deliveryFee) * 0.7);
+  return Math.max(DEFAULT_RIDER_PAYOUT_RWF, deliveryFeeShare);
+};
+
+const getOrderRiderPayout = (order = {}) => {
+  const explicitPayout = normalizeMoneyAmount(order.riderPayout, -1);
+  return explicitPayout >= 0 ? explicitPayout : calculateDefaultRiderPayout(order);
+};
+
+const getOrderRiderPayoutStatus = (order = {}) => {
+  if (order.riderPayoutStatus) return order.riderPayoutStatus;
+  if (order.status === 'completed' && order.riderId) return 'released';
+  if (order.riderId) return 'assigned';
+  if (order.status === 'ready_for_pickup') return 'ready';
+  return 'pending_assignment';
+};
+
+const withRiderPayout = (order = {}) => ({
+  ...order,
+  riderPayout: getOrderRiderPayout(order),
+  riderPayoutStatus: getOrderRiderPayoutStatus(order)
+});
+
+const releaseRiderPayoutForOrder = (db, order = {}) => {
+  if (!order.riderId) return null;
+
+  const payoutAmount = getOrderRiderPayout(order);
+  if (payoutAmount <= 0) return null;
+
+  const existingTransaction = (db.transactions || []).find((transaction) =>
+    transaction.userId === order.riderId &&
+    transaction.orderId === order.id &&
+    transaction.type === 'income' &&
+    (transaction.metadata?.source === 'rider_delivery_payout' || transaction.method === 'Rider Delivery Payout')
+  );
+
+  if (existingTransaction) return existingTransaction;
+
+  return createTransaction(db, {
+    userId: order.riderId,
+    orderId: order.id,
+    amount: payoutAmount,
+    type: 'income',
+    status: 'success',
+    method: 'Rider Delivery Payout',
+    tx_ref: `RIDER-PAYOUT-${order.id}`,
+    metadata: {
+      source: 'rider_delivery_payout',
+      orderNumber: order.orderNumber,
+      riderName: order.riderName || ''
+    }
+  });
 };
 
 const createEmailLog = (db, email) => {
@@ -1082,9 +1145,9 @@ const buildRiderSnapshot = (db) =>
       const deliveries = (db.orders || []).filter((order) => order.riderId === rider.id);
       const completedDeliveries = deliveries.filter((order) => ['delivered', 'completed'].includes(order.status)).length;
       const activeDeliveries = deliveries.filter((order) => ['assigned', 'picked_up', 'on_the_way', 'out_for_delivery'].includes(order.status)).length;
-      const earnings = (db.transactions || [])
-        .filter((transaction) => transaction.userId === rider.id && transaction.type === 'income')
-        .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
+      const earnings = deliveries
+        .filter((order) => order.status === 'completed')
+        .reduce((sum, order) => sum + getOrderRiderPayout(order), 0);
 
       return {
         ...sanitizeUser(rider),
@@ -4566,7 +4629,7 @@ const server = http.createServer(async (req, res) => {
         orders = orders.filter((order) => order.riderId === user.id);
       }
 
-      sendJson(res, 200, { orders });
+      sendJson(res, 200, { orders: orders.map(withRiderPayout) });
       return;
     }
 
@@ -4602,7 +4665,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      sendJson(res, 200, { order });
+      sendJson(res, 200, { order: withRiderPayout(order) });
       return;
     }
 
@@ -4669,6 +4732,7 @@ const server = http.createServer(async (req, res) => {
         ? `EMALLA-TX-${orderId}-${Date.now()}`
         : body.tx_ref || `TX-${Date.now()}`;
       const isCashOnDelivery = shouldInitializePayment && paymentMethod === 'CASH_ON_DELIVERY';
+      const riderPayout = calculateDefaultRiderPayout({ deliveryFee, totalAmount, address: customerAddress });
       const order = {
         id: orderId,
         orderNumber: generateOrderNumber(),
@@ -4682,6 +4746,8 @@ const server = http.createServer(async (req, res) => {
         paymentStatus: 'PENDING',
         paymentMethod,
         deliveryFee,
+        riderPayout,
+        riderPayoutStatus: 'pending_assignment',
         totalAmount,
         tx_ref: txRef,
         address: customerAddress,
@@ -4752,7 +4818,7 @@ const server = http.createServer(async (req, res) => {
       });
       invalidateProductsCache();
       sendJson(res, 201, {
-        order,
+        order: withRiderPayout(order),
         paymentInit: payment ? {
           status: 'success',
           link: null,
@@ -4841,8 +4907,11 @@ const server = http.createServer(async (req, res) => {
         ...current,
         status: 'completed',
         paymentStatus: current.paymentMethod === 'CASH_ON_DELIVERY' ? 'SUCCESS' : current.paymentStatus,
+        riderPayout: getOrderRiderPayout(current),
+        riderPayoutStatus: current.riderId ? 'released' : getOrderRiderPayoutStatus(current),
         updatedAt: new Date().toISOString()
       };
+      const riderPayoutTransaction = releaseRiderPayoutForOrder(db, db.orders[index]);
 
       if (current.paymentMethod === 'CASH_ON_DELIVERY') {
         db.payments = (db.payments || []).map((payment) =>
@@ -4879,7 +4948,7 @@ const server = http.createServer(async (req, res) => {
           userId: current.riderId,
           role: 'DELIVERY',
           title: 'Delivery Confirmed by Customer',
-          message: `${current.customerName} confirmed receipt of ${current.orderNumber}.`,
+          message: `${current.customerName} confirmed receipt of ${current.orderNumber}. RWF ${getOrderRiderPayout(db.orders[index]).toLocaleString()} has been released to your rider wallet.`,
           type: 'success',
           metadata: { orderId: current.id }
         });
@@ -4893,7 +4962,9 @@ const server = http.createServer(async (req, res) => {
           orderId: current.id,
           orderNumber: current.orderNumber,
           previousStatus: current.status,
-          nextStatus: 'completed'
+          nextStatus: 'completed',
+          riderPayout: getOrderRiderPayout(db.orders[index]),
+          riderPayoutTransactionId: riderPayoutTransaction?.id || null
         }
       });
       await sendPlatformEmail(db, {
@@ -4906,7 +4977,7 @@ const server = http.createServer(async (req, res) => {
       });
 
       await writeDb(db);
-      sendJson(res, 200, { order: db.orders[index] });
+      sendJson(res, 200, { order: withRiderPayout(db.orders[index]) });
       return;
     }
 
@@ -4953,13 +5024,24 @@ const server = http.createServer(async (req, res) => {
       const notificationCountBefore = db.notifications.length;
       const auditLogCountBefore = db.auditLogs.length;
       const emailLogCountBefore = db.emailLogs.length;
+      const nextRiderPayout = getOrderRiderPayout(current);
       db.orders[index] = {
         ...current,
         status: body.status,
         paymentStatus: body.status === 'paid' ? 'SUCCESS' : current.paymentStatus,
+        riderPayout: nextRiderPayout,
+        riderPayoutStatus:
+          body.status === 'completed' && current.riderId
+            ? 'released'
+            : body.status === 'ready_for_pickup'
+              ? 'ready'
+              : getOrderRiderPayoutStatus(current),
         inventoryRestockedAt: shouldRestockInventory ? new Date().toISOString() : current.inventoryRestockedAt,
         updatedAt: new Date().toISOString()
       };
+      const riderPayoutTransaction = body.status === 'completed'
+        ? releaseRiderPayoutForOrder(db, db.orders[index])
+        : null;
 
       const customerUpdate = getOrderStatusNotification(db.orders[index], body.status);
       createNotification(db, {
@@ -5001,7 +5083,7 @@ const server = http.createServer(async (req, res) => {
           userId: current.riderId,
           role: 'DELIVERY',
           title: 'Delivery Confirmed by Customer',
-          message: `${current.customerName} confirmed receipt of ${current.orderNumber}.`,
+          message: `${current.customerName} confirmed receipt of ${current.orderNumber}. RWF ${nextRiderPayout.toLocaleString()} has been released to your rider wallet.`,
           type: 'success',
           metadata: { orderId: current.id }
         });
@@ -5016,7 +5098,9 @@ const server = http.createServer(async (req, res) => {
           orderNumber: current.orderNumber,
           previousStatus: current.status,
           nextStatus: body.status,
-          merchantId: current.merchantId
+          merchantId: current.merchantId,
+          riderPayout: nextRiderPayout,
+          riderPayoutTransactionId: riderPayoutTransaction?.id || null
         }
       });
 
@@ -5042,7 +5126,57 @@ const server = http.createServer(async (req, res) => {
       } else {
         await writeDb(db);
       }
-      sendJson(res, 200, { order: db.orders[index] });
+      sendJson(res, 200, { order: withRiderPayout(db.orders[index]) });
+      return;
+    }
+
+    if (pathname.startsWith('/api/orders/') && pathname.endsWith('/rider-payout') && req.method === 'PUT') {
+      const user = await requireRole(req, res, ['ADMIN']);
+      if (!user) return;
+
+      const orderId = pathname.split('/')[3];
+      const body = await readBody(req);
+      const db = await readDb();
+      const index = db.orders.findIndex((order) => order.id === orderId);
+
+      if (index === -1) {
+        sendJson(res, 404, { error: 'Order not found' });
+        return;
+      }
+
+      const current = db.orders[index];
+      if (['completed', 'cancelled', 'refunded'].includes(current.status)) {
+        sendJson(res, 409, { error: 'Rider payout can only be changed before the order is closed.' });
+        return;
+      }
+
+      const riderPayout = normalizeMoneyAmount(body.riderPayout, -1);
+      if (riderPayout < 0) {
+        sendJson(res, 400, { error: 'Please provide a valid rider payout amount.' });
+        return;
+      }
+
+      db.orders[index] = {
+        ...current,
+        riderPayout,
+        riderPayoutStatus: current.riderId ? 'assigned' : current.status === 'ready_for_pickup' ? 'ready' : 'pending_assignment',
+        updatedAt: new Date().toISOString()
+      };
+
+      createAuditLog(db, {
+        event: `Rider payout updated for ${current.orderNumber}`,
+        actor: user.name || user.email,
+        category: 'riders',
+        status: 'success',
+        metadata: {
+          orderId: current.id,
+          orderNumber: current.orderNumber,
+          riderPayout
+        }
+      });
+
+      await writeDb(db);
+      sendJson(res, 200, { order: withRiderPayout(db.orders[index]) });
       return;
     }
 
@@ -5083,6 +5217,8 @@ const server = http.createServer(async (req, res) => {
         ...current,
         riderId: riderRecord.id,
         riderName: riderRecord.name || body.riderName || user.name,
+        riderPayout: getOrderRiderPayout(current),
+        riderPayoutStatus: 'assigned',
         status: 'assigned',
         updatedAt: new Date().toISOString()
       };
@@ -5091,7 +5227,7 @@ const server = http.createServer(async (req, res) => {
         userId: db.orders[index].riderId,
         role: 'DELIVERY',
         title: 'New Delivery Assigned',
-        message: `You have been assigned ${db.orders[index].orderNumber}.`,
+        message: `You have been assigned ${db.orders[index].orderNumber}. Rider payout: RWF ${getOrderRiderPayout(db.orders[index]).toLocaleString()}.`,
         type: 'success',
         metadata: { orderId: db.orders[index].id }
       });
@@ -5145,7 +5281,7 @@ const server = http.createServer(async (req, res) => {
       });
 
       await writeDb(db);
-      sendJson(res, 200, { order: db.orders[index] });
+      sendJson(res, 200, { order: withRiderPayout(db.orders[index]) });
       return;
     }
 
@@ -5708,24 +5844,64 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
 
       const db = await readDb();
-      const transactions = db.transactions.filter((transaction) => transaction.userId === user.id);
-      const week = transactions
-        .filter((transaction) => transaction.type === 'income')
-        .reduce((sum, transaction) => sum + transaction.amount, 0);
-      const today = week;
-      const pendingClearance = transactions
-        .filter((transaction) => transaction.status === 'pending')
-        .reduce((sum, transaction) => sum + transaction.amount, 0);
-      const walletBalance = transactions
-        .filter((transaction) => ['income', 'payment'].includes(transaction.type))
-        .reduce((sum, transaction) => sum + transaction.amount, 0) -
+      const transactions = (db.transactions || []).filter((transaction) => transaction.userId === user.id);
+      const riderOrders = (db.orders || []).filter((order) => order.riderId === user.id);
+      const completedOrders = riderOrders.filter((order) => order.status === 'completed');
+      const pendingOrders = riderOrders.filter((order) =>
+        !['completed', 'cancelled', 'refunded', 'rejected'].includes(order.status)
+      );
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const recordedDeliveryOrderIds = new Set(
         transactions
-          .filter((transaction) => transaction.type === 'payout')
-          .reduce((sum, transaction) => sum + transaction.amount, 0);
+          .filter((transaction) => transaction.type === 'income' && transaction.orderId)
+          .map((transaction) => transaction.orderId)
+      );
+      const virtualDeliveryTransactions = completedOrders
+        .filter((order) => !recordedDeliveryOrderIds.has(order.id))
+        .map((order) => ({
+          id: `virtual-rider-${order.id}`,
+          userId: user.id,
+          orderId: order.id,
+          amount: getOrderRiderPayout(order),
+          type: 'income',
+          status: 'success',
+          method: 'Rider Delivery Payout',
+          tx_ref: `RIDER-PAYOUT-${order.id}`,
+          timestamp: order.updatedAt || order.createdAt,
+          metadata: {
+            source: 'rider_delivery_payout',
+            orderNumber: order.orderNumber
+          }
+        }));
+      const ledgerTransactions = [...transactions, ...virtualDeliveryTransactions];
+      const releasedDeliveryEarnings = completedOrders.reduce((sum, order) => sum + getOrderRiderPayout(order), 0);
+      const otherIncome = transactions
+        .filter((transaction) => transaction.type === 'income' && !transaction.orderId)
+        .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
+      const payoutDeductions = transactions
+        .filter((transaction) => transaction.type === 'payout' && ['pending', 'success'].includes(transaction.status))
+        .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
+      const week = completedOrders
+        .filter((order) => new Date(order.updatedAt || order.createdAt || 0).getTime() >= sevenDaysAgo)
+        .reduce((sum, order) => sum + getOrderRiderPayout(order), 0);
+      const today = completedOrders
+        .filter((order) => new Date(order.updatedAt || order.createdAt || 0).getTime() >= startOfToday.getTime())
+        .reduce((sum, order) => sum + getOrderRiderPayout(order), 0);
+      const pendingClearance = pendingOrders.reduce((sum, order) => sum + getOrderRiderPayout(order), 0);
+      const walletBalance = Math.max(0, releasedDeliveryEarnings + otherIncome - payoutDeductions);
 
       sendJson(res, 200, {
-        summary: { today, week, walletBalance, pendingClearance },
-        transactions
+        summary: {
+          today,
+          week,
+          walletBalance,
+          pendingClearance,
+          completedDeliveries: completedOrders.length,
+          assignedDeliveries: pendingOrders.length
+        },
+        transactions: ledgerTransactions
       });
       return;
     }
@@ -5789,9 +5965,9 @@ const server = http.createServer(async (req, res) => {
           totalDeliveries: deliveries.length,
           mobileMoneyNumber: riderSettings.mobileMoneyNumber || user.phone || '',
           emergencyContact: riderSettings.emergencyContact || '',
-          earnings: db.transactions
-            .filter((transaction) => transaction.userId === user.id)
-            .reduce((sum, transaction) => sum + transaction.amount, 0)
+          earnings: deliveries
+            .filter((order) => order.status === 'completed')
+            .reduce((sum, order) => sum + getOrderRiderPayout(order), 0)
         }
       });
       return;
@@ -5854,9 +6030,9 @@ const server = http.createServer(async (req, res) => {
           totalDeliveries: deliveries.length,
           mobileMoneyNumber: updatedUser.riderSettings?.mobileMoneyNumber || updatedUser.phone || '',
           emergencyContact: updatedUser.riderSettings?.emergencyContact || '',
-          earnings: db.transactions
-            .filter((transaction) => transaction.userId === updatedUser.id)
-            .reduce((sum, transaction) => sum + transaction.amount, 0)
+          earnings: deliveries
+            .filter((order) => order.status === 'completed')
+            .reduce((sum, order) => sum + getOrderRiderPayout(order), 0)
         }
       });
       return;

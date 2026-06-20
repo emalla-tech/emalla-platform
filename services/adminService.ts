@@ -183,6 +183,11 @@ export const AdminService = {
     return true;
   },
 
+  updateOrderRiderPayout: async (orderId: string, riderPayout: number): Promise<Order> => {
+    const response = await apiClient.updateOrderRiderPayout(orderId, riderPayout);
+    return response.order as Order;
+  },
+
   getSellers: async (): Promise<Merchant[]> => {
     const response = await apiClient.getAdminSellers();
     return response.sellers || [];

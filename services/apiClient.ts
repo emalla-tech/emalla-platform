@@ -262,6 +262,13 @@ export const apiClient = {
     });
   },
 
+  async updateOrderRiderPayout(orderId: string, riderPayout: number) {
+    return request(`/orders/${orderId}/rider-payout`, {
+      method: 'PUT',
+      body: JSON.stringify({ riderPayout })
+    });
+  },
+
   async cancelOrder(orderId: string, options?: { email?: string; phone?: string }) {
     return request(`/orders/${orderId}/cancel`, {
       method: 'PUT',

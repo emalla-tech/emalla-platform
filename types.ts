@@ -108,6 +108,8 @@ export interface Order {
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
   deliveryFee: number;
+  riderPayout?: number;
+  riderPayoutStatus?: 'pending_assignment' | 'ready' | 'assigned' | 'released';
   totalAmount: number;
   tx_ref: string;
   address: string;

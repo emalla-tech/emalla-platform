@@ -11,6 +11,7 @@ import { uploadService } from '../../services/uploadService';
 import { Product } from '../../types';
 import { CATEGORIES } from '../../constants';
 import { getProductPrimaryImage, handleProductImageError } from '../../lib/productImages';
+import { PRODUCT_FULFILLMENT_OPTIONS } from '../../lib/productDelivery';
 
 const SPECIFICATION_FIELDS = [
   { key: 'material', label: 'Material', placeholder: 'e.g. Genuine leather' },
@@ -120,6 +121,10 @@ const Inventory: React.FC = () => {
     description: '',
     specifications: '',
     stock: 0,
+    fulfillmentType: 'ready_stock',
+    deliveryMinDays: 1,
+    deliveryMaxDays: 3,
+    deliveryNote: '',
     image: '',
     images: [],
     status: 'pending',
@@ -263,6 +268,10 @@ const Inventory: React.FC = () => {
         description: '',
         specifications: '',
         stock: 0,
+        fulfillmentType: 'ready_stock',
+        deliveryMinDays: 1,
+        deliveryMaxDays: 3,
+        deliveryNote: '',
         image: '',
         images: [],
         status: 'pending',
@@ -290,6 +299,10 @@ const Inventory: React.FC = () => {
     setNewProduct({
       ...product,
       images: product.images || (product.image ? [product.image] : []),
+      fulfillmentType: product.fulfillmentType || 'ready_stock',
+      deliveryMinDays: product.deliveryMinDays || 1,
+      deliveryMaxDays: product.deliveryMaxDays || 3,
+      deliveryNote: product.deliveryNote || '',
       status: product.status || 'pending',
       featured: product.featured ?? false
     });
@@ -306,6 +319,10 @@ const Inventory: React.FC = () => {
         description: '',
         specifications: '',
         stock: 0,
+        fulfillmentType: 'ready_stock',
+        deliveryMinDays: 1,
+        deliveryMaxDays: 3,
+        deliveryNote: '',
         image: '',
         images: [],
       status: 'pending',
@@ -623,6 +640,73 @@ const Inventory: React.FC = () => {
                     placeholder="0"
                     className="w-full px-6 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 rounded-2xl outline-none font-bold text-gray-900 transition-all"
                   />
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-blue-100 bg-blue-50/60 p-5 space-y-5">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Customer Delivery Estimate</p>
+                  <p className="mt-1 text-xs font-medium text-gray-500">
+                    Set a realistic timeline customers can see before checkout.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-3 space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fulfillment Type</label>
+                    <select
+                      value={newProduct.fulfillmentType || 'ready_stock'}
+                      onChange={(e) => setNewProduct({
+                        ...newProduct,
+                        fulfillmentType: e.target.value as Product['fulfillmentType']
+                      })}
+                      className="w-full px-5 py-4 bg-white border-2 border-transparent focus:border-blue-500 rounded-2xl outline-none font-bold text-gray-900 appearance-none"
+                    >
+                      {PRODUCT_FULFILLMENT_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label} - {option.description}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Minimum Days</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      max={180}
+                      value={newProduct.deliveryMinDays || ''}
+                      onChange={(e) => setNewProduct({
+                        ...newProduct,
+                        deliveryMinDays: parseInt(e.target.value, 10) || 0
+                      })}
+                      className="w-full px-5 py-4 bg-white border-2 border-transparent focus:border-blue-500 rounded-2xl outline-none font-bold text-gray-900"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Maximum Days</label>
+                    <input
+                      type="number"
+                      required
+                      min={Math.max(1, Number(newProduct.deliveryMinDays || 1))}
+                      max={180}
+                      value={newProduct.deliveryMaxDays || ''}
+                      onChange={(e) => setNewProduct({
+                        ...newProduct,
+                        deliveryMaxDays: parseInt(e.target.value, 10) || 0
+                      })}
+                      className="w-full px-5 py-4 bg-white border-2 border-transparent focus:border-blue-500 rounded-2xl outline-none font-bold text-gray-900"
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-3">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Delivery Note (Optional)</label>
+                    <input
+                      type="text"
+                      maxLength={240}
+                      value={newProduct.deliveryNote || ''}
+                      onChange={(e) => setNewProduct({ ...newProduct, deliveryNote: e.target.value })}
+                      placeholder="e.g. Imported from abroad after order confirmation"
+                      className="w-full px-5 py-4 bg-white border-2 border-transparent focus:border-blue-500 rounded-2xl outline-none font-bold text-gray-900"
+                    />
+                  </div>
                 </div>
               </div>
 

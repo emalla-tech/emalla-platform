@@ -1195,6 +1195,44 @@ const normalizeProductMedia = (product) => {
   };
 };
 
+const PRODUCT_FULFILLMENT_TYPES = new Set(['ready_stock', 'imported_on_demand', 'preorder']);
+
+const normalizeProductDeliverySettings = (updates = {}, existing = {}) => {
+  const fulfillmentType = String(updates.fulfillmentType ?? existing.fulfillmentType ?? 'ready_stock').trim();
+  const deliveryMinDays = Number(updates.deliveryMinDays ?? existing.deliveryMinDays ?? 1);
+  const deliveryMaxDays = Number(updates.deliveryMaxDays ?? existing.deliveryMaxDays ?? 3);
+  const deliveryNote = String(updates.deliveryNote ?? existing.deliveryNote ?? '').trim();
+
+  if (!PRODUCT_FULFILLMENT_TYPES.has(fulfillmentType)) {
+    const error = new Error('Select a valid product fulfillment type.');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (
+    !Number.isInteger(deliveryMinDays) ||
+    !Number.isInteger(deliveryMaxDays) ||
+    deliveryMinDays < 1 ||
+    deliveryMaxDays > 180 ||
+    deliveryMaxDays < deliveryMinDays
+  ) {
+    const error = new Error('Delivery time must be between 1 and 180 days, with the maximum not less than the minimum.');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (deliveryNote.length > 240) {
+    const error = new Error('Delivery note must not exceed 240 characters.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return {
+    fulfillmentType,
+    deliveryMinDays,
+    deliveryMaxDays,
+    deliveryNote
+  };
+};
+
 const invalidateProductsCache = () => {
   productsCache = {
     expiresAt: 0,
@@ -4211,6 +4249,7 @@ const server = http.createServer(async (req, res) => {
       }
       const db = await readDb();
       const canControlApproval = user.role === 'ADMIN';
+      const deliverySettings = normalizeProductDeliverySettings(body);
       const product = normalizeProductMedia({
         id: `p${Date.now()}`,
         name: productName,
@@ -4227,7 +4266,8 @@ const server = http.createServer(async (req, res) => {
         status: canControlApproval ? body.status || 'pending' : 'pending',
         featured: canControlApproval ? body.featured ?? true : false,
         reviewsCount: body.reviewsCount || 0,
-        variants: body.variants
+        variants: body.variants,
+        ...deliverySettings
       });
 
       db.products.unshift(product);
@@ -4290,6 +4330,15 @@ const server = http.createServer(async (req, res) => {
       if (body.name !== undefined && !isValidDisplayName(body.name, 180)) {
         sendJson(res, 400, { error: 'Product name must be between 2 and 180 characters.' });
         return;
+      }
+      const deliveryFieldsChanged = [
+        'fulfillmentType',
+        'deliveryMinDays',
+        'deliveryMaxDays',
+        'deliveryNote'
+      ].some((field) => body[field] !== undefined);
+      if (deliveryFieldsChanged) {
+        Object.assign(body, normalizeProductDeliverySettings(body, existing));
       }
 
       const previousMediaUrls = getProductMediaUrls(existing);

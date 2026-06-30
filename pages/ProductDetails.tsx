@@ -25,6 +25,11 @@ import { geminiService } from '../services/geminiService';
 import { Product, ProductReview } from '../types';
 import { useAuth } from '../auth/AuthContext';
 import { getProductGalleryImages, getProductPrimaryImage, handleProductImageError } from '../lib/productImages';
+import {
+  getProductDeliveryEstimate,
+  getProductDeliveryMessage,
+  getProductFulfillmentLabel
+} from '../lib/productDelivery';
 
 const RECENTLY_VIEWED_KEY = 'emalla_recently_viewed_products';
 
@@ -161,6 +166,11 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
       .filter(p => p.category === product.category && p.id !== product.id)
       .slice(0, 8); // Slice more for carousel
   }, [product, products]);
+
+  const deliveryEstimate = useMemo(
+    () => product ? getProductDeliveryEstimate(product) : null,
+    [product]
+  );
 
   const specificationItems = useMemo(() => {
     if (!product) {
@@ -399,7 +409,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
               </div>
               <div className="rounded-3xl border border-blue-100 bg-blue-50 p-4">
                 <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Delivery Info</p>
-                <p className="mt-2 text-sm font-bold text-gray-900">Doorstep delivery and pickup options available in Rwanda.</p>
+                <p className="mt-2 text-base font-black text-gray-900">{deliveryEstimate?.label}</p>
+                <p className="mt-1 text-xs font-bold text-blue-700">{getProductFulfillmentLabel(product.fulfillmentType)}</p>
               </div>
               <div className="rounded-3xl border border-yellow-100 bg-yellow-50 p-4">
                 <p className="text-[10px] font-black uppercase tracking-widest text-yellow-700">Reviews</p>
@@ -532,6 +543,21 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
                     </button>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('shipping')}
+                  className="flex w-full items-start gap-4 rounded-3xl border border-blue-100 bg-blue-50/70 p-5 text-left transition-colors hover:border-blue-200 hover:bg-blue-50"
+                >
+                  <span className="mt-0.5 rounded-2xl bg-blue-600 p-3 text-white shadow-lg shadow-blue-100">
+                    <Truck size={20} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[10px] font-black uppercase tracking-widest text-blue-600">Estimated Delivery</span>
+                    <span className="mt-1 block text-lg font-black text-gray-900">{deliveryEstimate?.label}</span>
+                    <span className="mt-1 block text-sm font-medium leading-relaxed text-gray-600">{getProductDeliveryMessage(product)}</span>
+                  </span>
+                </button>
               </div>
               
               <div className="bg-orange-50/50 p-4 border-t border-orange-100 flex items-center justify-center space-x-2">
@@ -760,8 +786,9 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
                   </div>
                   <h4 className="text-lg font-bold text-gray-900">Doorstep Delivery</h4>
                   <p className="text-sm text-gray-600 leading-relaxed">
-                    Estimated dispatch depends on seller confirmation and stock availability.<br />
-                    In-stock items are prioritized for same-day or next-day handling.
+                    Estimated timeline: <strong>{deliveryEstimate?.label}</strong><br />
+                    Fulfillment: {getProductFulfillmentLabel(product.fulfillmentType)}<br />
+                    {getProductDeliveryMessage(product)}
                   </p>
                 </div>
                 <div className="bg-orange-50/50 p-8 rounded-3xl border border-orange-100 flex flex-col space-y-4">

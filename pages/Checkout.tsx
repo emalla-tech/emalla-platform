@@ -13,6 +13,7 @@ import { PaymentService } from '../services/paymentService';
 import { OrderService } from '../services/orderService';
 import PaymentMethodSelector from '../components/Payment/PaymentMethodSelector';
 import { useAuth } from '../auth/AuthContext';
+import { getProductDeliveryEstimate } from '../lib/productDelivery';
 
 const DISTRICTS = [
   'Nyarugenge', 'Gasabo', 'Kicukiro', 
@@ -31,6 +32,8 @@ interface CheckoutProps {
       image: string;
       merchantId?: string;
       merchantName?: string;
+      deliveryMinDays?: number;
+      deliveryMaxDays?: number;
     };
   }>;
   subtotal: number;
@@ -293,6 +296,9 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-gray-900 break-words">{item.product.name}</p>
                           <p className="text-[10px] text-gray-400 font-bold uppercase">Qty: {item.quantity}</p>
+                          <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-blue-600">
+                            Delivery: {getProductDeliveryEstimate(item.product).label}
+                          </p>
                         </div>
                       </div>
                       <span className="text-sm font-black text-gray-900 text-right shrink-0">RWF {item.subtotal.toLocaleString()}</span>

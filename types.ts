@@ -169,6 +169,10 @@ export interface Product {
   featured?: boolean;
   reviewsCount?: number;
   variants?: ProductVariant;
+  fulfillmentType?: 'ready_stock' | 'imported_on_demand' | 'preorder';
+  deliveryMinDays?: number;
+  deliveryMaxDays?: number;
+  deliveryNote?: string;
 }
 
 export interface ProductReview {

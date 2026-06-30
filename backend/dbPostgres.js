@@ -699,6 +699,12 @@ export const createPostgresAdapter = () => {
       };
     },
 
+    async saveAuditLog(entry) {
+      const activePool = await getPool();
+      await upsertAuditLogRecord(activePool, entry);
+      return entry;
+    },
+
     async readAuthUserByIdentity(identity) {
       const normalizedIdentity = String(identity || '').toLowerCase().trim();
       const userResult = await query(

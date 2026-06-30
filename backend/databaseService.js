@@ -8,6 +8,7 @@ import {
   readAdminStatsData,
   readAdminRidersData,
   readRiderDashboardData,
+  saveAuditLog,
   readAuthUserByIdentity,
   findLatestSellerApplicationByEmail,
   findLatestRiderApplicationByEmail,
@@ -52,6 +53,7 @@ export const databaseService = {
   readAdminStatsData: () => readAdminStatsData(),
   readAdminRidersData: () => readAdminRidersData(),
   readRiderDashboardData: (userId) => readRiderDashboardData(userId),
+  saveAuditLog: (entry) => saveAuditLog(entry),
   readAuthUserByIdentity: (identity) => readAuthUserByIdentity(identity),
   findLatestSellerApplicationByEmail: (email) => findLatestSellerApplicationByEmail(email),
   findLatestRiderApplicationByEmail: (email) => findLatestRiderApplicationByEmail(email),
@@ -79,6 +81,7 @@ export const readPublicInsightsRecords = () => databaseService.readPublicInsight
 export const readAdminStatsRecords = () => databaseService.readAdminStatsData();
 export const readAdminRiderRecords = () => databaseService.readAdminRidersData();
 export const readRiderDashboardRecords = (userId) => databaseService.readRiderDashboardData(userId);
+export const persistAuditLogRecord = (entry) => databaseService.saveAuditLog(entry);
 export const readAuthUserRecordByIdentity = (identity) => databaseService.readAuthUserByIdentity(identity);
 export const findLatestSellerApplicationRecordByEmail = (email) => databaseService.findLatestSellerApplicationByEmail(email);
 export const findLatestRiderApplicationRecordByEmail = (email) => databaseService.findLatestRiderApplicationByEmail(email);

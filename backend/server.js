@@ -11,6 +11,7 @@ import {
   readAdminStatsRecords,
   readAdminRiderRecords,
   readRiderDashboardRecords,
+  persistAuditLogRecord,
   readAuthUserRecordByIdentity,
   findLatestSellerApplicationRecordByEmail,
   findLatestRiderApplicationRecordByEmail,
@@ -932,34 +933,32 @@ const buildRiderAssignmentEmailMessage = ({ order, riderName }) => {
   };
 };
 
+const createAuditLogRecord = (entry) => ({
+  id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+  time: new Date().toISOString(),
+  status: 'success',
+  ...entry
+});
+
 const createAuditLog = (db, entry) => {
   db.auditLogs = db.auditLogs || [];
-  const record = {
-    id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    time: new Date().toISOString(),
-    status: 'success',
-    ...entry
-  };
+  const record = createAuditLogRecord(entry);
   db.auditLogs.unshift(record);
   return record;
 };
 
-const recordMonitoringEvent = async (entry) => {
-  try {
-    await updateDatabaseSnapshot((db) => {
-      createAuditLog(db, {
-        actor: 'E-Malla Monitoring',
-        category: 'monitoring',
-        status: 'error',
-        ...entry
-      });
-      return db;
-    });
-  } catch (error) {
+const recordMonitoringEvent = (entry) => {
+  void persistAuditLogRecord(createAuditLogRecord({
+      actor: 'E-Malla Monitoring',
+      category: 'monitoring',
+      status: 'error',
+      ...entry
+    }))
+    .catch((error) => {
     structuredLog('error', 'monitoring_event_persist_failed', {
       error: sanitizeMonitoringText(error instanceof Error ? error.message : error)
     });
-  }
+    });
 };
 
 const normalizeInquiryStatus = (value) => {
@@ -4033,7 +4032,6 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === '/api/uploads/image' && req.method === 'POST') {
       const body = await readBody(req);
-      const db = await readDb();
       const storageConfig = getStorageConfig();
       const uploadFolder = body.folder || 'e-malla/products';
       if (!ALLOWED_UPLOAD_FOLDERS.has(uploadFolder)) {
@@ -4066,7 +4064,7 @@ const server = http.createServer(async (req, res) => {
           : storageConfig.maxImageUploadMb
       });
 
-      createAuditLog(db, {
+      void persistAuditLogRecord(createAuditLogRecord({
         event: isApplicationUpload
           ? `Application file uploaded: ${body.fileName || 'application-file'}`
           : `Product image uploaded by ${user.name || user.email}`,
@@ -4081,9 +4079,16 @@ const server = http.createServer(async (req, res) => {
           folder: uploadFolder,
           fileName: body.fileName || 'product-image'
         }
-      });
+      }))
+        .catch((error) => {
+          structuredLog('warn', 'upload_audit_persist_failed', {
+            requestId,
+            provider: uploaded.provider,
+            publicId: uploaded.publicId,
+            error: sanitizeMonitoringText(error instanceof Error ? error.message : error)
+          });
+        });
 
-      await writeDb(db);
       sendJson(res, 201, { upload: uploaded });
       return;
     }

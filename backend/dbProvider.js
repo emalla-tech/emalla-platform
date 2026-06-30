@@ -101,6 +101,18 @@ const getJsonAdapter = () => {
         transactions: (snapshot.transactions || []).filter((entry) => entry.userId === userId)
       };
     },
+    saveAuditLog: async (entry) => {
+      const snapshot = await jsonDb.readDb();
+      snapshot.auditLogs = snapshot.auditLogs || [];
+      const index = snapshot.auditLogs.findIndex((item) => item.id === entry.id);
+      if (index >= 0) {
+        snapshot.auditLogs[index] = entry;
+      } else {
+        snapshot.auditLogs.unshift(entry);
+      }
+      await jsonDb.writeDb(snapshot);
+      return entry;
+    },
     readAuthUserByIdentity: async (identity) => {
       const snapshot = await jsonDb.readDb();
       const normalized = String(identity || '').toLowerCase().trim();
@@ -346,6 +358,7 @@ const createActiveAdapter = () => {
       readAdminStatsData: () => callWithFallback('readAdminStatsData'),
       readAdminRidersData: () => callWithFallback('readAdminRidersData'),
       readRiderDashboardData: (userId) => callWithFallback('readRiderDashboardData', userId),
+      saveAuditLog: (entry) => callWithFallback('saveAuditLog', entry),
       readAuthUserByIdentity: (identity) => callWithFallback('readAuthUserByIdentity', identity),
       findLatestSellerApplicationByEmail: (email) => callWithFallback('findLatestSellerApplicationByEmail', email),
       findLatestRiderApplicationByEmail: (email) => callWithFallback('findLatestRiderApplicationByEmail', email),
@@ -488,6 +501,13 @@ export const readRiderDashboardData = async (userId) => {
     orders: (snapshot.orders || []).filter((entry) => entry.riderId === userId),
     transactions: (snapshot.transactions || []).filter((entry) => entry.userId === userId)
   };
+};
+
+export const saveAuditLog = async (entry) => {
+  const adapter = getAdapter();
+  if (typeof adapter.saveAuditLog === 'function') {
+    return adapter.saveAuditLog(entry);
+  }
 };
 
 export const readAuthUserByIdentity = async (identity) => {

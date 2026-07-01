@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Banknote, CreditCard, DollarSign, ReceiptText, Wallet } from 'lucide-react';
 import { BarChart, Bar, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAuth } from '../../auth/AuthContext';
-import { AdminService } from '../../services/adminService';
+import { AdminService, FinanceReport, FinanceReportMetricKey } from '../../services/adminService';
 import AdminToast from '../../components/AdminToast';
 import { downloadCsv, html, printPdfDocument, renderTableRows } from '../../lib/documentExport';
 import { UserRole } from '../../types';
@@ -68,6 +68,27 @@ const defaultSummary: FinanceSummary = {
 
 const money = (value: number) => `RWF ${Number(value || 0).toLocaleString()}`;
 const chartColors = ['#f97316', '#0f766e', '#2563eb', '#eab308', '#db2777', '#7c3aed'];
+const financeMetricOptions: Array<{
+  key: FinanceReportMetricKey;
+  label: string;
+  description: string;
+}> = [
+  { key: 'grossRevenue', label: 'Gross Revenue', description: 'Successful payments recorded in the period.' },
+  { key: 'platformNetRevenue', label: 'Platform Net Revenue', description: 'Commission plus collected delivery fees.' },
+  { key: 'totalCommissionEarned', label: 'Commission Earned', description: 'Category commission from successful sales.' },
+  { key: 'pendingCodValue', label: 'Pending COD Value', description: 'Current outstanding COD orders created in the period.' }
+];
+const defaultReportMetrics = financeMetricOptions.map((option) => option.key);
+const toDateInput = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+const getDefaultReportStart = () => {
+  const date = new Date();
+  return toDateInput(new Date(date.getFullYear(), date.getMonth(), 1));
+};
 
 const FinanceOverview: React.FC = () => {
   const { user } = useAuth();
@@ -79,6 +100,12 @@ const FinanceOverview: React.FC = () => {
   const [messageTone, setMessageTone] = useState<'success' | 'error' | 'info'>('success');
   const [busyPayoutId, setBusyPayoutId] = useState<string | null>(null);
   const [busyClaimId, setBusyClaimId] = useState<string | null>(null);
+  const [reportFrom, setReportFrom] = useState(getDefaultReportStart);
+  const [reportTo, setReportTo] = useState(() => toDateInput(new Date()));
+  const [reportMetrics, setReportMetrics] = useState<FinanceReportMetricKey[]>(defaultReportMetrics);
+  const [reportPreview, setReportPreview] = useState<FinanceReport | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<'pdf' | 'csv' | null>(null);
   const isFinanceWorkspace = user?.role === UserRole.FINANCE;
   const canReview = user?.role === UserRole.ADMIN || (isFinanceWorkspace && user.staffLevel === 'manager');
 
@@ -171,150 +198,138 @@ const FinanceOverview: React.FC = () => {
     }
   };
 
-  const handleExportFinance = () => {
-    const rows = [
-      {
-        section: 'overview',
-        metric: 'gross_revenue',
-        value: summary.overview.grossRevenue
-      },
-      {
-        section: 'overview',
-        metric: 'platform_net_revenue',
-        value: summary.overview.platformNetRevenue
-      },
-      {
-        section: 'overview',
-        metric: 'commission_earned',
-        value: summary.overview.totalCommissionEarned
-      },
-      ...summary.categoryCommission.map((entry) => ({
-        section: 'category_commission',
-        metric: entry.categoryName,
-        value: entry.commissionEarned
-      })),
-      ...payouts.map((entry) => ({
-        section: 'payout_request',
-        metric: `${entry.merchantName} (${entry.status})`,
-        value: entry.amount
-      }))
-    ];
-
-    downloadCsv(`admin-finance-report-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+  const applyReportPreset = (preset: 'today' | '7days' | '30days' | 'month') => {
+    const end = new Date();
+    const start = new Date(end);
+    if (preset === '7days') start.setDate(end.getDate() - 6);
+    if (preset === '30days') start.setDate(end.getDate() - 29);
+    if (preset === 'month') start.setDate(1);
+    setReportFrom(toDateInput(start));
+    setReportTo(toDateInput(end));
+    setReportPreview(null);
   };
 
-  const handleExportFinancePdf = () => {
-    const generatedAt = new Date();
-    const categoryRows = summary.categoryCommission.map((entry) => [
-      entry.categoryName,
-      `${entry.rate}%`,
-      entry.successfulOrders,
-      `RWF ${Number(entry.grossSales || 0).toLocaleString()}`,
-      `RWF ${Number(entry.commissionEarned || 0).toLocaleString()}`,
-      `RWF ${Number(entry.merchantNet || 0).toLocaleString()}`
-    ]);
-    const payoutRows = payouts.map((entry) => [
-      entry.merchantName,
-      entry.payoutMethod,
-      entry.status,
-      `RWF ${Number(entry.amount || 0).toLocaleString()}`,
-      entry.payoutDestination || 'Not configured',
-      new Date(entry.timestamp).toLocaleDateString()
-    ]);
+  const toggleReportMetric = (metric: FinanceReportMetricKey) => {
+    setReportMetrics((current) =>
+      current.includes(metric)
+        ? current.filter((entry) => entry !== metric)
+        : [...current, metric]
+    );
+    setReportPreview(null);
+  };
 
+  const handlePreviewReport = async () => {
+    if (reportMetrics.length === 0) {
+      setMessageTone('error');
+      setMessage('Select at least one finance metric.');
+      return;
+    }
+
+    setReportLoading(true);
+    try {
+      const report = await AdminService.getFinanceReport({
+        from: reportFrom,
+        to: reportTo,
+        metrics: reportMetrics
+      });
+      setReportPreview(report);
+      setMessage(null);
+    } catch (error) {
+      setMessageTone('error');
+      setMessage(error instanceof Error ? error.message : 'Unable to prepare finance report.');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const downloadFinanceCsv = (report: FinanceReport) => {
+    const rows = report.metrics.map((metric) => ({
+      from: report.range.from,
+      to: report.range.to,
+      timezone: report.range.timezone,
+      metric: metric.label,
+      amount_rwf: metric.value,
+      basis: metric.basis,
+      successful_orders: report.successfulOrders,
+      generated_at: report.generatedAt,
+      generated_by: user?.name || user?.email || 'E-Malla Finance'
+    }));
+    downloadCsv(`emalla-finance-${report.range.from}-to-${report.range.to}.csv`, rows);
+  };
+
+  const printFinancePdf = (report: FinanceReport) => {
+    const generatedAt = new Date(report.generatedAt);
+    const metricCards = report.metrics.map((metric) => `
+      <div class="card">
+        <div class="card-label">${html.escape(metric.label)}</div>
+        <div class="card-value">RWF ${html.escape(Number(metric.value || 0).toLocaleString())}</div>
+        <div class="muted">${html.escape(metric.basis)}</div>
+      </div>
+    `).join('');
     const bodyHtml = `
       <div class="page">
         <div class="header">
           <div>
             <div class="brand">E-<span>Malla</span> Rwanda</div>
-            <div class="subtitle">Admin finance report with commissions and merchant settlements</div>
+            <div class="subtitle">Controlled finance report</div>
           </div>
           <div class="meta">
-            <div><strong>Document:</strong> Finance Command Center Report</div>
+            <div><strong>Period:</strong> ${html.escape(report.range.from)} to ${html.escape(report.range.to)}</div>
+            <div><strong>Timezone:</strong> ${html.escape(report.range.timezone)}</div>
             <div><strong>Generated:</strong> ${html.escape(generatedAt.toLocaleString())}</div>
-            <div><strong>Successful Orders:</strong> ${html.escape(summary.overview.successfulOrders)}</div>
+            <div><strong>Generated by:</strong> ${html.escape(user?.name || user?.email || 'E-Malla Finance')}</div>
           </div>
         </div>
-
-        <div class="grid">
-          <div class="card">
-            <div class="card-label">Gross Revenue</div>
-            <div class="card-value">RWF ${html.escape(Number(summary.overview.grossRevenue || 0).toLocaleString())}</div>
-          </div>
-          <div class="card">
-            <div class="card-label">Platform Net Revenue</div>
-            <div class="card-value">RWF ${html.escape(Number(summary.overview.platformNetRevenue || 0).toLocaleString())}</div>
-          </div>
-          <div class="card">
-            <div class="card-label">Commission Earned</div>
-            <div class="card-value">RWF ${html.escape(Number(summary.overview.totalCommissionEarned || 0).toLocaleString())}</div>
-          </div>
-        </div>
-
-        <div class="grid">
-          <div class="card">
-            <div class="card-label">Pending COD Value</div>
-            <div class="card-value">RWF ${html.escape(Number(summary.overview.pendingCodValue || 0).toLocaleString())}</div>
-          </div>
-          <div class="card">
-            <div class="card-label">Completed Payouts</div>
-            <div class="card-value">RWF ${html.escape(Number(summary.overview.completedPayouts || 0).toLocaleString())}</div>
-          </div>
-          <div class="card">
-            <div class="card-label">Pending Payouts</div>
-            <div class="card-value">RWF ${html.escape(Number(summary.overview.pendingPayouts || 0).toLocaleString())}</div>
-          </div>
-        </div>
-
+        <div class="grid">${metricCards}</div>
         <div class="section">
-          <h2 class="section-title">Category Commission Performance</h2>
-          ${
-            categoryRows.length > 0
-              ? `<table>
-                  <thead>
-                    <tr>
-                      <th>Category</th>
-                      <th>Rate</th>
-                      <th>Orders</th>
-                      <th>Gross Sales</th>
-                      <th>Commission</th>
-                      <th>Merchant Net</th>
-                    </tr>
-                  </thead>
-                  <tbody>${renderTableRows(categoryRows)}</tbody>
-                </table>`
-              : '<div class="card muted">No category commission activity available yet.</div>'
-          }
+          <h2 class="section-title">Report Controls</h2>
+          <table>
+            <tbody>
+              ${renderTableRows([
+                ['Successful Orders', report.successfulOrders],
+                ['Selected Metrics', report.metrics.map((metric) => metric.label).join(', ')],
+                ['Period Start', report.range.from],
+                ['Period End', report.range.to]
+              ])}
+            </tbody>
+          </table>
         </div>
-
-        <div class="section">
-          <h2 class="section-title">Merchant Payout Queue</h2>
-          ${
-            payoutRows.length > 0
-              ? `<table>
-                  <thead>
-                    <tr>
-                      <th>Merchant</th>
-                      <th>Method</th>
-                      <th>Status</th>
-                      <th>Amount</th>
-                      <th>Destination</th>
-                      <th>Requested</th>
-                    </tr>
-                  </thead>
-                  <tbody>${renderTableRows(payoutRows)}</tbody>
-                </table>`
-              : '<div class="card muted">No payout requests available yet.</div>'
-          }
-        </div>
-
         <div class="footer">
-          This finance report was generated from the live admin dashboard data currently loaded in E-Malla Rwanda.
+          Pending COD represents current outstanding COD orders created in the selected period. This export is recorded in the E-Malla audit trail.
         </div>
       </div>
     `;
 
-    printPdfDocument(`Admin Finance Report - ${generatedAt.toISOString().slice(0, 10)}`, bodyHtml);
+    printPdfDocument(`E-Malla Finance ${report.range.from} to ${report.range.to}`, bodyHtml);
+  };
+
+  const handleReportExport = async (format: 'pdf' | 'csv') => {
+    if (reportMetrics.length === 0) {
+      setMessageTone('error');
+      setMessage('Select at least one finance metric.');
+      return;
+    }
+
+    setExportingFormat(format);
+    try {
+      const report = await AdminService.exportFinanceReport({
+        from: reportFrom,
+        to: reportTo,
+        metrics: reportMetrics,
+        format
+      });
+      setReportPreview(report);
+      if (format === 'pdf') printFinancePdf(report);
+      else downloadFinanceCsv(report);
+      setMessageTone('success');
+      setMessage(`${format.toUpperCase()} finance report exported and recorded in audit logs.`);
+      window.setTimeout(() => setMessage(null), 3500);
+    } catch (error) {
+      setMessageTone('error');
+      setMessage(error instanceof Error ? error.message : 'Unable to export finance report.');
+    } finally {
+      setExportingFormat(null);
+    }
   };
 
   const handleExportPayoutReceipt = (payout: any) => {
@@ -385,18 +400,6 @@ const FinanceOverview: React.FC = () => {
           <p className="mt-1 text-gray-500">Verify payments, reconcile collections, and control merchant settlements from live platform data.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={handleExportFinancePdf}
-            className="bg-orange-50 border border-orange-200 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-widest text-orange-600 hover:bg-orange-100"
-          >
-            Export PDF
-          </button>
-          <button
-            onClick={handleExportFinance}
-            className="bg-white border border-gray-100 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-widest text-gray-500 hover:bg-gray-50"
-          >
-            Export CSV
-          </button>
           <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-widest text-gray-500">
             Successful Orders: {summary.overview.successfulOrders}
           </div>
@@ -415,6 +418,145 @@ const FinanceOverview: React.FC = () => {
             : 'A Finance Manager must approve or reject payments and payouts.'}
         </div>
       )}
+
+      <section className="overflow-hidden rounded-[32px] border border-blue-100 bg-white shadow-sm">
+        <div className="border-b border-blue-100 bg-blue-50/70 px-6 py-5 md:px-8">
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-blue-600">Controlled Reporting</p>
+          <h2 className="mt-2 text-xl font-black text-gray-950">Finance Report Builder</h2>
+          <p className="mt-1 text-sm text-gray-600">Choose the reporting period and include only the metrics needed for this document.</p>
+        </div>
+
+        <div className="space-y-6 p-6 md:p-8">
+          <div className="flex flex-wrap gap-2" aria-label="Finance report date presets">
+            {([
+              ['today', 'Today'],
+              ['7days', 'Last 7 Days'],
+              ['30days', 'Last 30 Days'],
+              ['month', 'This Month']
+            ] as const).map(([preset, label]) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => applyReportPreset(preset)}
+                className="min-h-11 rounded-xl border border-gray-200 bg-white px-4 text-xs font-black text-gray-600 hover:border-blue-300 hover:text-blue-700"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="text-sm font-bold text-gray-700">
+              From
+              <input
+                type="date"
+                value={reportFrom}
+                max={reportTo}
+                onChange={(event) => {
+                  setReportFrom(event.target.value);
+                  setReportPreview(null);
+                }}
+                className="mt-2 min-h-12 w-full rounded-2xl border border-gray-200 bg-white px-4 text-gray-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+              />
+            </label>
+            <label className="text-sm font-bold text-gray-700">
+              To
+              <input
+                type="date"
+                value={reportTo}
+                min={reportFrom}
+                max={toDateInput(new Date())}
+                onChange={(event) => {
+                  setReportTo(event.target.value);
+                  setReportPreview(null);
+                }}
+                className="mt-2 min-h-12 w-full rounded-2xl border border-gray-200 bg-white px-4 text-gray-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+              />
+            </label>
+          </div>
+
+          <fieldset>
+            <legend className="text-sm font-black text-gray-900">Metrics to include</legend>
+            <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {financeMetricOptions.map((option) => {
+                const selected = reportMetrics.includes(option.key);
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => toggleReportMetric(option.key)}
+                    className={`min-h-24 rounded-2xl border p-4 text-left transition-colors ${
+                      selected
+                        ? 'border-blue-500 bg-blue-50 text-blue-950'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                    }`}
+                  >
+                    <span className="block text-sm font-black">{option.label}</span>
+                    <span className="mt-1 block text-xs leading-relaxed opacity-75">{option.description}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handlePreviewReport}
+              disabled={reportLoading || reportMetrics.length === 0}
+              className="min-h-12 rounded-2xl bg-gray-950 px-6 text-xs font-black uppercase tracking-widest text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {reportLoading ? 'Preparing...' : 'Generate Preview'}
+            </button>
+            {canReview ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleReportExport('pdf')}
+                  disabled={exportingFormat !== null || reportMetrics.length === 0}
+                  className="min-h-12 rounded-2xl border border-orange-200 bg-orange-50 px-6 text-xs font-black uppercase tracking-widest text-orange-700 disabled:opacity-50"
+                >
+                  {exportingFormat === 'pdf' ? 'Exporting...' : 'Export PDF'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleReportExport('csv')}
+                  disabled={exportingFormat !== null || reportMetrics.length === 0}
+                  className="min-h-12 rounded-2xl border border-gray-200 bg-white px-6 text-xs font-black uppercase tracking-widest text-gray-700 disabled:opacity-50"
+                >
+                  {exportingFormat === 'csv' ? 'Exporting...' : 'Export CSV'}
+                </button>
+              </>
+            ) : (
+              <span className="rounded-2xl bg-amber-50 px-5 py-3 text-xs font-bold text-amber-800">
+                Finance Manager approval is required to export.
+              </span>
+            )}
+          </div>
+
+          {reportPreview && (
+            <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5 md:p-6">
+              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Preview</p>
+                  <h3 className="mt-1 font-black text-gray-950">{reportPreview.range.from} to {reportPreview.range.to}</h3>
+                </div>
+                <p className="text-xs font-bold text-gray-500">{reportPreview.range.timezone} | {reportPreview.successfulOrders} successful orders</p>
+              </div>
+              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {reportPreview.metrics.map((metric) => (
+                  <div key={metric.key} className="rounded-2xl border border-gray-200 bg-white p-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{metric.label}</p>
+                    <p className="mt-2 text-xl font-black text-gray-950">{money(metric.value)}</p>
+                    <p className="mt-2 text-xs leading-relaxed text-gray-500">{metric.basis}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
 
       {loading ? (
         <div className="p-20 flex justify-center">

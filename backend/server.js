@@ -1379,11 +1379,99 @@ const CATEGORY_LABELS = {
   '6': 'Books'
 };
 
-const buildAdminFinanceSummary = (db) => {
-  const orders = db.orders || [];
+const FINANCE_REPORT_METRICS = {
+  grossRevenue: 'Gross Revenue',
+  platformNetRevenue: 'Platform Net Revenue',
+  totalCommissionEarned: 'Commission Earned',
+  pendingCodValue: 'Pending COD Value'
+};
+
+const parseFinanceReportRange = (from, to) => {
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  const normalizedFrom = String(from || '').trim();
+  const normalizedTo = String(to || '').trim();
+
+  if (!datePattern.test(normalizedFrom) || !datePattern.test(normalizedTo)) {
+    const error = new Error('Choose a valid report start and end date.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const start = new Date(`${normalizedFrom}T00:00:00.000+02:00`);
+  const end = new Date(`${normalizedTo}T23:59:59.999+02:00`);
+  const durationDays = Math.floor((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || start > end) {
+    const error = new Error('The report start date must not be after the end date.');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (durationDays > 366) {
+    const error = new Error('Finance reports can cover a maximum of 366 days at a time.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return {
+    from: normalizedFrom,
+    to: normalizedTo,
+    startMs: start.getTime(),
+    endMs: end.getTime()
+  };
+};
+
+const parseFinanceReportMetrics = (metrics) => {
+  const requested = (Array.isArray(metrics) ? metrics : String(metrics || '').split(','))
+    .map((entry) => String(entry || '').trim())
+    .filter(Boolean);
+  const selected = [...new Set(requested)].filter((entry) => FINANCE_REPORT_METRICS[entry]);
+
+  if (selected.length === 0) {
+    const error = new Error('Select at least one finance metric for the report.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return selected;
+};
+
+const buildAdminFinanceSummary = (db, reportRange = null) => {
+  const allOrders = db.orders || [];
+  const successfulPaymentByOrder = new Map();
+  (db.payments || [])
+    .filter((payment) => payment.status === 'SUCCESS' && payment.orderId)
+    .forEach((payment) => {
+      const existing = successfulPaymentByOrder.get(payment.orderId);
+      const paymentTime = new Date(payment.reviewedAt || payment.verifiedAt || payment.updatedAt || payment.createdAt || 0).getTime();
+      const existingTime = new Date(existing?.reviewedAt || existing?.verifiedAt || existing?.updatedAt || existing?.createdAt || 0).getTime();
+      if (!existing || paymentTime >= existingTime) successfulPaymentByOrder.set(payment.orderId, payment);
+    });
+  const isWithinReportRange = (value) => {
+    if (!reportRange) return true;
+    const timestamp = new Date(value || 0).getTime();
+    return Number.isFinite(timestamp) && timestamp >= reportRange.startMs && timestamp <= reportRange.endMs;
+  };
+  const orders = reportRange
+    ? allOrders.filter((order) => {
+        if (order.paymentStatus === 'SUCCESS') {
+          const payment = successfulPaymentByOrder.get(order.id);
+          return isWithinReportRange(
+            payment?.reviewedAt ||
+            payment?.verifiedAt ||
+            payment?.updatedAt ||
+            payment?.createdAt ||
+            order.updatedAt ||
+            order.createdAt
+          );
+        }
+        return isWithinReportRange(order.createdAt);
+      })
+    : allOrders;
   const successfulOrders = orders.filter((order) => order.paymentStatus === 'SUCCESS');
   const productMap = new Map((db.products || []).map((product) => [product.id, product]));
-  const merchantPayouts = (db.transactions || []).filter((transaction) => transaction.type === 'payout');
+  const merchantPayouts = (db.transactions || []).filter(
+    (transaction) => transaction.type === 'payout' && isWithinReportRange(transaction.timestamp || transaction.createdAt)
+  );
   const categorySummaryMap = new Map();
 
   successfulOrders.forEach((order) => {
@@ -1474,6 +1562,29 @@ const buildAdminFinanceSummary = (db) => {
       pendingCount: merchantPayouts.filter((transaction) => transaction.status === 'pending').length,
       rejectedCount: merchantPayouts.filter((transaction) => transaction.status === 'failed').length
     }
+  };
+};
+
+const buildFinanceReport = (db, range, metrics) => {
+  const summary = buildAdminFinanceSummary(db, range);
+  const generatedAt = new Date().toISOString();
+
+  return {
+    range: {
+      from: range.from,
+      to: range.to,
+      timezone: 'Africa/Kigali'
+    },
+    generatedAt,
+    metrics: metrics.map((key) => ({
+      key,
+      label: FINANCE_REPORT_METRICS[key],
+      value: Number(summary.overview[key] || 0),
+      basis: key === 'pendingCodValue'
+        ? 'Current outstanding COD orders created in the selected period'
+        : 'Successful payments recorded in the selected period'
+    })),
+    successfulOrders: summary.overview.successfulOrders
   };
 };
 
@@ -3517,6 +3628,58 @@ const server = http.createServer(async (req, res) => {
 
       await writeDb(db);
       sendJson(res, 200, { settings: db.adminSettings });
+      return;
+    }
+
+    if (pathname === '/api/admin/finance/report' && req.method === 'GET') {
+      const user = await requireRole(req, res, ['ADMIN', 'FINANCE']);
+      if (!user) return;
+
+      const range = parseFinanceReportRange(url.searchParams.get('from'), url.searchParams.get('to'));
+      const metrics = parseFinanceReportMetrics(url.searchParams.get('metrics'));
+      const db = await readDb();
+      sendJson(res, 200, { report: buildFinanceReport(db, range, metrics) });
+      return;
+    }
+
+    if (pathname === '/api/admin/finance/report' && req.method === 'POST') {
+      const user = await requireRole(req, res, ['ADMIN', 'FINANCE']);
+      if (!user) return;
+      if (user.role === 'FINANCE' && user.staffLevel !== 'manager') {
+        sendJson(res, 403, { error: 'Finance manager approval is required to export reports.' });
+        return;
+      }
+
+      const body = await readBody(req);
+      const range = parseFinanceReportRange(body.from, body.to);
+      const metrics = parseFinanceReportMetrics(body.metrics);
+      const format = String(body.format || '').trim().toLowerCase();
+      if (!['pdf', 'csv'].includes(format)) {
+        sendJson(res, 400, { error: 'Finance report format must be PDF or CSV.' });
+        return;
+      }
+
+      const db = await readDb();
+      const report = buildFinanceReport(db, range, metrics);
+      await persistAuditLogRecord(createAuditLogRecord({
+        event: `Finance report exported (${format.toUpperCase()})`,
+        actor: user.name || user.email,
+        category: 'payments',
+        status: 'success',
+        metadata: {
+          from: range.from,
+          to: range.to,
+          timezone: report.range.timezone,
+          metrics,
+          format,
+          generatedAt: report.generatedAt,
+          generatedById: user.id,
+          generatedByRole: user.role,
+          generatedByLevel: user.staffLevel || 'admin'
+        }
+      }));
+
+      sendJson(res, 200, { report });
       return;
     }
 

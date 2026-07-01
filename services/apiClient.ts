@@ -412,6 +412,22 @@ export const apiClient = {
     return request('/admin/finance');
   },
 
+  async getAdminFinanceReport(params: { from: string; to: string; metrics: string[] }) {
+    const query = new URLSearchParams({
+      from: params.from,
+      to: params.to,
+      metrics: params.metrics.join(',')
+    });
+    return request(`/admin/finance/report?${query.toString()}`);
+  },
+
+  async exportAdminFinanceReport(params: { from: string; to: string; metrics: string[]; format: 'pdf' | 'csv' }) {
+    return request('/admin/finance/report', {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+  },
+
   async getAdminPaymentClaims() {
     return request('/admin/payment-claims');
   },

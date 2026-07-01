@@ -35,7 +35,7 @@ type AdminSettingsResponse = {
   };
 };
 
-type AdminFinanceResponse = {
+export type AdminFinanceResponse = {
   overview: {
     grossRevenue: number;
     onlineRevenue: number;
@@ -69,6 +69,28 @@ type AdminFinanceResponse = {
     pendingCount: number;
     rejectedCount: number;
   };
+};
+
+export type FinanceReportMetricKey =
+  | 'grossRevenue'
+  | 'platformNetRevenue'
+  | 'totalCommissionEarned'
+  | 'pendingCodValue';
+
+export type FinanceReport = {
+  range: {
+    from: string;
+    to: string;
+    timezone: string;
+  };
+  generatedAt: string;
+  metrics: Array<{
+    key: FinanceReportMetricKey;
+    label: string;
+    value: number;
+    basis: string;
+  }>;
+  successfulOrders: number;
 };
 
 type AdminPayout = {
@@ -142,6 +164,25 @@ export const AdminService = {
 
   getFinanceSummary: async (): Promise<AdminFinanceResponse> => {
     return apiClient.getAdminFinance();
+  },
+
+  getFinanceReport: async (params: {
+    from: string;
+    to: string;
+    metrics: FinanceReportMetricKey[];
+  }): Promise<FinanceReport> => {
+    const response = await apiClient.getAdminFinanceReport(params);
+    return response.report;
+  },
+
+  exportFinanceReport: async (params: {
+    from: string;
+    to: string;
+    metrics: FinanceReportMetricKey[];
+    format: 'pdf' | 'csv';
+  }): Promise<FinanceReport> => {
+    const response = await apiClient.exportAdminFinanceReport(params);
+    return response.report;
   },
 
   getPaymentClaims: async (): Promise<any[]> => {

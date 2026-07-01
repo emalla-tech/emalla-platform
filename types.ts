@@ -3,8 +3,13 @@ export enum UserRole {
   CUSTOMER = 'CUSTOMER',
   MERCHANT = 'MERCHANT',
   DELIVERY = 'DELIVERY',
-  ADMIN = 'ADMIN'
+  ADMIN = 'ADMIN',
+  LOGISTICS = 'LOGISTICS',
+  FINANCE = 'FINANCE',
+  SUPPORT = 'SUPPORT'
 }
+
+export type StaffLevel = 'officer' | 'manager';
 
 export enum PaymentStatus {
   PENDING = 'PENDING',
@@ -72,6 +77,14 @@ export interface User {
   createdAt: string;
   orderCount: number;
   mustChangePassword?: boolean;
+  staffLevel?: StaffLevel;
+  department?: string;
+  lastLoginAt?: string;
+}
+
+export interface StaffUser extends User {
+  role: UserRole.LOGISTICS | UserRole.FINANCE | UserRole.SUPPORT;
+  staffLevel: StaffLevel;
 }
 
 export interface Address {

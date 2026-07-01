@@ -11,6 +11,8 @@ import {
   readAdminStatsRecords,
   readAdminRiderRecords,
   readRiderDashboardRecords,
+  readStaffUserRecords,
+  updateStaffUserRecord,
   persistAuditLogRecord,
   readAuthUserRecordByIdentity,
   findLatestSellerApplicationRecordByEmail,
@@ -67,6 +69,8 @@ const ALLOWED_UPLOAD_FOLDERS = new Set([
   'e-malla/profiles'
 ]);
 const DEFAULT_SESSION_MAX_AGE_DAYS = 30;
+const STAFF_ROLES = new Set(['LOGISTICS', 'FINANCE', 'SUPPORT']);
+const STAFF_LEVELS = new Set(['officer', 'manager']);
 const PRODUCTS_CACHE_TTL_MS = 60 * 1000;
 const PUBLIC_INSIGHTS_CACHE_TTL_MS = 5 * 60 * 1000;
 const AUTH_RATE_LIMIT_STATE = new Map();
@@ -458,6 +462,11 @@ const isValidPassword = (value) => {
   return normalized.length >= 8 && normalized.length <= 128;
 };
 
+const isAccountAccessBlocked = (status) =>
+  ['suspended', 'banned', 'pending', 'rejected', 'inactive'].includes(
+    String(status || '').toLowerCase()
+  );
+
 const parseNonNegativeMoney = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
@@ -506,6 +515,10 @@ const getAuthorizedUser = async (req) => {
 
   const authRecord = await readAuthUserRecordByToken(token);
   if (!authRecord?.user) return null;
+  if (isAccountAccessBlocked(authRecord.user.status)) {
+    await deleteAuthTokenRecord(token);
+    return null;
+  }
 
   const createdAt = authRecord.createdAt;
   if (createdAt && Date.now() - new Date(createdAt).getTime() > getSessionMaxAgeMs()) {
@@ -1749,6 +1762,10 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 401, { error: 'Invalid credentials' });
         return;
       }
+      if (isAccountAccessBlocked(user.status)) {
+        sendJson(res, 403, { error: 'This account is not active. Contact an E-Malla administrator.' });
+        return;
+      }
 
       const nextPasswordHash = !isHashedPassword(user.password)
         ? hashPassword(String(body.password || ''))
@@ -2924,6 +2941,206 @@ const server = http.createServer(async (req, res) => {
       }
 
       sendJson(res, 200, { users: customers });
+      return;
+    }
+
+    if (pathname === '/api/admin/staff' && req.method === 'GET') {
+      const user = await requireRole(req, res, ['ADMIN']);
+      if (!user) return;
+
+      const staff = (await readStaffUserRecords()).map((entry) => sanitizeUser(entry));
+      sendJson(res, 200, { staff });
+      return;
+    }
+
+    if (pathname === '/api/admin/staff' && req.method === 'POST') {
+      const user = await requireRole(req, res, ['ADMIN']);
+      if (!user) return;
+
+      const body = await readBody(req);
+      const name = String(body.name || '').trim();
+      const email = String(body.email || '').toLowerCase().trim();
+      const phone = String(body.phone || '').trim();
+      const role = String(body.role || '').toUpperCase().trim();
+      const staffLevel = String(body.staffLevel || 'officer').toLowerCase().trim();
+
+      if (!isValidDisplayName(name)) {
+        sendJson(res, 400, { error: 'Staff name must be between 2 and 120 characters.' });
+        return;
+      }
+      if (!isValidEmail(email)) {
+        sendJson(res, 400, { error: 'A valid staff email is required.' });
+        return;
+      }
+      if (phone && !isValidPhone(phone)) {
+        sendJson(res, 400, { error: 'Enter a valid staff phone number.' });
+        return;
+      }
+      if (!STAFF_ROLES.has(role)) {
+        sendJson(res, 400, { error: 'Select Logistics, Finance, or Support as the staff department.' });
+        return;
+      }
+      if (!STAFF_LEVELS.has(staffLevel)) {
+        sendJson(res, 400, { error: 'Staff level must be officer or manager.' });
+        return;
+      }
+      if (await readAuthUserRecordByIdentity(email)) {
+        sendJson(res, 409, { error: 'An account with this email already exists.' });
+        return;
+      }
+
+      const username = await makeUniqueUsernameByLookup(`${name.split(' ')[0]}.${role.toLowerCase()}`);
+      const temporaryPassword = createTemporaryPassword();
+      const now = new Date().toISOString();
+      const staffUser = {
+        id: `STF-${Date.now()}`,
+        name,
+        username,
+        email,
+        phone,
+        password: hashPassword(temporaryPassword),
+        role,
+        staffLevel,
+        department: role.toLowerCase(),
+        status: 'active',
+        mustChangePassword: true,
+        createdBy: user.id,
+        createdAt: now,
+        updatedAt: now,
+        orderCount: 0
+      };
+      const savedStaff = await createAuthUserRecord(staffUser);
+      const hubRoutes = {
+        LOGISTICS: '/logistics',
+        FINANCE: '/finance',
+        SUPPORT: '/staff/support'
+      };
+      const hubUrl = buildPublicRoute(hubRoutes[role]);
+
+      sendPlatformEmailsInBackground([
+        {
+          to: email,
+          subject: `Your E-Malla ${role.charAt(0) + role.slice(1).toLowerCase()} Workspace Access`,
+          template: 'staff_account_created',
+          body: `Your E-Malla staff account is ready. Username: ${username}. Temporary password: ${temporaryPassword}. Sign in: ${hubUrl}`,
+          html: createEmailHtml({
+            title: 'Your staff workspace is ready',
+            intro: `Muraho ${name}. Wahawe access ya ${role.toLowerCase()} kuri E-Malla Rwanda.`,
+            sections: [
+              { label: 'Department', value: role },
+              { label: 'Access Level', value: staffLevel.toUpperCase() },
+              { label: 'Username', value: username },
+              { label: 'Temporary Password', value: temporaryPassword },
+              { label: 'Workspace', value: hubUrl }
+            ],
+            closing: 'Injira ukoresheje temporary password, uhite uyihindura mbere yo gukomeza.',
+            primaryAction: { label: 'Open Staff Workspace', url: hubUrl },
+            support: {
+              email: 'support@emallarwanda.com',
+              url: buildPublicRoute('/contact')
+            }
+          })
+        }
+      ], {
+        event: 'staff_account_created',
+        staffId: savedStaff.id,
+        role
+      });
+
+      void persistAuditLogRecord(createAuditLogRecord({
+        event: `Staff account created: ${name}`,
+        actor: user.name || user.email,
+        category: 'security',
+        status: 'success',
+        metadata: {
+          staffId: savedStaff.id,
+          staffEmail: email,
+          role,
+          staffLevel
+        }
+      })).catch((error) => {
+        structuredLog('error', 'staff_audit_persist_failed', {
+          staffId: savedStaff.id,
+          error: sanitizeMonitoringText(error instanceof Error ? error.message : error)
+        });
+      });
+
+      sendJson(res, 201, { staff: sanitizeUser(savedStaff), credentialsSent: true });
+      return;
+    }
+
+    if (pathname.startsWith('/api/admin/staff/') && req.method === 'PUT') {
+      const user = await requireRole(req, res, ['ADMIN']);
+      if (!user) return;
+
+      const staffId = pathname.split('/')[4];
+      const staff = (await readStaffUserRecords()).find((entry) => entry.id === staffId);
+      if (!staff) {
+        sendJson(res, 404, { error: 'Staff account not found.' });
+        return;
+      }
+
+      const body = await readBody(req);
+      const name = String(body.name ?? staff.name).trim();
+      const phone = String(body.phone ?? staff.phone ?? '').trim();
+      const role = String(body.role ?? staff.role).toUpperCase().trim();
+      const staffLevel = String(body.staffLevel ?? staff.staffLevel ?? 'officer').toLowerCase().trim();
+      const status = String(body.status ?? staff.status ?? 'active').toLowerCase().trim();
+
+      if (!isValidDisplayName(name) || (phone && !isValidPhone(phone))) {
+        sendJson(res, 400, { error: 'Enter valid staff profile information.' });
+        return;
+      }
+      if (!STAFF_ROLES.has(role) || !STAFF_LEVELS.has(staffLevel) || !['active', 'suspended'].includes(status)) {
+        sendJson(res, 400, { error: 'Invalid staff role, level, or account status.' });
+        return;
+      }
+
+      const permissionsChanged =
+        role !== staff.role ||
+        staffLevel !== (staff.staffLevel || 'officer') ||
+        status !== staff.status;
+      const updatedStaff = await updateStaffUserRecord({
+        id: staff.id,
+        name,
+        phone,
+        role,
+        staffLevel,
+        status,
+        updatedBy: user.id,
+        updatedAt: new Date().toISOString()
+      });
+      if (!updatedStaff) {
+        sendJson(res, 404, { error: 'Staff account could not be updated.' });
+        return;
+      }
+
+      if (permissionsChanged) {
+        await deleteAuthTokensForUser(staff.id);
+      }
+      void persistAuditLogRecord(createAuditLogRecord({
+        event: `Staff account updated: ${updatedStaff.name}`,
+        actor: user.name || user.email,
+        category: 'security',
+        status: status === 'active' ? 'success' : 'info',
+        metadata: {
+          staffId: updatedStaff.id,
+          previousRole: staff.role,
+          nextRole: role,
+          previousLevel: staff.staffLevel || 'officer',
+          nextLevel: staffLevel,
+          previousStatus: staff.status,
+          nextStatus: status,
+          sessionsRevoked: permissionsChanged
+        }
+      })).catch((error) => {
+        structuredLog('error', 'staff_audit_persist_failed', {
+          staffId: updatedStaff.id,
+          error: sanitizeMonitoringText(error instanceof Error ? error.message : error)
+        });
+      });
+
+      sendJson(res, 200, { staff: sanitizeUser(updatedStaff), sessionsRevoked: permissionsChanged });
       return;
     }
 

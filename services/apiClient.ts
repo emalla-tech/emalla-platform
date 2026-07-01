@@ -455,6 +455,39 @@ export const apiClient = {
     return request(`/admin/users${search}`);
   },
 
+  async getAdminStaff() {
+    return request('/admin/staff');
+  },
+
+  async createAdminStaff(params: {
+    name: string;
+    email: string;
+    phone?: string;
+    role: 'LOGISTICS' | 'FINANCE' | 'SUPPORT';
+    staffLevel: 'officer' | 'manager';
+  }) {
+    return request('/admin/staff', {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+  },
+
+  async updateAdminStaff(
+    staffId: string,
+    params: {
+      name?: string;
+      phone?: string;
+      role?: 'LOGISTICS' | 'FINANCE' | 'SUPPORT';
+      staffLevel?: 'officer' | 'manager';
+      status?: 'active' | 'suspended';
+    }
+  ) {
+    return request(`/admin/staff/${staffId}`, {
+      method: 'PUT',
+      body: JSON.stringify(params)
+    });
+  },
+
   async getAdminInquiries(type: string = 'all') {
     const search = type && type !== 'all' ? `?type=${encodeURIComponent(type)}` : '';
     return request(`/admin/inquiries${search}`);

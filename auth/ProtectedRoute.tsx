@@ -2,6 +2,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import { isStaffRole } from './roleRouting';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -32,6 +33,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     location.pathname !== '/seller/change-password'
   ) {
     return <Navigate to="/seller/change-password" replace />;
+  }
+  if (
+    isStaffRole(user?.role) &&
+    user?.mustChangePassword &&
+    location.pathname !== '/staff/change-password'
+  ) {
+    return <Navigate to="/staff/change-password" replace />;
   }
 
   return <>{children}</>;

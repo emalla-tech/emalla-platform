@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, KeyRound, Lock, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
+import { getRoleHome, isStaffRole } from '../../auth/roleRouting';
 
 const SellerPasswordReset: React.FC = () => {
   const navigate = useNavigate();
   const { changePassword, user } = useAuth();
+  const staffAccount = isStaffRole(user?.role);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -30,7 +32,7 @@ const SellerPasswordReset: React.FC = () => {
     setError(null);
     try {
       await changePassword(currentPassword, newPassword);
-      navigate('/seller', { replace: true });
+      navigate(getRoleHome(user?.role), { replace: true });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Unable to change password.');
     } finally {
@@ -44,10 +46,12 @@ const SellerPasswordReset: React.FC = () => {
         <div className="w-16 h-16 rounded-[24px] bg-orange-50 text-orange-600 flex items-center justify-center mb-6">
           <KeyRound size={30} />
         </div>
-        <p className="text-[10px] font-black uppercase tracking-[0.35em] text-orange-500">Seller Security</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.35em] text-orange-500">
+          {staffAccount ? 'Staff Security' : 'Seller Security'}
+        </p>
         <h1 className="text-3xl md:text-4xl font-black text-gray-900 mt-4">Change Your Temporary Password</h1>
         <p className="text-gray-500 mt-4 leading-relaxed">
-          {user?.name ? `${user.name}, ` : ''}for security, Seller Hub requires a new password before your first session can continue.
+          {user?.name ? `${user.name}, ` : ''}for security, {staffAccount ? 'your staff workspace' : 'Seller Hub'} requires a new password before your first session can continue.
         </p>
 
         {error ? (

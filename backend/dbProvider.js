@@ -101,6 +101,32 @@ const getJsonAdapter = () => {
         transactions: (snapshot.transactions || []).filter((entry) => entry.userId === userId)
       };
     },
+    readStaffUsers: async () => {
+      const snapshot = await jsonDb.readDb();
+      return (snapshot.users || [])
+        .filter((entry) => ['LOGISTICS', 'FINANCE', 'SUPPORT'].includes(entry.role))
+        .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime());
+    },
+    updateStaffUser: async (payload) => {
+      const snapshot = await jsonDb.readDb();
+      const index = (snapshot.users || []).findIndex(
+        (entry) => entry.id === payload.id && ['LOGISTICS', 'FINANCE', 'SUPPORT'].includes(entry.role)
+      );
+      if (index === -1) return null;
+      snapshot.users[index] = {
+        ...snapshot.users[index],
+        name: payload.name,
+        role: payload.role,
+        status: payload.status,
+        phone: payload.phone || '',
+        staffLevel: payload.staffLevel,
+        department: String(payload.role || '').toLowerCase(),
+        updatedBy: payload.updatedBy,
+        updatedAt: payload.updatedAt || new Date().toISOString()
+      };
+      await jsonDb.writeDb(snapshot);
+      return snapshot.users[index];
+    },
     saveAuditLog: async (entry) => {
       const snapshot = await jsonDb.readDb();
       snapshot.auditLogs = snapshot.auditLogs || [];
@@ -358,6 +384,8 @@ const createActiveAdapter = () => {
       readAdminStatsData: () => callWithFallback('readAdminStatsData'),
       readAdminRidersData: () => callWithFallback('readAdminRidersData'),
       readRiderDashboardData: (userId) => callWithFallback('readRiderDashboardData', userId),
+      readStaffUsers: () => callWithFallback('readStaffUsers'),
+      updateStaffUser: (payload) => callWithFallback('updateStaffUser', payload),
       saveAuditLog: (entry) => callWithFallback('saveAuditLog', entry),
       readAuthUserByIdentity: (identity) => callWithFallback('readAuthUserByIdentity', identity),
       findLatestSellerApplicationByEmail: (email) => callWithFallback('findLatestSellerApplicationByEmail', email),
@@ -501,6 +529,21 @@ export const readRiderDashboardData = async (userId) => {
     orders: (snapshot.orders || []).filter((entry) => entry.riderId === userId),
     transactions: (snapshot.transactions || []).filter((entry) => entry.userId === userId)
   };
+};
+
+export const readStaffUsers = async () => {
+  const adapter = getAdapter();
+  if (typeof adapter.readStaffUsers === 'function') {
+    return adapter.readStaffUsers();
+  }
+  return [];
+};
+
+export const updateStaffUser = async (payload) => {
+  const adapter = getAdapter();
+  if (typeof adapter.updateStaffUser === 'function') {
+    return adapter.updateStaffUser(payload);
+  }
 };
 
 export const saveAuditLog = async (entry) => {

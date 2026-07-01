@@ -1,4 +1,4 @@
-import { Order, OrderStatus, Product, Merchant, Rider, RiderApplication } from '../types';
+import { Order, OrderStatus, Product, Merchant, Rider, RiderApplication, StaffLevel, StaffUser, UserRole } from '../types';
 import { apiClient } from './apiClient';
 import { OrderService } from './orderService';
 
@@ -196,6 +196,36 @@ export const AdminService = {
   getUsers: async (status: string = 'all'): Promise<any[]> => {
     const response = await apiClient.getAdminUsers(status);
     return response.users || [];
+  },
+
+  getStaff: async (): Promise<StaffUser[]> => {
+    const response = await apiClient.getAdminStaff();
+    return response.staff || [];
+  },
+
+  createStaff: async (params: {
+    name: string;
+    email: string;
+    phone?: string;
+    role: UserRole.LOGISTICS | UserRole.FINANCE | UserRole.SUPPORT;
+    staffLevel: StaffLevel;
+  }): Promise<StaffUser> => {
+    const response = await apiClient.createAdminStaff(params);
+    return response.staff;
+  },
+
+  updateStaff: async (
+    staffId: string,
+    params: {
+      name?: string;
+      phone?: string;
+      role?: UserRole.LOGISTICS | UserRole.FINANCE | UserRole.SUPPORT;
+      staffLevel?: StaffLevel;
+      status?: 'active' | 'suspended';
+    }
+  ): Promise<StaffUser> => {
+    const response = await apiClient.updateAdminStaff(staffId, params);
+    return response.staff;
   },
 
   getInquiries: async (type: string = 'all'): Promise<any[]> => {

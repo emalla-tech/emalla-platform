@@ -39,6 +39,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { name: 'Merchants', path: '/admin/dashboard/sellers', icon: <Store size={20} /> },
     { name: 'Products', path: '/admin/dashboard/products', icon: <FileText size={20} /> },
     { name: 'Customers', path: '/admin/dashboard/users', icon: <Users size={20} /> },
+    { name: 'Team Access', path: '/admin/dashboard/staff', icon: <Shield size={20} /> },
     { name: 'Support Desk', path: '/admin/dashboard/inquiries', icon: <Mail size={20} /> },
     { name: 'Emails', path: '/admin/dashboard/emails', icon: <Mail size={20} /> },
     { name: 'Logistics', path: '/admin/dashboard/logistics', icon: <Truck size={20} /> },

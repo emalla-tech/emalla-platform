@@ -8,6 +8,8 @@ import {
   readAdminStatsData,
   readAdminRidersData,
   readRiderDashboardData,
+  readStaffUsers,
+  updateStaffUser,
   saveAuditLog,
   readAuthUserByIdentity,
   findLatestSellerApplicationByEmail,
@@ -53,6 +55,8 @@ export const databaseService = {
   readAdminStatsData: () => readAdminStatsData(),
   readAdminRidersData: () => readAdminRidersData(),
   readRiderDashboardData: (userId) => readRiderDashboardData(userId),
+  readStaffUsers: () => readStaffUsers(),
+  updateStaffUser: (payload) => updateStaffUser(payload),
   saveAuditLog: (entry) => saveAuditLog(entry),
   readAuthUserByIdentity: (identity) => readAuthUserByIdentity(identity),
   findLatestSellerApplicationByEmail: (email) => findLatestSellerApplicationByEmail(email),
@@ -81,6 +85,8 @@ export const readPublicInsightsRecords = () => databaseService.readPublicInsight
 export const readAdminStatsRecords = () => databaseService.readAdminStatsData();
 export const readAdminRiderRecords = () => databaseService.readAdminRidersData();
 export const readRiderDashboardRecords = (userId) => databaseService.readRiderDashboardData(userId);
+export const readStaffUserRecords = () => databaseService.readStaffUsers();
+export const updateStaffUserRecord = (payload) => databaseService.updateStaffUser(payload);
 export const persistAuditLogRecord = (entry) => databaseService.saveAuditLog(entry);
 export const readAuthUserRecordByIdentity = (identity) => databaseService.readAuthUserByIdentity(identity);
 export const findLatestSellerApplicationRecordByEmail = (email) => databaseService.findLatestSellerApplicationByEmail(email);

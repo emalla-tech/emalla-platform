@@ -33,6 +33,7 @@ import { useCart } from './hooks/useCart';
 import ProtectedRoute from './auth/ProtectedRoute';
 import RoleRoute from './auth/RoleRoute';
 import { useAuth } from './auth/AuthContext';
+import { getRoleHome } from './auth/roleRouting';
 
 const Home = lazy(() => import('./pages/Home'));
 const BecomeSeller = lazy(() => import('./pages/BecomeSeller'));
@@ -70,6 +71,9 @@ const AdminSettings = lazy(() => import('./admin/pages/AdminSettings'));
 const CustomerManagement = lazy(() => import('./admin/pages/CustomerManagement'));
 const InquiryManagement = lazy(() => import('./admin/pages/InquiryManagement'));
 const EmailLogsPage = lazy(() => import('./admin/pages/EmailLogsPage'));
+const StaffManagement = lazy(() => import('./admin/pages/StaffManagement'));
+const StaffLayout = lazy(() => import('./staff/StaffLayout'));
+const StaffOverview = lazy(() => import('./staff/pages/StaffOverview'));
 const MerchantDashboard = lazy(() => import('./pages/Dashboard/MerchantDashboard'));
 const MerchantInventory = lazy(() => import('./merchant/pages/Inventory'));
 const MerchantOrders = lazy(() => import('./merchant/pages/Orders'));
@@ -385,6 +389,7 @@ const App: React.FC = () => {
                     <Route path="notifications" element={user ? <NotificationList userId={user.id} role={UserRole.ADMIN} /> : <RouteLoader />} />
                     <Route path="sellers" element={withSuspense(<SellerApplications />)} />
                     <Route path="users" element={withSuspense(<CustomerManagement />)} />
+                    <Route path="staff" element={withSuspense(<StaffManagement />)} />
                     <Route path="inquiries" element={withSuspense(<InquiryManagement />)} />
                     <Route path="emails" element={withSuspense(<EmailLogsPage />)} />
                     <Route path="logistics" element={withSuspense(<RiderManagement />)} />
@@ -396,6 +401,62 @@ const App: React.FC = () => {
                     <Route path="*" element={<Navigate to="/admin/dashboard" />} />
                   </Routes>
                 </AdminLayout>)}
+              </RoleRoute>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/staff/change-password" element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={[UserRole.LOGISTICS, UserRole.FINANCE, UserRole.SUPPORT]}>
+                {withSuspense(<SellerPasswordReset />)}
+              </RoleRoute>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/logistics/*" element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={[UserRole.LOGISTICS]}>
+                {withSuspense(
+                  <StaffLayout>
+                    <Routes>
+                      <Route index element={withSuspense(<StaffOverview />)} />
+                      <Route path="notifications" element={user ? <NotificationList userId={user.id} role={UserRole.LOGISTICS} /> : <RouteLoader />} />
+                      <Route path="*" element={<Navigate to="/logistics" replace />} />
+                    </Routes>
+                  </StaffLayout>
+                )}
+              </RoleRoute>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/finance/*" element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={[UserRole.FINANCE]}>
+                {withSuspense(
+                  <StaffLayout>
+                    <Routes>
+                      <Route index element={withSuspense(<StaffOverview />)} />
+                      <Route path="notifications" element={user ? <NotificationList userId={user.id} role={UserRole.FINANCE} /> : <RouteLoader />} />
+                      <Route path="*" element={<Navigate to="/finance" replace />} />
+                    </Routes>
+                  </StaffLayout>
+                )}
+              </RoleRoute>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/staff/support/*" element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={[UserRole.SUPPORT]}>
+                {withSuspense(
+                  <StaffLayout>
+                    <Routes>
+                      <Route index element={withSuspense(<StaffOverview />)} />
+                      <Route path="notifications" element={user ? <NotificationList userId={user.id} role={UserRole.SUPPORT} /> : <RouteLoader />} />
+                      <Route path="*" element={<Navigate to="/staff/support" replace />} />
+                    </Routes>
+                  </StaffLayout>
+                )}
               </RoleRoute>
             </ProtectedRoute>
           } />
@@ -507,10 +568,7 @@ const App: React.FC = () => {
             path="/dashboard/*"
             element={
               !user ? <Navigate to="/login" replace /> :
-              user.role === UserRole.ADMIN ? <Navigate to="/admin/dashboard" replace /> :
-              user?.role === UserRole.MERCHANT ? <Navigate to="/seller" replace /> :
-              user?.role === UserRole.DELIVERY ? <Navigate to="/rider" replace /> :
-              <Navigate to="/buyer" replace />
+              <Navigate to={getRoleHome(user.role)} replace />
             }
           />
           </Routes>

@@ -21,6 +21,7 @@
     "db:postgres:import": "node ./scripts/import-latest-postgres-migration.mjs",
     "db:postgres:check": "node ./scripts/check-postgres-readiness.mjs",
     "launch:cleanup": "node ./scripts/cleanup-test-commerce.mjs",
+    "staff:check": "node ./scripts/check-staff-foundation.mjs",
     "storage:migrate:products": "node ./scripts/migrate-product-images-to-files.mjs",
     "email:check": "node ./scripts/check-email-config.mjs",
     "storage:check": "node ./scripts/check-storage-config.mjs",

@@ -4,7 +4,7 @@ import { DEFAULT_CATEGORY_SEEDS, getCategorySeedMap } from './databaseReference.
 let pool;
 
 const READ_COLUMNS = {
-  users: 'users.id, users.name, users.username, users.email, users.password, users.role, users.status, users.phone, users.avatar, users.must_change_password, users.last_login_at, users.password_changed_at, users.created_at, users.updated_at',
+  users: 'users.id, users.name, users.username, users.email, users.password, users.role, users.status, users.phone, users.avatar, users.must_change_password, users.last_login_at, users.password_changed_at, users.created_at, users.updated_at, users.metadata',
   categories: 'id, name, slug, description, icon_key, sort_order, is_active, created_at, updated_at',
   seller_profiles: "user_id, business_name, primary_category_id, support_email, CASE WHEN COALESCE(logo_url, '') LIKE 'data:%' THEN NULL ELSE logo_url END AS logo_url, CASE WHEN COALESCE(cover_url, '') LIKE 'data:%' THEN NULL ELSE cover_url END AS cover_url, commission_rate, total_sales, gross_sales, commission_amount, documents_verified, created_at, updated_at",
   buyer_profiles: 'user_id, preferred_language, last_order_at, created_at, updated_at',
@@ -90,6 +90,7 @@ const databaseUserRef = (value) => {
     ? normalized
     : null;
 };
+const STAFF_ROLES = ['LOGISTICS', 'FINANCE', 'SUPPORT'];
 const dedupeById = (items = []) => {
   const seen = new Set();
   return items.filter((item) => {
@@ -482,6 +483,13 @@ export const getPostgresStatus = () => {
   };
 };
 
+export const closePostgresPool = async () => {
+  if (!pool) return;
+  const activePool = pool;
+  pool = undefined;
+  await activePool.end();
+};
+
 export const createPostgresAdapter = () => {
   const status = getPostgresStatus();
 
@@ -697,6 +705,56 @@ export const createPostgresAdapter = () => {
           type: row.metadata?.type || ''
         }))
       };
+    },
+
+    async readStaffUsers() {
+      const result = await query(
+        `SELECT ${READ_COLUMNS.users}
+         FROM users
+         WHERE role = ANY($1::text[])
+         ORDER BY created_at DESC`,
+        [STAFF_ROLES]
+      );
+      return result.rows.map(mapUser);
+    },
+
+    async updateStaffUser(payload) {
+      const timestamp = payload.updatedAt || new Date().toISOString();
+      const metadataPatch = {
+        staffLevel: payload.staffLevel,
+        department: String(payload.role || '').toLowerCase(),
+        updatedBy: payload.updatedBy,
+        staffUpdatedAt: timestamp
+      };
+      const result = await query(
+        `UPDATE users
+         SET
+           name = $2,
+           role = $3,
+           status = $4,
+           phone = $5,
+           metadata = COALESCE(metadata, '{}'::jsonb) || $6::jsonb,
+           updated_at = $7
+         WHERE id = $1 AND role = ANY($8::text[])
+         RETURNING id`,
+        [
+          payload.id,
+          payload.name,
+          payload.role,
+          payload.status,
+          payload.phone || null,
+          JSON.stringify(metadataPatch),
+          timestamp,
+          STAFF_ROLES
+        ]
+      );
+      if (!result.rows[0]?.id) return null;
+
+      const updated = await query(
+        `SELECT ${READ_COLUMNS.users} FROM users WHERE id = $1 LIMIT 1`,
+        [payload.id]
+      );
+      return updated.rows[0] ? mapUser(updated.rows[0]) : null;
     },
 
     async saveAuditLog(entry) {

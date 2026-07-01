@@ -5,6 +5,7 @@ import { UserRole } from '../types';
 import { useAuth } from '../auth/AuthContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { apiClient } from '../services/apiClient';
+import { canRoleAccessPath, getRoleHome, isStaffRole } from '../auth/roleRouting';
 
 interface LoginProps {
   onLoginSuccess?: (role: UserRole) => void;
@@ -28,15 +29,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     apiClient.warmBackend().catch(() => undefined);
   }, []);
 
-  const canAccessPath = (role: UserRole, targetPath: string) => {
-    if (!targetPath) return false;
-    if (targetPath.startsWith('/buyer')) return role === UserRole.CUSTOMER;
-    if (targetPath.startsWith('/seller')) return role === UserRole.MERCHANT;
-    if (targetPath.startsWith('/rider')) return role === UserRole.DELIVERY;
-    if (targetPath.startsWith('/admin')) return role === UserRole.ADMIN;
-    return true;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -52,12 +44,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
       if (authenticatedRole === UserRole.MERCHANT && authenticatedUser.mustChangePassword) {
         navigate('/seller/change-password');
-      } else if (nextPath && canAccessPath(authenticatedRole, nextPath)) {
+      } else if (isStaffRole(authenticatedRole) && authenticatedUser.mustChangePassword) {
+        navigate('/staff/change-password');
+      } else if (nextPath && canRoleAccessPath(authenticatedRole, nextPath)) {
         navigate(nextPath);
-      } else if (authenticatedRole === UserRole.ADMIN) {
-        navigate('/admin/dashboard');
       } else {
-        navigate('/dashboard');
+        navigate(getRoleHome(authenticatedRole));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed. Please check your credentials.');

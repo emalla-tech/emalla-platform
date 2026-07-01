@@ -4,3 +4,4 @@
 
 \i backend/sql/migrations/001_initial_supabase_schema.sql
 \i backend/sql/migrations/002_seed_reference_data.sql
+\i backend/sql/migrations/003_expand_staff_user_roles.sql

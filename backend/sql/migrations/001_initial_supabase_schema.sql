@@ -18,7 +18,15 @@ CREATE TABLE IF NOT EXISTS users (
   username text UNIQUE,
   email text UNIQUE NOT NULL,
   password text NOT NULL,
-  role text NOT NULL CHECK (role IN ('ADMIN', 'CUSTOMER', 'MERCHANT', 'DELIVERY')),
+  role text NOT NULL CHECK (role IN (
+    'ADMIN',
+    'CUSTOMER',
+    'MERCHANT',
+    'DELIVERY',
+    'LOGISTICS',
+    'FINANCE',
+    'SUPPORT'
+  )),
   status text NOT NULL DEFAULT 'active',
   phone text,
   avatar text,

@@ -20,6 +20,7 @@
     "db:postgres:seed": "node ./scripts/seed-postgres-reference-data.mjs",
     "db:postgres:import": "node ./scripts/import-latest-postgres-migration.mjs",
     "db:postgres:check": "node ./scripts/check-postgres-readiness.mjs",
+    "launch:cleanup": "node ./scripts/cleanup-test-commerce.mjs",
     "storage:migrate:products": "node ./scripts/migrate-product-images-to-files.mjs",
     "email:check": "node ./scripts/check-email-config.mjs",
     "storage:check": "node ./scripts/check-storage-config.mjs",

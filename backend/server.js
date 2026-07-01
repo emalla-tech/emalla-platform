@@ -3145,7 +3145,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/admin/payouts' && req.method === 'GET') {
-      const user = await requireRole(req, res, ['ADMIN']);
+      const user = await requireRole(req, res, ['ADMIN', 'FINANCE']);
       if (!user) return;
 
       const db = await readDb();
@@ -3154,8 +3154,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname.startsWith('/api/admin/payouts/') && pathname.endsWith('/status') && req.method === 'PUT') {
-      const user = await requireRole(req, res, ['ADMIN']);
+      const user = await requireRole(req, res, ['ADMIN', 'FINANCE']);
       if (!user) return;
+      if (user.role === 'FINANCE' && user.staffLevel !== 'manager') {
+        sendJson(res, 403, { error: 'Finance manager approval is required for payout decisions.' });
+        return;
+      }
 
       const payoutId = pathname.split('/')[4];
       const body = await readBody(req);
@@ -3174,6 +3178,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const currentTransaction = db.transactions[transactionIndex];
+      const merchant = (db.users || []).find((entry) => entry.id === currentTransaction.userId);
       if (currentTransaction.status !== 'pending') {
         sendJson(res, 400, { error: 'Only pending payouts can be reviewed.' });
         return;
@@ -3233,7 +3238,9 @@ const server = http.createServer(async (req, res) => {
           payoutId: currentTransaction.id,
           merchantId: currentTransaction.userId,
           amount: currentTransaction.amount,
-          nextStatus
+          nextStatus,
+          reviewerRole: user.role,
+          reviewerLevel: user.staffLevel || 'admin'
         }
       });
 
@@ -3514,7 +3521,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/admin/finance' && req.method === 'GET') {
-      const user = await requireRole(req, res, ['ADMIN']);
+      const user = await requireRole(req, res, ['ADMIN', 'FINANCE']);
       if (!user) return;
 
       const db = await readDb();
@@ -3523,7 +3530,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/admin/payment-claims' && req.method === 'GET') {
-      const user = await requireRole(req, res, ['ADMIN']);
+      const user = await requireRole(req, res, ['ADMIN', 'FINANCE']);
       if (!user) return;
 
       const db = await readDb();
@@ -3547,8 +3554,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname.startsWith('/api/admin/payment-claims/') && pathname.endsWith('/status') && req.method === 'PUT') {
-      const user = await requireRole(req, res, ['ADMIN']);
+      const user = await requireRole(req, res, ['ADMIN', 'FINANCE']);
       if (!user) return;
+      if (user.role === 'FINANCE' && user.staffLevel !== 'manager') {
+        sendJson(res, 403, { error: 'Finance manager approval is required for payment decisions.' });
+        return;
+      }
 
       const paymentId = pathname.split('/')[4];
       const body = await readBody(req);
@@ -3618,7 +3629,14 @@ const server = http.createServer(async (req, res) => {
         actor: user.name || user.email,
         category: 'payments',
         status: approved ? 'success' : 'error',
-        metadata: { orderId: order.id, paymentId: payment.id, bankReference: payment.bankReference, decision }
+        metadata: {
+          orderId: order.id,
+          paymentId: payment.id,
+          bankReference: payment.bankReference,
+          decision,
+          reviewerRole: user.role,
+          reviewerLevel: user.staffLevel || 'admin'
+        }
       });
       await persistCheckoutBundleRecord({
         orders: [db.orders[orderIndex]],

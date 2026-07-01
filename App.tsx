@@ -435,7 +435,7 @@ const App: React.FC = () => {
                 {withSuspense(
                   <StaffLayout>
                     <Routes>
-                      <Route index element={withSuspense(<StaffOverview />)} />
+                      <Route index element={withSuspense(<FinanceOverview />)} />
                       <Route path="notifications" element={user ? <NotificationList userId={user.id} role={UserRole.FINANCE} /> : <RouteLoader />} />
                       <Route path="*" element={<Navigate to="/finance" replace />} />
                     </Routes>

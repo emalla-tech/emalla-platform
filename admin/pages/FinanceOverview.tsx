@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Banknote, CreditCard, DollarSign, ReceiptText, Wallet } from 'lucide-react';
 import { BarChart, Bar, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { useAuth } from '../../auth/AuthContext';
 import { AdminService } from '../../services/adminService';
 import AdminToast from '../../components/AdminToast';
 import { downloadCsv, html, printPdfDocument, renderTableRows } from '../../lib/documentExport';
+import { UserRole } from '../../types';
 
 type FinanceSummary = {
   overview: {
@@ -68,6 +70,7 @@ const money = (value: number) => `RWF ${Number(value || 0).toLocaleString()}`;
 const chartColors = ['#f97316', '#0f766e', '#2563eb', '#eab308', '#db2777', '#7c3aed'];
 
 const FinanceOverview: React.FC = () => {
+  const { user } = useAuth();
   const [summary, setSummary] = useState<FinanceSummary>(defaultSummary);
   const [payouts, setPayouts] = useState<any[]>([]);
   const [paymentClaims, setPaymentClaims] = useState<any[]>([]);
@@ -76,8 +79,12 @@ const FinanceOverview: React.FC = () => {
   const [messageTone, setMessageTone] = useState<'success' | 'error' | 'info'>('success');
   const [busyPayoutId, setBusyPayoutId] = useState<string | null>(null);
   const [busyClaimId, setBusyClaimId] = useState<string | null>(null);
+  const isFinanceWorkspace = user?.role === UserRole.FINANCE;
+  const canReview = user?.role === UserRole.ADMIN || (isFinanceWorkspace && user.staffLevel === 'manager');
 
   useEffect(() => {
+    let active = true;
+
     const load = async () => {
       setLoading(true);
       try {
@@ -86,6 +93,7 @@ const FinanceOverview: React.FC = () => {
           AdminService.getPayouts(),
           AdminService.getPaymentClaims()
         ]);
+        if (!active) return;
         setSummary({
           overview: data.overview || defaultSummary.overview,
           categoryCommission: data.categoryCommission || [],
@@ -94,12 +102,20 @@ const FinanceOverview: React.FC = () => {
         });
         setPayouts(payoutData);
         setPaymentClaims(claimData);
+      } catch (error) {
+        if (!active) return;
+        setMessageTone('error');
+        setMessage(error instanceof Error ? error.message : 'Unable to load finance operations.');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     load();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const commissionChartData = summary.categoryCommission.slice(0, 6).map((entry) => ({
@@ -362,10 +378,13 @@ const FinanceOverview: React.FC = () => {
       <AdminToast message={message} tone={messageTone} />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
-          <h1 className="text-3xl font-black text-gray-900">Finance Command Center</h1>
-          <p className="text-gray-500">Monitor platform earnings, category commissions, merchant payouts, and cash exposure in one place.</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-blue-600">
+            {isFinanceWorkspace ? 'Protected Finance Workspace' : 'Admin Financial Oversight'}
+          </p>
+          <h1 className="mt-2 text-3xl font-black text-gray-900">Finance Command Center</h1>
+          <p className="mt-1 text-gray-500">Verify payments, reconcile collections, and control merchant settlements from live platform data.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleExportFinancePdf}
             className="bg-orange-50 border border-orange-200 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-widest text-orange-600 hover:bg-orange-100"
@@ -383,6 +402,19 @@ const FinanceOverview: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {isFinanceWorkspace && (
+        <div className={`rounded-2xl border px-5 py-4 text-sm ${
+          canReview
+            ? 'border-emerald-100 bg-emerald-50 text-emerald-800'
+            : 'border-amber-100 bg-amber-50 text-amber-800'
+        }`}>
+          <span className="font-black">{canReview ? 'Manager controls active.' : 'Read-only finance access.'}</span>{' '}
+          {canReview
+            ? 'Payment and payout decisions are recorded in the audit trail.'
+            : 'A Finance Manager must approve or reject payments and payouts.'}
+        </div>
+      )}
 
       {loading ? (
         <div className="p-20 flex justify-center">
@@ -609,9 +641,9 @@ const FinanceOverview: React.FC = () => {
               ) : paymentClaims.map((claim) => (
                 <div key={claim.id} className="px-8 py-5 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
                   <div>
-                    <p className="text-sm font-black text-gray-900">{claim.orderNumber} · {claim.customerName}</p>
+                    <p className="text-sm font-black text-gray-900">{claim.orderNumber} | {claim.customerName}</p>
                     <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-gray-400">{claim.customerEmail}</p>
-                    <p className="mt-2 text-xs font-bold text-gray-600">Bank reference: {claim.bankReference || 'Not supplied'} · Phone: {claim.payerPhone || 'Not supplied'}</p>
+                    <p className="mt-2 text-xs font-bold text-gray-600">Bank reference: {claim.bankReference || 'Not supplied'} | Phone: {claim.payerPhone || 'Not supplied'}</p>
                   </div>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                     <div className="rounded-2xl bg-gray-50 border border-gray-100 px-5 py-3">
@@ -619,10 +651,14 @@ const FinanceOverview: React.FC = () => {
                       <p className="mt-1 text-sm font-black text-gray-900">{money(claim.orderTotal || claim.amount)}</p>
                     </div>
                     {claim.status === 'VERIFICATION_PENDING' ? (
-                      <>
-                        <button onClick={() => handlePaymentClaimReview(claim.id, 'approved')} disabled={busyClaimId === claim.id} className="rounded-2xl bg-emerald-500 px-5 py-4 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-60">Approve</button>
-                        <button onClick={() => handlePaymentClaimReview(claim.id, 'rejected')} disabled={busyClaimId === claim.id} className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-[10px] font-black uppercase tracking-widest text-red-500 disabled:opacity-60">Reject</button>
-                      </>
+                      canReview ? (
+                        <>
+                          <button onClick={() => handlePaymentClaimReview(claim.id, 'approved')} disabled={busyClaimId === claim.id} className="rounded-2xl bg-emerald-500 px-5 py-4 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-60">Approve</button>
+                          <button onClick={() => handlePaymentClaimReview(claim.id, 'rejected')} disabled={busyClaimId === claim.id} className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-[10px] font-black uppercase tracking-widest text-red-500 disabled:opacity-60">Reject</button>
+                        </>
+                      ) : (
+                        <span className="rounded-2xl bg-amber-50 px-5 py-4 text-[10px] font-black uppercase tracking-widest text-amber-700">Manager review required</span>
+                      )
                     ) : (
                       <span className="rounded-2xl bg-red-50 px-5 py-4 text-[10px] font-black uppercase tracking-widest text-red-500">Rejected</span>
                     )}
@@ -664,28 +700,42 @@ const FinanceOverview: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       {payout.status === 'pending' ? (
-                        <>
-                          <button
-                            onClick={() => handleExportPayoutReceipt(payout)}
-                            className="rounded-2xl bg-white border border-gray-200 text-gray-600 px-4 py-3 text-[10px] font-black uppercase tracking-widest hover:bg-gray-50"
-                          >
-                            Receipt
-                          </button>
-                          <button
-                            onClick={() => handlePayoutReview(payout.id, 'success')}
-                            disabled={busyPayoutId === payout.id}
-                            className="flex-1 rounded-2xl bg-emerald-500 text-white px-4 py-3 text-[10px] font-black uppercase tracking-widest disabled:opacity-60"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handlePayoutReview(payout.id, 'failed')}
-                            disabled={busyPayoutId === payout.id}
-                            className="flex-1 rounded-2xl bg-red-50 text-red-500 border border-red-100 px-4 py-3 text-[10px] font-black uppercase tracking-widest disabled:opacity-60"
-                          >
-                            Reject
-                          </button>
-                        </>
+                        canReview ? (
+                          <>
+                            <button
+                              onClick={() => handleExportPayoutReceipt(payout)}
+                              className="rounded-2xl bg-white border border-gray-200 text-gray-600 px-4 py-3 text-[10px] font-black uppercase tracking-widest hover:bg-gray-50"
+                            >
+                              Receipt
+                            </button>
+                            <button
+                              onClick={() => handlePayoutReview(payout.id, 'success')}
+                              disabled={busyPayoutId === payout.id}
+                              className="flex-1 rounded-2xl bg-emerald-500 text-white px-4 py-3 text-[10px] font-black uppercase tracking-widest disabled:opacity-60"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handlePayoutReview(payout.id, 'failed')}
+                              disabled={busyPayoutId === payout.id}
+                              className="flex-1 rounded-2xl bg-red-50 text-red-500 border border-red-100 px-4 py-3 text-[10px] font-black uppercase tracking-widest disabled:opacity-60"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleExportPayoutReceipt(payout)}
+                              className="rounded-2xl bg-white border border-gray-200 text-gray-600 px-4 py-3 text-[10px] font-black uppercase tracking-widest hover:bg-gray-50"
+                            >
+                              Receipt
+                            </button>
+                            <div className="flex-1 rounded-2xl bg-amber-50 px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-amber-700">
+                              Manager review required
+                            </div>
+                          </>
+                        )
                       ) : (
                         <>
                           <button

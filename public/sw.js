@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'e-malla-pwa-v3';
+const CACHE_VERSION = 'e-malla-pwa-v4';
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const OFFLINE_URL = '/offline.html';
@@ -10,10 +10,12 @@ const APP_SHELL_FILES = [
   '/offline.html',
   '/robots.txt',
   '/sitemap.xml',
-  '/pwa/icon-192.png',
-  '/pwa/icon-512.png',
-  '/pwa/icon-maskable-512.png',
-  '/pwa/apple-touch-icon.png'
+  '/brand/emalla-favicon.svg',
+  '/pwa/favicon-32-v2.png',
+  '/pwa/icon-192-v2.png',
+  '/pwa/icon-512-v2.png',
+  '/pwa/icon-maskable-512-v2.png',
+  '/pwa/apple-touch-icon-v2.png'
 ];
 
 self.addEventListener('install', (event) => {

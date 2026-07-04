@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">E-Malla Rwanda maskable app icon</title>
+  <desc id="desc">Mask-safe E-Malla shopping cart with an integrated letter E</desc>
+  <rect width="512" height="512" fill="#0B1020"/>
+  <circle cx="256" cy="256" r="184" fill="#131B31"/>
+  <g transform="translate(112 112) scale(2.25)">
+    <path d="M10 22h17l13 65h67" fill="none" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M34 31h82l-9 48H44z" fill="#F97316"/>
+    <path d="M52 42h47M52 55h37M52 68h47" fill="none" stroke="#FFFFFF" stroke-width="9"/>
+    <circle cx="49" cy="104" r="10" fill="#FFFFFF"/>
+    <circle cx="99" cy="104" r="10" fill="#FFFFFF"/>
+  </g>
+</svg>

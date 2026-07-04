@@ -164,7 +164,7 @@ const ProductApprovals: React.FC = () => {
                   </div>
                   <p className="text-sm text-gray-500 font-medium">{product.merchantName || 'Unknown merchant'}</p>
                   <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1">
-                    {CATEGORIES.find((category) => category.id === product.category)?.name || 'General'} | RWF {product.price.toLocaleString()}
+                    {CATEGORIES.find((category) => category.id === product.category)?.name || 'General'} | {product.pricingType === 'quote' ? 'Price on Request' : `RWF ${product.price.toLocaleString()}`}
                   </p>
                 </div>
               </div>

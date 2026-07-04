@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Building2, Mail, MessageSquare, Search, UserCheck } from 'lucide-react';
+import { Building2, Mail, MapPin, MessageSquare, Package, Phone, Search, UserCheck } from 'lucide-react';
 import AdminToast from '../../components/AdminToast';
 import { useAuth } from '../../auth/AuthContext';
 import { AdminService } from '../../services/adminService';
@@ -9,7 +9,7 @@ type InquiryStatus = 'new' | 'replied' | 'resolved';
 type Inquiry = {
   id: string;
   ticketNumber?: string;
-  type: 'contact' | 'investor' | 'support' | 'return' | 'refund';
+  type: 'contact' | 'investor' | 'support' | 'return' | 'refund' | 'product_quote';
   name: string;
   email: string;
   subject: string;
@@ -26,9 +26,13 @@ type Inquiry = {
   orderNumber?: string | null;
   reason?: string;
   requestedAmount?: number;
+  phone?: string;
+  location?: string;
+  productName?: string;
+  quantity?: number;
 };
 
-const FILTERS = ['all', 'support', 'return', 'refund', 'contact', 'investor'] as const;
+const FILTERS = ['all', 'product_quote', 'support', 'return', 'refund', 'contact', 'investor'] as const;
 
 const STATUS_STYLES: Record<InquiryStatus, string> = {
   new: 'bg-amber-100 text-amber-700',
@@ -170,7 +174,7 @@ const InquiryManagement: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
           <h1 className="text-3xl font-black text-gray-900">Inquiries Desk</h1>
-          <p className="text-gray-500">Manage customer support tickets, returns, refunds, contact messages, and investor inquiries.</p>
+          <p className="text-gray-500">Manage product quotes, customer support, returns, refunds, contact messages, and investor inquiries.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {FILTERS.map((item) => (
@@ -220,6 +224,8 @@ const InquiryManagement: React.FC = () => {
                       <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
                         entry.type === 'investor'
                           ? 'bg-purple-100 text-purple-700'
+                          : entry.type === 'product_quote'
+                            ? 'bg-cyan-100 text-cyan-700'
                           : entry.type === 'refund'
                             ? 'bg-rose-100 text-rose-700'
                             : entry.type === 'return'
@@ -249,6 +255,13 @@ const InquiryManagement: React.FC = () => {
                       <Mail size={16} className="mr-2 text-gray-400" />
                       {entry.email}
                     </div>
+                    {entry.type === 'product_quote' && (
+                      <div className="grid gap-3 text-sm font-bold text-gray-600 sm:grid-cols-2">
+                        <span className="flex items-center"><Package size={16} className="mr-2 text-cyan-600" />{entry.productName} x {entry.quantity}</span>
+                        <span className="flex items-center"><Phone size={16} className="mr-2 text-gray-400" />{entry.phone}</span>
+                        <span className="flex items-center sm:col-span-2"><MapPin size={16} className="mr-2 text-gray-400" />{entry.location}</span>
+                      </div>
+                    )}
 
                     {entry.company ? (
                       <div className="flex items-center text-sm text-gray-600 font-bold">

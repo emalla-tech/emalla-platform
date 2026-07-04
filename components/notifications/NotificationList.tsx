@@ -131,6 +131,17 @@ const NotificationList: React.FC<NotificationListProps> = ({ userId, role }) => 
                       </button>
                    </div>
                  )}
+                 {!n.metadata?.orderId && n.metadata?.productId && (
+                   <div className="pt-4 flex">
+                     <button
+                       type="button"
+                       onClick={() => navigate(`/product/${String(n.metadata?.productId)}`)}
+                       className="text-[10px] font-black text-orange-500 uppercase tracking-widest flex items-center group/btn"
+                     >
+                       View Related Product <ChevronRight size={14} className="ml-1 group-hover/btn:translate-x-1 transition-transform" />
+                     </button>
+                   </div>
+                 )}
               </div>
             </div>
           );

@@ -179,7 +179,9 @@ const CustomerDashboard: React.FC = () => {
                   />
                   <div>
                     <h4 className="font-bold text-sm text-gray-900">{item.name}</h4>
-                    <p className="text-orange-500 font-black text-xs mt-1">RWF {item.price.toLocaleString()}</p>
+                    <p className="text-orange-500 font-black text-xs mt-1">
+                      {item.pricingType === 'quote' ? 'Price on Request' : `RWF ${item.price.toLocaleString()}`}
+                    </p>
                   </div>
                </div>
              ))}

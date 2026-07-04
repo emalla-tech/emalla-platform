@@ -117,6 +117,7 @@ const Inventory: React.FC = () => {
   const [newProduct, setNewProduct] = useState<Partial<Product>>({
     name: '',
     price: 0,
+    pricingType: 'fixed',
     category: '1',
     description: '',
     specifications: '',
@@ -243,6 +244,7 @@ const Inventory: React.FC = () => {
       const specifications = buildSpecifications(structuredSpecifications);
       const productPayload = {
         ...newProduct,
+        price: newProduct.pricingType === 'quote' ? 0 : Number(newProduct.price || 0),
         description,
         specifications
       };
@@ -264,6 +266,7 @@ const Inventory: React.FC = () => {
       setNewProduct({
         name: '',
         price: 0,
+        pricingType: 'fixed',
         category: '1',
         description: '',
         specifications: '',
@@ -298,6 +301,7 @@ const Inventory: React.FC = () => {
     setEditingProductId(product.id);
     setNewProduct({
       ...product,
+      pricingType: product.pricingType || 'fixed',
       images: product.images || (product.image ? [product.image] : []),
       fulfillmentType: product.fulfillmentType || 'ready_stock',
       deliveryMinDays: product.deliveryMinDays || 1,
@@ -315,6 +319,7 @@ const Inventory: React.FC = () => {
       setNewProduct({
         name: '',
         price: 0,
+        pricingType: 'fixed',
         category: '1',
         description: '',
         specifications: '',
@@ -441,7 +446,15 @@ const Inventory: React.FC = () => {
                   <td className="px-8 py-6 text-sm font-medium text-gray-500">
                     {CATEGORIES.find(c => c.id === p.category)?.name || 'General'}
                   </td>
-                  <td className="px-8 py-6 font-black text-gray-900 text-sm">RWF {p.price.toLocaleString()}</td>
+                  <td className="px-8 py-6 font-black text-gray-900 text-sm">
+                    {p.pricingType === 'quote' ? (
+                      <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-[10px] uppercase tracking-wider text-blue-700">
+                        Price on request
+                      </span>
+                    ) : (
+                      <>RWF {p.price.toLocaleString()}</>
+                    )}
+                  </td>
                   <td className="px-8 py-6">
                     <div className="flex items-center space-x-2">
                        <span className={`text-sm font-black ${p.stock < 5 ? 'text-red-500' : 'text-gray-900'}`}>{p.stock}</span>
@@ -620,16 +633,51 @@ const Inventory: React.FC = () => {
                 </div>
               </div>
 
+              <div className="rounded-3xl border border-gray-100 bg-gray-50/70 p-5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Pricing Method</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewProduct({ ...newProduct, pricingType: 'fixed' })}
+                    className={`rounded-2xl border-2 p-4 text-left transition-all ${
+                      newProduct.pricingType !== 'quote'
+                        ? 'border-orange-500 bg-white shadow-lg shadow-orange-100'
+                        : 'border-transparent bg-white text-gray-500'
+                    }`}
+                  >
+                    <span className="block text-sm font-black text-gray-900">Fixed Price</span>
+                    <span className="mt-1 block text-xs font-medium leading-5 text-gray-500">Customers see the price and can add the product to cart.</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewProduct({ ...newProduct, pricingType: 'quote', price: 0 })}
+                    className={`rounded-2xl border-2 p-4 text-left transition-all ${
+                      newProduct.pricingType === 'quote'
+                        ? 'border-blue-500 bg-white shadow-lg shadow-blue-100'
+                        : 'border-transparent bg-white text-gray-500'
+                    }`}
+                  >
+                    <span className="block text-sm font-black text-gray-900">Price on Request</span>
+                    <span className="mt-1 block text-xs font-medium leading-5 text-gray-500">Customers send quantity and delivery details for your quotation.</span>
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Price (RWF)</label>
                   <input 
-                    type="number" required
+                    type="number"
+                    required={newProduct.pricingType !== 'quote'}
+                    disabled={newProduct.pricingType === 'quote'}
                     value={newProduct.price || ''}
                     onChange={e => setNewProduct({...newProduct, price: parseInt(e.target.value) || 0})}
-                    placeholder="0"
-                    className="w-full px-6 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 rounded-2xl outline-none font-bold text-gray-900 transition-all"
+                    placeholder={newProduct.pricingType === 'quote' ? 'Seller quotation required' : '0'}
+                    className="w-full px-6 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 rounded-2xl outline-none font-bold text-gray-900 transition-all disabled:cursor-not-allowed disabled:bg-blue-50 disabled:text-blue-600"
                   />
+                  {newProduct.pricingType === 'quote' && (
+                    <p className="text-[10px] font-bold text-blue-600">No public price will be displayed for this product.</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Initial Stock</label>

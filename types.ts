@@ -169,6 +169,7 @@ export interface Product {
   id: string;
   name: string;
   price: number;
+  pricingType?: 'fixed' | 'quote';
   category: string;
   image: string;
   images?: string[];
@@ -186,6 +187,24 @@ export interface Product {
   deliveryMinDays?: number;
   deliveryMaxDays?: number;
   deliveryNote?: string;
+}
+
+export interface ProductQuoteRequest {
+  id: string;
+  productId: string;
+  productName: string;
+  merchantId: string;
+  merchantName: string;
+  customerId?: string;
+  name: string;
+  email: string;
+  phone: string;
+  location: string;
+  quantity: number;
+  message?: string;
+  status: 'new' | 'contacted' | 'quoted' | 'closed';
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ProductReview {

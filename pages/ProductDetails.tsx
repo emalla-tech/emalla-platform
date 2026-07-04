@@ -30,6 +30,7 @@ import {
   getProductDeliveryMessage,
   getProductFulfillmentLabel
 } from '../lib/productDelivery';
+import QuoteRequestModal from '../components/products/QuoteRequestModal';
 
 const RECENTLY_VIEWED_KEY = 'emalla_recently_viewed_products';
 
@@ -64,6 +65,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
+  const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
   
   // Gallery State
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -171,6 +173,10 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
     () => product ? getProductDeliveryEstimate(product) : null,
     [product]
   );
+  const isQuoteProduct = product?.pricingType === 'quote';
+  const quantityLimit = isQuoteProduct && Number(product?.stock || 0) === 0
+    ? 999
+    : Number(product?.stock || 0);
 
   const specificationItems = useMemo(() => {
     if (!product) {
@@ -202,7 +208,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
     return [
       { label: 'Category', value: CATEGORIES.find((category) => category.id === product.category)?.name || 'General' },
       { label: 'Seller', value: product.merchantName || 'E-Malla Merchant' },
-      { label: 'Price', value: `RWF ${product.price.toLocaleString()}` },
+      { label: 'Price', value: product.pricingType === 'quote' ? 'Price on request' : `RWF ${product.price.toLocaleString()}` },
       { label: 'Availability', value: product.stock > 0 ? `${product.stock} units in stock` : 'Out of stock' },
       { label: 'Customer Rating', value: `${product.rating} / 5.0` },
       { label: 'Review Count', value: `${reviews.length || product.reviewsCount || 0} review(s)` },
@@ -223,7 +229,12 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
   };
 
   const handleAddToCart = () => {
-    if (!product || product.stock <= 0) return;
+    if (!product) return;
+    if (product.pricingType === 'quote') {
+      setIsQuoteModalOpen(true);
+      return;
+    }
+    if (product.stock <= 0) return;
     onAddToCart({
       productId: product.id,
       quantity: Math.min(quantity, product.stock),
@@ -235,6 +246,10 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
   };
 
   const handleBuyNow = () => {
+    if (product?.pricingType === 'quote') {
+      setIsQuoteModalOpen(true);
+      return;
+    }
     handleAddToCart();
     navigate('/checkout');
   };
@@ -401,7 +416,9 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 md:hidden">
               <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-4">
                 <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Stock Availability</p>
-                <p className="mt-2 text-base font-black text-gray-900">{product.stock > 0 ? `${product.stock} items ready` : 'Currently unavailable'}</p>
+                <p className="mt-2 text-base font-black text-gray-900">
+                  {isQuoteProduct && product.stock <= 0 ? 'Available by quotation' : product.stock > 0 ? `${product.stock} items ready` : 'Currently unavailable'}
+                </p>
               </div>
               <div className="rounded-3xl border border-orange-100 bg-orange-50 p-4">
                 <p className="text-[10px] font-black uppercase tracking-widest text-orange-600">Seller Info</p>
@@ -426,8 +443,12 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
                   <div className="space-y-1">
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Price</p>
                     <div className="flex items-center space-x-3">
-                      <span className="text-4xl font-black text-gray-900">RWF {product.price.toLocaleString()}</span>
-                      <span className="text-sm text-gray-400 line-through">RWF {(product.price * 1.2).toLocaleString()}</span>
+                      <span className={`font-black ${isQuoteProduct ? 'text-3xl text-blue-700' : 'text-4xl text-gray-900'}`}>
+                        {isQuoteProduct ? 'Price on Request' : `RWF ${product.price.toLocaleString()}`}
+                      </span>
+                      {!isQuoteProduct && (
+                        <span className="text-sm text-gray-400 line-through">RWF {(product.price * 1.2).toLocaleString()}</span>
+                      )}
                     </div>
                   </div>
                   <div className="text-right">
@@ -502,8 +523,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
                           <span className="font-bold text-lg">{quantity}</span>
                         </div>
                         <button 
-                          onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                          disabled={quantity >= product.stock}
+                          onClick={() => setQuantity(Math.min(quantityLimit, quantity + 1))}
+                          disabled={quantity >= quantityLimit}
                           className="p-3 bg-gray-50 hover:bg-orange-50 hover:text-orange-600 transition-colors disabled:cursor-not-allowed disabled:opacity-30"
                           aria-label="Increase quantity"
                         >
@@ -513,23 +534,37 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
                     </div>
 
                     <div className="flex-grow flex flex-col space-y-3">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Total</label>
-                      <p className="text-xl font-bold text-gray-900 leading-none py-2">RWF {(product.price * quantity).toLocaleString()}</p>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                        {isQuoteProduct ? 'Quotation' : 'Total'}
+                      </label>
+                      <p className={`py-2 text-xl font-bold leading-none ${isQuoteProduct ? 'text-blue-700' : 'text-gray-900'}`}>
+                        {isQuoteProduct ? `Request price for ${quantity} unit${quantity === 1 ? '' : 's'}` : `RWF ${(product.price * quantity).toLocaleString()}`}
+                      </p>
                     </div>
                   </div>
 
                   <div className="flex gap-4 pt-2">
                     <button 
-                      onClick={handleAddToCart}
-                      disabled={product.stock <= 0}
-                      className={`flex-grow py-5 rounded-2xl font-bold flex items-center justify-center space-x-3 transition-all shadow-lg active:scale-95 group disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none ${isAdded ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-200'}`}
+                      onClick={() => isQuoteProduct ? setIsQuoteModalOpen(true) : handleAddToCart()}
+                      disabled={!isQuoteProduct && product.stock <= 0}
+                      className={`flex-grow py-5 rounded-2xl font-bold flex items-center justify-center space-x-3 transition-all shadow-lg active:scale-95 group disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none ${
+                        isQuoteProduct
+                          ? 'bg-blue-600 text-white shadow-blue-200 hover:bg-blue-700'
+                          : isAdded
+                            ? 'bg-emerald-500 text-white shadow-emerald-200'
+                            : 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-200'
+                      }`}
                     >
-                      {isAdded ? (
+                      {isQuoteProduct ? (
+                        <MessageSquare size={20} />
+                      ) : isAdded ? (
                         <Check size={20} className="animate-in zoom-in" />
                       ) : (
                         <ShoppingBag size={20} className="group-hover:rotate-12 transition-transform" />
                       )}
-                      <span className="text-lg">{product.stock <= 0 ? 'Out of Stock' : isAdded ? 'Added to Cart' : 'Add to Cart'}</span>
+                      <span className="text-lg">
+                        {!isQuoteProduct && product.stock <= 0 ? 'Out of Stock' : isQuoteProduct ? 'Request a Quote' : isAdded ? 'Added to Cart' : 'Add to Cart'}
+                      </span>
                     </button>
                     <button
                       onClick={handleToggleWishlist}
@@ -562,7 +597,11 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
               
               <div className="bg-orange-50/50 p-4 border-t border-orange-100 flex items-center justify-center space-x-2">
                 <Zap size={14} className="text-orange-500" />
-                <span className="text-xs font-bold text-orange-700">Secure checkout with live pricing and seller stock validation.</span>
+                <span className="text-xs font-bold text-orange-700">
+                  {isQuoteProduct
+                    ? 'Your request goes directly to the verified seller without creating an unpaid order.'
+                    : 'Secure checkout with live pricing and seller stock validation.'}
+                </span>
               </div>
             </div>
 
@@ -886,7 +925,9 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
                       {p.name}
                     </h4>
                     <div className="mt-auto pt-6 border-t border-gray-50 flex justify-between items-center">
-                      <span className="text-gray-900 font-black text-lg">RWF {p.price.toLocaleString()}</span>
+                      <span className="text-gray-900 font-black text-lg">
+                        {p.pricingType === 'quote' ? 'Price on Request' : `RWF ${p.price.toLocaleString()}`}
+                      </span>
                       <div className="p-2 bg-orange-50 text-orange-600 rounded-xl group-hover:bg-orange-500 group-hover:text-white transition-all shadow-sm">
                         <ArrowRight size={16} />
                       </div>
@@ -899,35 +940,54 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
         )}
       </div>
 
+      <QuoteRequestModal
+        product={product}
+        defaultQuantity={quantity}
+        isOpen={isQuoteModalOpen}
+        onClose={() => setIsQuoteModalOpen(false)}
+      />
+
       <div className="mobile-product-action-bar md:hidden fixed inset-x-0 bottom-[calc(5.3rem+env(safe-area-inset-bottom,0px))] z-[65] px-4">
         <div className="mx-auto max-w-lg rounded-[28px] border border-gray-200 bg-white/96 p-3 shadow-2xl backdrop-blur-xl">
           <div className="mb-3 flex items-center justify-between gap-4 px-2">
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Total</p>
-              <p className="text-lg font-black text-gray-900">RWF {(product.price * quantity).toLocaleString()}</p>
+              <p className={`text-lg font-black ${isQuoteProduct ? 'text-blue-700' : 'text-gray-900'}`}>
+                {isQuoteProduct ? 'Price on Request' : `RWF ${(product.price * quantity).toLocaleString()}`}
+              </p>
             </div>
             <div className="text-right">
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Status</p>
-              <p className="text-sm font-black text-emerald-600">{product.stock > 0 ? 'In Stock' : 'Unavailable'}</p>
+              <p className="text-sm font-black text-emerald-600">
+                {isQuoteProduct ? 'Quote Available' : product.stock > 0 ? 'In Stock' : 'Unavailable'}
+              </p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className={`grid gap-3 ${isQuoteProduct ? 'grid-cols-1' : 'grid-cols-2'}`}>
             <button
-              onClick={handleAddToCart}
-              disabled={product.stock <= 0}
+              onClick={() => isQuoteProduct ? setIsQuoteModalOpen(true) : handleAddToCart()}
+              disabled={!isQuoteProduct && product.stock <= 0}
               className={`rounded-2xl px-4 py-4 text-sm font-black transition-all active:scale-[0.98] ${
-                product.stock <= 0 ? 'cursor-not-allowed bg-gray-200 text-gray-500' : isAdded ? 'bg-emerald-500 text-white' : 'bg-gray-900 text-white'
+                !isQuoteProduct && product.stock <= 0
+                  ? 'cursor-not-allowed bg-gray-200 text-gray-500'
+                  : isQuoteProduct
+                    ? 'bg-blue-600 text-white'
+                    : isAdded
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-gray-900 text-white'
               }`}
             >
-              {product.stock <= 0 ? 'Out of Stock' : isAdded ? 'Added' : 'Add to Cart'}
+              {!isQuoteProduct && product.stock <= 0 ? 'Out of Stock' : isQuoteProduct ? 'Request a Quote' : isAdded ? 'Added' : 'Add to Cart'}
             </button>
-            <button
-              onClick={handleBuyNow}
-              disabled={product.stock <= 0}
-              className="rounded-2xl bg-orange-500 px-4 py-4 text-sm font-black text-white shadow-lg shadow-orange-200 transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none"
-            >
-              Buy Now
-            </button>
+            {!isQuoteProduct && (
+              <button
+                onClick={handleBuyNow}
+                disabled={product.stock <= 0}
+                className="rounded-2xl bg-orange-500 px-4 py-4 text-sm font-black text-white shadow-lg shadow-orange-200 transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none"
+              >
+                Buy Now
+              </button>
+            )}
           </div>
         </div>
       </div>

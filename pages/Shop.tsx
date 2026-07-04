@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef, useDeferredValue } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { CATEGORIES } from '../constants';
-import { ShoppingBag, Search, Filter, Star, ChevronRight, Check, Clock, X, TrendingUp, Heart } from 'lucide-react';
+import { ShoppingBag, Search, Filter, Star, ChevronRight, Check, Clock, X, TrendingUp, Heart, MessageSquare } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
 import { useAuth } from '../auth/AuthContext';
 import { CustomerService } from '../services/customerService';
@@ -287,7 +287,9 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                             />
                             <div className="min-w-0">
                               <p className="truncate text-sm font-black text-gray-900">{product.name}</p>
-                              <p className="text-xs font-bold text-orange-500">RWF {product.price.toLocaleString()}</p>
+                              <p className="text-xs font-bold text-orange-500">
+                                {product.pricingType === 'quote' ? 'Price on Request' : `RWF ${product.price.toLocaleString()}`}
+                              </p>
                             </div>
                           </button>
                         ))}
@@ -433,20 +435,31 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                       </h3>
                       <div className="mt-auto">
                         <div className="flex items-baseline space-x-2 mb-6">
-                          <span className="text-2xl font-black text-gray-900">RWF {product.price.toLocaleString()}</span>
+                          <span className="text-2xl font-black text-gray-900">
+                            {product.pricingType === 'quote' ? 'Price on Request' : `RWF ${product.price.toLocaleString()}`}
+                          </span>
                         </div>
                         <button 
-                          onClick={(e) => handleAddToCart(e, product.id, product.stock)}
-                          disabled={product.stock <= 0}
+                          onClick={(e) => {
+                            if (product.pricingType === 'quote') {
+                              e.stopPropagation();
+                              navigate(`/product/${product.id}`);
+                              return;
+                            }
+                            handleAddToCart(e, product.id, product.stock);
+                          }}
+                          disabled={product.pricingType !== 'quote' && product.stock <= 0}
                           className={`w-full py-4 rounded-2xl text-sm font-black transition-all flex items-center justify-center shadow-lg active:scale-[0.98] ${
-                            product.stock <= 0
+                            product.pricingType !== 'quote' && product.stock <= 0
                             ? 'cursor-not-allowed bg-gray-200 text-gray-500 shadow-none'
                             : addedItems.has(product.id)
                             ? 'bg-emerald-500 text-white shadow-emerald-200' 
                             : 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-200'
                           }`}
                         >
-                          {product.stock <= 0 ? (
+                          {product.pricingType === 'quote' ? (
+                            <><MessageSquare size={18} className="mr-2" /> Request a Quote</>
+                          ) : product.stock <= 0 ? (
                             <>Out of Stock</>
                           ) : addedItems.has(product.id) ? (
                             <><Check size={18} className="mr-2" /> Added to Bag</>

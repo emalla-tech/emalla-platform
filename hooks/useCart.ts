@@ -41,7 +41,7 @@ export const useCart = () => {
     setItems((current) => {
       const catalogProduct = catalogProducts[item.productId];
       const availableStock = catalogProduct ? Math.max(0, Number(catalogProduct.stock || 0)) : Number.POSITIVE_INFINITY;
-      if (catalogProduct && availableStock === 0) return current;
+      if (catalogProduct && (availableStock === 0 || catalogProduct.pricingType === 'quote')) return current;
 
       const existingIndex = current.findIndex(
         (entry) =>
@@ -82,18 +82,29 @@ export const useCart = () => {
   }, []);
 
   useEffect(() => {
-    const loadProducts = async () => {
-      const products = await ProductService.getProducts();
+    const syncCatalog = (products: Product[]) => {
       setCatalogProducts(
         Object.fromEntries(products.map((product) => [product.id, product]))
       );
+      const quoteOnlyIds = new Set(
+        products.filter((product) => product.pricingType === 'quote').map((product) => product.id)
+      );
+      if (quoteOnlyIds.size > 0) {
+        setItems((current) => {
+          const nextItems = current.filter((item) => !quoteOnlyIds.has(item.productId));
+          return nextItems.length === current.length ? current : nextItems;
+        });
+      }
+    };
+
+    const loadProducts = async () => {
+      const products = await ProductService.getProducts();
+      syncCatalog(products);
     };
 
     loadProducts();
     const unsubscribe = ProductService.subscribe((products) => {
-      setCatalogProducts(
-        Object.fromEntries(products.map((product) => [product.id, product]))
-      );
+      syncCatalog(products);
     });
 
     return () => {

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CATEGORIES } from '../constants';
-import { ShoppingBag, ArrowRight, ShieldCheck, Truck, Zap, Store, Check, Star } from 'lucide-react';
+import { ShoppingBag, ArrowRight, ShieldCheck, Truck, Zap, Store, Check, Star, MessageSquare } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
 import { getProductPrimaryImage, handleProductImageError } from '../lib/productImages';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -218,20 +218,31 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
                   <h3 className="font-bold text-gray-900 mb-6 truncate text-lg">{product.name}</h3>
                   <div className="mt-auto space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-orange-600 font-black text-xl">RWF {product.price.toLocaleString()}</span>
+                      <span className="text-orange-600 font-black text-xl">
+                        {product.pricingType === 'quote' ? 'Price on Request' : `RWF ${product.price.toLocaleString()}`}
+                      </span>
                     </div>
                     <button 
-                      onClick={(e) => handleAddToCart(e, product.id, product.stock)}
-                      disabled={product.stock <= 0}
+                      onClick={(e) => {
+                        if (product.pricingType === 'quote') {
+                          e.stopPropagation();
+                          navigate(`/product/${product.id}`);
+                          return;
+                        }
+                        handleAddToCart(e, product.id, product.stock);
+                      }}
+                      disabled={product.pricingType !== 'quote' && product.stock <= 0}
                       className={`w-full py-3 rounded-xl text-xs font-black transition-all flex items-center justify-center shadow-lg active:scale-[0.98] ${
-                        product.stock <= 0
+                        product.pricingType !== 'quote' && product.stock <= 0
                         ? 'cursor-not-allowed bg-gray-200 text-gray-500 shadow-none'
                         : addedItems.has(product.id)
                         ? 'bg-emerald-500 text-white shadow-emerald-200' 
                         : 'bg-black text-white hover:bg-orange-600 shadow-black/10'
                       }`}
                     >
-                      {product.stock <= 0 ? (
+                      {product.pricingType === 'quote' ? (
+                        <><MessageSquare size={14} className="mr-2" /> Request a Quote</>
+                      ) : product.stock <= 0 ? (
                         <>Out of Stock</>
                       ) : addedItems.has(product.id) ? (
                         <><Check size={14} className="mr-2" /> {t.home.added}</>

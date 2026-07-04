@@ -856,6 +856,11 @@ const buildTrustedOrderItems = (db, rawItems = []) => {
       error.statusCode = 409;
       throw error;
     }
+    if (product.pricingType === 'quote') {
+      const error = new Error(`${product.name} requires a seller quotation before checkout.`);
+      error.statusCode = 409;
+      throw error;
+    }
 
     const price = Number(product.price || 0);
     return {
@@ -1209,6 +1214,17 @@ const normalizeProductMedia = (product) => {
 };
 
 const PRODUCT_FULFILLMENT_TYPES = new Set(['ready_stock', 'imported_on_demand', 'preorder']);
+const PRODUCT_PRICING_TYPES = new Set(['fixed', 'quote']);
+
+const normalizeProductPricingType = (value, fallback = 'fixed') => {
+  const pricingType = String(value ?? fallback).trim().toLowerCase();
+  if (!PRODUCT_PRICING_TYPES.has(pricingType)) {
+    const error = new Error('Select either a fixed price or price on request.');
+    error.statusCode = 400;
+    throw error;
+  }
+  return pricingType;
+};
 
 const normalizeProductDeliverySettings = (updates = {}, existing = {}) => {
   const fulfillmentType = String(updates.fulfillmentType ?? existing.fulfillmentType ?? 'ready_stock').trim();
@@ -4432,6 +4448,175 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/quote-requests' && req.method === 'POST') {
+      const user = await getOptionalUser(req);
+      const customerUser = user?.role === 'CUSTOMER' ? user : null;
+      const body = await readBody(req);
+      const db = await readDb();
+      const productId = String(body.productId || '').trim();
+      const product = (db.products || []).find((entry) => entry.id === productId);
+      const name = String(body.name || customerUser?.name || '').trim();
+      const email = String(body.email || customerUser?.email || '').trim().toLowerCase();
+      const phone = String(body.phone || customerUser?.phone || '').trim();
+      const location = String(body.location || '').trim();
+      const message = String(body.message || '').trim();
+      const quantity = Number(body.quantity || 0);
+
+      if (!product || product.status !== 'approved') {
+        sendJson(res, 404, { error: 'This product is not available for a price request.' });
+        return;
+      }
+      if (product.pricingType !== 'quote') {
+        sendJson(res, 409, { error: 'This product already has a fixed marketplace price.' });
+        return;
+      }
+      if (
+        !isValidDisplayName(name, 120) ||
+        !isValidEmail(email) ||
+        !isValidPhone(phone) ||
+        location.length < 2 ||
+        location.length > 240 ||
+        message.length > 800 ||
+        !Number.isInteger(quantity) ||
+        quantity < 1 ||
+        (Number(product.stock || 0) > 0 && quantity > Number(product.stock))
+      ) {
+        sendJson(res, 400, { error: 'Enter valid contact details, delivery location, and quantity.' });
+        return;
+      }
+
+      const duplicateWindowStart = Date.now() - 10 * 60 * 1000;
+      const duplicateRequest = (db.contactSubmissions || []).find((entry) =>
+        entry.type === 'product_quote' &&
+        entry.productId === product.id &&
+        String(entry.email || '').toLowerCase() === email &&
+        new Date(entry.createdAt || 0).getTime() >= duplicateWindowStart
+      );
+      if (duplicateRequest) {
+        sendJson(res, 409, { error: 'Your request was already sent. Please allow the seller time to respond.' });
+        return;
+      }
+
+      const merchant = (db.users || []).find((entry) =>
+        entry.id === product.merchantId && entry.role === 'MERCHANT'
+      );
+      if (!merchant) {
+        sendJson(res, 409, { error: 'Seller contact information is currently unavailable.' });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const quoteRequest = {
+        id: `quote-${Date.now()}`,
+        type: 'product_quote',
+        subject: `Price request for ${product.name}`,
+        company: product.merchantName || merchant.name || '',
+        productId: product.id,
+        productName: product.name,
+        merchantId: product.merchantId,
+        merchantName: product.merchantName || merchant.name || 'E-Malla Merchant',
+        customerId: customerUser?.id,
+        name,
+        email,
+        phone,
+        location,
+        quantity,
+        message,
+        status: 'new',
+        createdAt: now,
+        updatedAt: now
+      };
+
+      db.contactSubmissions = db.contactSubmissions || [];
+      db.contactSubmissions.unshift(quoteRequest);
+      createNotification(db, {
+        userId: product.merchantId,
+        role: 'MERCHANT',
+        title: 'New Product Price Request',
+        message: `${name} requested a price for ${quantity} x ${product.name}. Contact: ${phone} / ${email}. Delivery area: ${location}.`,
+        type: 'info',
+        metadata: {
+          quoteRequestId: quoteRequest.id,
+          productId: product.id,
+          customerEmail: email,
+          customerPhone: phone
+        }
+      });
+      if (customerUser) {
+        createNotification(db, {
+          userId: customerUser.id,
+          role: 'CUSTOMER',
+          title: 'Price Request Sent',
+          message: `Your request for ${product.name} was sent to ${quoteRequest.merchantName}.`,
+          type: 'success',
+          metadata: {
+            quoteRequestId: quoteRequest.id,
+            productId: product.id
+          }
+        });
+      }
+      createAuditLog(db, {
+        event: `Product price requested: ${product.name}`,
+        actor: customerUser?.name || name,
+        category: 'products',
+        status: 'info',
+        metadata: {
+          quoteRequestId: quoteRequest.id,
+          productId: product.id,
+          merchantId: product.merchantId,
+          quantity
+        }
+      });
+
+      await writeDb(db);
+      sendJson(res, 201, { quoteRequest });
+
+      sendPlatformEmailsInBackground([
+        {
+          to: merchant.email,
+          subject: `New price request for ${product.name}`,
+          template: 'product_quote_request_seller',
+          body: `${name} requested a quotation for ${quantity} unit(s) of ${product.name}. Contact ${email} or ${phone}.`,
+          html: createEmailHtml({
+            title: 'New product price request',
+            intro: `${name} is interested in a product you listed as Price on Request.`,
+            sections: [
+              { label: 'Product', value: product.name },
+              { label: 'Quantity', value: String(quantity) },
+              { label: 'Customer', value: name },
+              { label: 'Email', value: email },
+              { label: 'Phone', value: phone },
+              { label: 'Delivery Area', value: location },
+              ...(message ? [{ label: 'Customer Note', value: message }] : [])
+            ],
+            closing: 'Contact the customer with a clear quotation, delivery estimate, and validity period.'
+          })
+        },
+        {
+          to: email,
+          subject: `We sent your price request for ${product.name}`,
+          template: 'product_quote_request_customer',
+          body: `Your quotation request for ${product.name} was sent to ${quoteRequest.merchantName}.`,
+          html: createEmailHtml({
+            title: 'Price request received',
+            intro: `Muraho ${name}, your request has been delivered to ${quoteRequest.merchantName}.`,
+            sections: [
+              { label: 'Product', value: product.name },
+              { label: 'Quantity', value: String(quantity) },
+              { label: 'Delivery Area', value: location },
+              { label: 'Status', value: 'Waiting for seller response' }
+            ],
+            closing: 'The seller will contact you using the email or phone number you provided.'
+          })
+        }
+      ], {
+        event: 'product_quote_request_email_failed',
+        requestId,
+        quoteRequestId: quoteRequest.id
+      });
+      return;
+    }
+
     if (pathname === '/api/monitoring/client-error' && req.method === 'POST') {
       const user = await getOptionalUser(req);
       const body = await readBody(req);
@@ -4631,7 +4816,14 @@ const server = http.createServer(async (req, res) => {
 
       const body = await readBody(req);
       const stock = Number(body.stock ?? 0);
-      const price = parseNonNegativeMoney(body.price);
+      let pricingType;
+      try {
+        pricingType = normalizeProductPricingType(body.pricingType);
+      } catch (error) {
+        sendJson(res, error.statusCode || 400, { error: error.message });
+        return;
+      }
+      const price = pricingType === 'quote' ? 0 : parseNonNegativeMoney(body.price);
       const productName = String(body.name || '').trim();
       if (!Number.isInteger(stock) || stock < 0) {
         sendJson(res, 400, { error: 'Stock must be a non-negative whole number.' });
@@ -4652,6 +4844,7 @@ const server = http.createServer(async (req, res) => {
         id: `p${Date.now()}`,
         name: productName,
         price,
+        pricingType,
         category: body.category || '1',
         image: body.image || '/catalog/electronics.svg',
         images: body.images || [],
@@ -4717,7 +4910,17 @@ const server = http.createServer(async (req, res) => {
         }
         body.stock = stock;
       }
-      if (body.price !== undefined) {
+      let pricingType;
+      try {
+        pricingType = normalizeProductPricingType(body.pricingType, existing.pricingType || 'fixed');
+      } catch (error) {
+        sendJson(res, error.statusCode || 400, { error: error.message });
+        return;
+      }
+      body.pricingType = pricingType;
+      if (pricingType === 'quote') {
+        body.price = 0;
+      } else if (body.price !== undefined) {
         const price = parseNonNegativeMoney(body.price);
         if (price === null) {
           sendJson(res, 400, { error: 'Price must be a valid non-negative amount.' });

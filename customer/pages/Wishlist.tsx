@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Heart, ShoppingBag, Trash2, ArrowRight } from 'lucide-react';
+import { Heart, ShoppingBag, Trash2, ArrowRight, MessageSquare } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CustomerService } from '../../services/customerService';
 import { Product } from '../../types';
@@ -93,17 +93,23 @@ const Wishlist: React.FC<WishlistProps> = ({ onAddToCart }) => {
                 <div className="mt-5">
                   <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{item.category}</p>
                   <h2 className="mt-2 line-clamp-2 text-lg font-black text-gray-900">{item.name}</h2>
-                  <p className="mt-3 text-xl font-black text-orange-600">RWF {item.price.toLocaleString()}</p>
+                  <p className="mt-3 text-xl font-black text-orange-600">
+                    {item.pricingType === 'quote' ? 'Price on Request' : `RWF ${item.price.toLocaleString()}`}
+                  </p>
                 </div>
               </button>
 
               <div className="mt-5 grid grid-cols-[1fr_auto] gap-3">
                 <button
-                  onClick={() => onAddToCart({ productId: item.id, quantity: 1 })}
-                  className="flex items-center justify-center rounded-2xl bg-gray-900 px-4 py-4 text-sm font-black text-white transition-all hover:bg-orange-600"
+                  onClick={() => item.pricingType === 'quote'
+                    ? navigate(`/product/${item.id}`)
+                    : onAddToCart({ productId: item.id, quantity: 1 })}
+                  className={`flex items-center justify-center rounded-2xl px-4 py-4 text-sm font-black text-white transition-all ${
+                    item.pricingType === 'quote' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-900 hover:bg-orange-600'
+                  }`}
                 >
-                  <ShoppingBag size={16} className="mr-2" />
-                  Add to Cart
+                  {item.pricingType === 'quote' ? <MessageSquare size={16} className="mr-2" /> : <ShoppingBag size={16} className="mr-2" />}
+                  {item.pricingType === 'quote' ? 'Request Quote' : 'Add to Cart'}
                 </button>
                 <button
                   onClick={() => removeItem(item.id)}

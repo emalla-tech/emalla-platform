@@ -13,6 +13,8 @@ type FinanceSummary = {
     onlineRevenue: number;
     pendingCodValue: number;
     deliveryFeesCollected: number;
+    promotionSubsidies: number;
+    promotedOrders: number;
     totalCommissionEarned: number;
     merchantNetRevenue: number;
     platformNetRevenue: number;
@@ -49,6 +51,8 @@ const defaultSummary: FinanceSummary = {
     onlineRevenue: 0,
     pendingCodValue: 0,
     deliveryFeesCollected: 0,
+    promotionSubsidies: 0,
+    promotedOrders: 0,
     totalCommissionEarned: 0,
     merchantNetRevenue: 0,
     platformNetRevenue: 0,
@@ -743,6 +747,14 @@ const FinanceOverview: React.FC = () => {
                   <div className="flex items-center justify-between gap-4">
                     <span className="text-gray-500">Delivery fees collected</span>
                     <span className="font-black text-gray-900">{money(summary.overview.deliveryFeesCollected)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-gray-500">Launch delivery subsidies</span>
+                    <span className="font-black text-orange-600">{money(summary.overview.promotionSubsidies)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-gray-500">Promoted first orders</span>
+                    <span className="font-black text-gray-900">{summary.overview.promotedOrders}</span>
                   </div>
                 </div>
               </div>

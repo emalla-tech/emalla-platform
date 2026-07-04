@@ -639,6 +639,8 @@ const createTransaction = (db, transaction) => {
 };
 
 const DEFAULT_RIDER_PAYOUT_RWF = 2500;
+const FIRST_ORDER_DELIVERY_PROMOTION_CODE = 'KIGALI_FIRST_DELIVERY_2026';
+const KIGALI_DISTRICTS = new Set(['kigali', 'gasabo', 'kicukiro', 'nyarugenge']);
 
 const normalizeMoneyAmount = (value, fallback = 0) => {
   const amount = Number(value);
@@ -648,6 +650,89 @@ const normalizeMoneyAmount = (value, fallback = 0) => {
 const calculateDefaultRiderPayout = (order = {}) => {
   const deliveryFeeShare = Math.round(normalizeMoneyAmount(order.deliveryFee) * 0.7);
   return Math.max(DEFAULT_RIDER_PAYOUT_RWF, deliveryFeeShare);
+};
+
+const getFirstOrderDeliveryPromotion = () => {
+  const startAt = process.env.FIRST_ORDER_FREE_DELIVERY_START || '2026-07-04T00:00:00+02:00';
+  const endAt = process.env.FIRST_ORDER_FREE_DELIVERY_END || '2026-09-04T23:59:59+02:00';
+  const maxDiscount = Math.max(
+    0,
+    normalizeMoneyAmount(process.env.FIRST_ORDER_FREE_DELIVERY_MAX_RWF, 3500)
+  );
+  const now = Date.now();
+  const startTime = new Date(startAt).getTime();
+  const endTime = new Date(endAt).getTime();
+
+  return {
+    code: FIRST_ORDER_DELIVERY_PROMOTION_CODE,
+    title: 'Your First Delivery Is On Us',
+    startAt,
+    endAt,
+    maxDiscount,
+    eligibleDistricts: ['Gasabo', 'Kicukiro', 'Nyarugenge'],
+    active:
+      Number.isFinite(startTime) &&
+      Number.isFinite(endTime) &&
+      now >= startTime &&
+      now <= endTime &&
+      maxDiscount > 0
+  };
+};
+
+const isKigaliDelivery = (district, address = '') => {
+  const normalizedDistrict = String(district || '').trim().toLowerCase();
+  const normalizedAddress = String(address || '').toLowerCase();
+  if (normalizedDistrict) {
+    return KIGALI_DISTRICTS.has(normalizedDistrict) && normalizedAddress.includes(normalizedDistrict);
+  }
+
+  return Array.from(KIGALI_DISTRICTS).some((entry) => normalizedAddress.includes(entry));
+};
+
+const hasPriorCustomerOrder = (db, { customerId, email, phone }) => {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const normalizedPhone = String(phone || '').replace(/\s+/g, '');
+  const excludedStatuses = new Set(['cancelled', 'rejected', 'refunded']);
+
+  return (db.orders || []).some((order) => {
+    if (excludedStatuses.has(String(order.status || '').toLowerCase())) return false;
+    if (customerId && order.customerId === customerId) return true;
+    if (normalizedEmail && String(order.customerEmail || '').trim().toLowerCase() === normalizedEmail) return true;
+    return normalizedPhone && String(order.phone || '').replace(/\s+/g, '') === normalizedPhone;
+  });
+};
+
+const evaluateFirstOrderDeliveryPromotion = ({
+  db,
+  customerId,
+  email,
+  phone,
+  district,
+  address,
+  baseDeliveryFee
+}) => {
+  const campaign = getFirstOrderDeliveryPromotion();
+  let reason = 'eligible';
+
+  if (!campaign.active) reason = 'campaign_inactive';
+  else if (!isKigaliDelivery(district, address)) reason = 'outside_kigali';
+  else if (normalizeMoneyAmount(baseDeliveryFee) <= 0) reason = 'delivery_already_free';
+  else if (!email || !phone) reason = 'customer_details_required';
+  else if (hasPriorCustomerOrder(db, { customerId, email, phone })) reason = 'not_first_order';
+
+  const eligible = reason === 'eligible';
+  const discount = eligible
+    ? Math.min(normalizeMoneyAmount(baseDeliveryFee), campaign.maxDiscount)
+    : 0;
+
+  return {
+    ...campaign,
+    eligible,
+    reason,
+    baseDeliveryFee: normalizeMoneyAmount(baseDeliveryFee),
+    discount,
+    deliveryFee: Math.max(0, normalizeMoneyAmount(baseDeliveryFee) - discount)
+  };
 };
 
 const getOrderRiderPayout = (order = {}) => {
@@ -1532,6 +1617,8 @@ const buildAdminFinanceSummary = (db, reportRange = null) => {
     .reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
   const grossRevenue = successfulOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
   const deliveryFeesCollected = successfulOrders.reduce((sum, order) => sum + Number(order.deliveryFee || 0), 0);
+  const promotionSubsidies = successfulOrders.reduce((sum, order) => sum + Number(order.promotionSubsidy || 0), 0);
+  const promotedOrders = successfulOrders.filter((order) => order.promotionApplied).length;
   const totalCommissionEarned = categoryCommission.reduce((sum, entry) => sum + entry.commissionEarned, 0);
   const merchantNetRevenue = categoryCommission.reduce((sum, entry) => sum + entry.merchantNet, 0);
   const pendingCodValue = orders
@@ -1550,6 +1637,8 @@ const buildAdminFinanceSummary = (db, reportRange = null) => {
       onlineRevenue: Math.round(onlineRevenue),
       pendingCodValue: Math.round(pendingCodValue),
       deliveryFeesCollected: Math.round(deliveryFeesCollected),
+      promotionSubsidies: Math.round(promotionSubsidies),
+      promotedOrders,
       totalCommissionEarned: Math.round(totalCommissionEarned),
       merchantNetRevenue: Math.round(merchantNetRevenue),
       platformNetRevenue: Math.round(totalCommissionEarned + deliveryFeesCollected),
@@ -4448,6 +4537,43 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/promotions/first-order-delivery' && req.method === 'GET') {
+      const campaign = getFirstOrderDeliveryPromotion();
+      sendJson(res, 200, {
+        promotion: {
+          code: campaign.code,
+          title: campaign.title,
+          startAt: campaign.startAt,
+          endAt: campaign.endAt,
+          maxDiscount: campaign.maxDiscount,
+          eligibleDistricts: campaign.eligibleDistricts,
+          active: campaign.active
+        }
+      });
+      return;
+    }
+
+    if (pathname === '/api/promotions/first-order-delivery/preview' && req.method === 'POST') {
+      const user = await getOptionalUser(req);
+      const customerUser = user?.role === 'CUSTOMER' ? user : null;
+      const body = await readBody(req);
+      const subtotal = normalizeMoneyAmount(body.subtotal);
+      const baseDeliveryFee = subtotal > 50000 ? 0 : 3500;
+      const db = await readDb();
+      const preview = evaluateFirstOrderDeliveryPromotion({
+        db,
+        customerId: customerUser?.id,
+        email: String(body.email || customerUser?.email || '').trim().toLowerCase(),
+        phone: String(body.phone || customerUser?.phone || '').trim(),
+        district: body.district,
+        address: body.address,
+        baseDeliveryFee
+      });
+
+      sendJson(res, 200, { preview });
+      return;
+    }
+
     if (pathname === '/api/quote-requests' && req.method === 'POST') {
       const user = await getOptionalUser(req);
       const customerUser = user?.role === 'CUSTOMER' ? user : null;
@@ -5346,7 +5472,17 @@ const server = http.createServer(async (req, res) => {
       }
 
       const subtotal = items.reduce((acc, item) => acc + item.subtotal, 0);
-      const deliveryFee = subtotal > 50000 ? 0 : 3500;
+      const baseDeliveryFee = subtotal > 50000 ? 0 : 3500;
+      const promotion = evaluateFirstOrderDeliveryPromotion({
+        db,
+        customerId: customerUser?.id,
+        email: customerEmail,
+        phone: customerPhone,
+        district: body.deliveryDistrict,
+        address: customerAddress,
+        baseDeliveryFee
+      });
+      const deliveryFee = promotion.deliveryFee;
       const totalAmount = subtotal + deliveryFee;
       const firstProduct = db.products.find((product) => product.id === items[0]?.productId);
       const matchedProducts = items
@@ -5387,7 +5523,11 @@ const server = http.createServer(async (req, res) => {
         ? `EMALLA-TX-${orderId}-${Date.now()}`
         : body.tx_ref || `TX-${Date.now()}`;
       const isCashOnDelivery = shouldInitializePayment && paymentMethod === 'CASH_ON_DELIVERY';
-      const riderPayout = calculateDefaultRiderPayout({ deliveryFee, totalAmount, address: customerAddress });
+      const riderPayout = calculateDefaultRiderPayout({
+        deliveryFee: baseDeliveryFee,
+        totalAmount,
+        address: customerAddress
+      });
       const order = {
         id: orderId,
         orderNumber: generateOrderNumber(),
@@ -5401,6 +5541,12 @@ const server = http.createServer(async (req, res) => {
         paymentStatus: 'PENDING',
         paymentMethod,
         deliveryFee,
+        deliveryFeeBeforeDiscount: baseDeliveryFee,
+        deliveryDiscount: promotion.discount,
+        promotionCode: promotion.eligible ? promotion.code : null,
+        promotionApplied: promotion.eligible,
+        promotionSubsidy: promotion.discount,
+        deliveryDistrict: String(body.deliveryDistrict || '').trim(),
         riderPayout,
         riderPayoutStatus: 'pending_assignment',
         totalAmount,
@@ -5438,6 +5584,20 @@ const server = http.createServer(async (req, res) => {
         type: isCashOnDelivery ? 'success' : 'info',
         metadata: { orderId: order.id }
       }));
+      if (promotion.eligible) {
+        checkoutNotifications.push(createNotification(db, {
+          userId: order.customerId,
+          role: 'CUSTOMER',
+          title: 'Free First Delivery Applied',
+          message: `You saved RWF ${promotion.discount.toLocaleString()} on delivery for ${order.orderNumber}.`,
+          type: 'success',
+          metadata: {
+            orderId: order.id,
+            promotionCode: promotion.code,
+            deliveryDiscount: promotion.discount
+          }
+        }));
+      }
       checkoutNotifications.push(createNotification(db, {
         userId: order.merchantId,
         role: 'MERCHANT',
@@ -5460,7 +5620,10 @@ const server = http.createServer(async (req, res) => {
           merchantId: order.merchantId,
           merchantName: order.merchantName,
           paymentMethod: order.paymentMethod,
-          totalAmount: order.totalAmount
+          totalAmount: order.totalAmount,
+          promotionCode: order.promotionCode,
+          deliveryDiscount: order.deliveryDiscount,
+          riderPayoutProtected: promotion.eligible
         }
       });
       await persistCheckoutBundleRecord({

@@ -25,6 +25,14 @@ body.quote-modal-open {
   overflow: hidden;
 }
 
+body.launch-promotion-open {
+  overflow: hidden;
+}
+
+.cookie-consent-open .launch-promotion-modal {
+  display: none;
+}
+
 .imigongo-bg {
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30L30 0ZM30 10L50 30L30 50L10 30L30 10Z' fill='%23f97316' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
 }
@@ -127,6 +135,10 @@ button {
 
 .support-welcome-enter {
   animation: support-welcome-in 320ms ease-out;
+}
+
+.promotion-popup-enter {
+  animation: promotion-popup-in 320ms ease-out;
 }
 
 .animate-shake {
@@ -296,6 +308,17 @@ button {
   }
 }
 
+@keyframes promotion-popup-in {
+  from {
+    opacity: 0;
+    transform: translateY(1.5rem) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes cart-badge-pop {
   0% {
     transform: scale(0.82);
@@ -336,6 +359,7 @@ button {
   .install-banner-enter,
   .support-bubble-enter,
   .support-welcome-enter,
+  .promotion-popup-enter,
   .mobile-navigation-panel,
   .mobile-bottom-nav__item,
   .mobile-bottom-nav__icon,

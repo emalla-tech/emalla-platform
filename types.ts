@@ -121,6 +121,12 @@ export interface Order {
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
   deliveryFee: number;
+  deliveryFeeBeforeDiscount?: number;
+  deliveryDiscount?: number;
+  deliveryDistrict?: string;
+  promotionCode?: string | null;
+  promotionApplied?: boolean;
+  promotionSubsidy?: number;
   riderPayout?: number;
   riderPayoutStatus?: 'pending_assignment' | 'ready' | 'assigned' | 'released';
   totalAmount: number;

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Shield, Scale, FileText, Lock, UserCheck, Gavel } from 'lucide-react';
+import { Shield, Scale, FileText, Lock, UserCheck, Gavel, Gift } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 
 const TermsOfService: React.FC = () => {
@@ -101,6 +101,24 @@ const TermsOfService: React.FC = () => {
               <h2 className="text-2xl font-bold text-gray-900 mb-4">{t.terms.ipTitle}</h2>
               <p className="text-gray-600 leading-relaxed">
                 {t.terms.ipText}
+              </p>
+            </div>
+          </div>
+
+          <div id="launch-offer" className="flex scroll-mt-28 flex-col gap-8 md:flex-row">
+            <div className="flex-shrink-0">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
+                <Gift size={24} />
+              </div>
+            </div>
+            <div>
+              <h2 className="mb-4 text-2xl font-bold text-gray-900">Kigali First Delivery Launch Offer</h2>
+              <p className="text-gray-600 leading-relaxed">
+                From 4 July through 4 September 2026, an eligible customer placing their first E-Malla order
+                for delivery in Gasabo, Kicukiro, or Nyarugenge may receive an automatic delivery discount of
+                up to RWF 3,500. Eligibility is checked using the customer account, email address, and phone
+                number. The offer is limited to one redemption per customer, is not transferable or redeemable
+                for cash. E-Malla may reject duplicate, fraudulent, cancelled, or otherwise abusive claims.
               </p>
             </div>
           </div>

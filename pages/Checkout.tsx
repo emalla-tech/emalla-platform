@@ -6,7 +6,8 @@ import {
   ChevronRight,
   ArrowLeft,
   Lock,
-  Loader2
+  Loader2,
+  Gift
 } from 'lucide-react';
 import { PaymentMethod } from '../types';
 import { PaymentService } from '../services/paymentService';
@@ -14,6 +15,10 @@ import { OrderService } from '../services/orderService';
 import PaymentMethodSelector from '../components/Payment/PaymentMethodSelector';
 import { useAuth } from '../auth/AuthContext';
 import { getProductDeliveryEstimate } from '../lib/productDelivery';
+import {
+  DeliveryPromotionPreview,
+  promotionService
+} from '../services/promotionService';
 
 const DISTRICTS = [
   'Nyarugenge', 'Gasabo', 'Kicukiro', 
@@ -49,29 +54,69 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
   const [formData, setFormData] = useState({
     fullName: user?.name || '',
     email: user?.email || '',
-    phone: '0780000000',
+    phone: user?.phone || '',
     district: 'Gasabo',
-    sector: 'Kimironko',
-    street: 'KG 11 St, House 4',
+    sector: '',
+    street: '',
     paymentMethod: PaymentMethod.GTBANK_MOMO_PAY,
     notes: ''
   });
+  const [promotionPreview, setPromotionPreview] = useState<DeliveryPromotionPreview | null>(null);
 
   useEffect(() => {
     if (user?.name || user?.email) {
       setFormData((current) => ({
         ...current,
         fullName: user?.name || current.fullName,
-        email: user?.email || current.email
+        email: user?.email || current.email,
+        phone: user?.phone || current.phone
       }));
     }
   }, [user]);
 
-  const deliveryFee = subtotal > 50000 ? 0 : 3500;
+  const baseDeliveryFee = subtotal > 50000 ? 0 : 3500;
+  const deliveryFee = promotionPreview?.eligible ? promotionPreview.deliveryFee : baseDeliveryFee;
   const cartTotal = subtotal;
   const finalTotal = cartTotal + deliveryFee;
   const merchantIds = Array.from(new Set(cartItems.map((item) => item.product.merchantId).filter(Boolean)));
   const hasMixedMerchantCart = merchantIds.length > 1;
+
+  useEffect(() => {
+    setPromotionPreview(null);
+    if (!formData.email.trim() || !formData.phone.trim() || baseDeliveryFee <= 0) {
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      promotionService.previewFirstOrderDelivery({
+        subtotal,
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        district: formData.district,
+        address: `${formData.street}, ${formData.sector}, ${formData.district}`
+      })
+        .then((preview) => {
+          if (!cancelled) setPromotionPreview(preview);
+        })
+        .catch(() => {
+          if (!cancelled) setPromotionPreview(null);
+        });
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    baseDeliveryFee,
+    formData.district,
+    formData.email,
+    formData.phone,
+    formData.sector,
+    formData.street,
+    subtotal
+  ]);
 
   const handlePlaceOrder = async () => {
     if (cartItems.length === 0) {
@@ -109,6 +154,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
         })),
         totalAmount: finalTotal,
         deliveryFee,
+        deliveryDistrict: formData.district,
         address: `${formData.street}, ${formData.sector}, ${formData.district}`,
         phone: formData.phone,
         paymentMethod: formData.paymentMethod,
@@ -116,11 +162,12 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
       });
       const order = checkoutResult.order;
       createdOrderId = order.id;
+      const confirmedTotal = Number(order.totalAmount || finalTotal);
 
       // Keep the legacy initiation call as a safe deployment-order fallback.
       const paymentInit = checkoutResult.paymentInit || await PaymentService.initializePayment({
           orderId: order.id,
-          amount: finalTotal,
+          amount: confirmedTotal,
           customerEmail: formData.email,
           customerName: formData.fullName,
           method: formData.paymentMethod
@@ -133,7 +180,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
       }
 
       const emailParam = encodeURIComponent(formData.email);
-      navigate(`/payment/processing?tx_ref=${String(paymentInit.tx_ref)}&order_id=${order.id}&email=${emailParam}&amount=${finalTotal}`);
+      navigate(`/payment/processing?tx_ref=${String(paymentInit.tx_ref)}&order_id=${order.id}&email=${emailParam}&amount=${confirmedTotal}`);
 
     } catch (err) {
       if (createdOrderId) {
@@ -313,8 +360,28 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
                    </div>
                    <div className="flex justify-between text-sm">
                       <span className="text-gray-400 font-medium">Delivery</span>
-                      <span className="text-emerald-600 font-bold">RWF {deliveryFee.toLocaleString()}</span>
+                      {promotionPreview?.eligible ? (
+                        <span className="flex items-center gap-2 font-bold">
+                          <span className="text-gray-400 line-through">RWF {baseDeliveryFee.toLocaleString()}</span>
+                          <span className="text-emerald-600">FREE</span>
+                        </span>
+                      ) : (
+                        <span className="text-emerald-600 font-bold">RWF {deliveryFee.toLocaleString()}</span>
+                      )}
                    </div>
+                   {promotionPreview?.eligible && (
+                     <div className="flex items-start gap-3 rounded-2xl border border-orange-100 bg-orange-50 p-4">
+                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-500 text-white">
+                         <Gift size={17} />
+                       </span>
+                       <div>
+                         <p className="text-xs font-black text-gray-900">Free first delivery applied</p>
+                         <p className="mt-1 text-[10px] font-bold leading-5 text-orange-700">
+                           Kigali launch offer saved you RWF {promotionPreview.discount.toLocaleString()}.
+                         </p>
+                       </div>
+                     </div>
+                   )}
                    <div className="flex justify-between items-center pt-4 border-t border-gray-100">
                       <span className="text-lg font-black text-gray-900">Total</span>
                       <span className="text-2xl font-black text-orange-600">RWF {finalTotal.toLocaleString()}</span>

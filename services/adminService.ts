@@ -41,6 +41,8 @@ export type AdminFinanceResponse = {
     onlineRevenue: number;
     pendingCodValue: number;
     deliveryFeesCollected: number;
+    promotionSubsidies: number;
+    promotedOrders: number;
     totalCommissionEarned: number;
     merchantNetRevenue: number;
     platformNetRevenue: number;

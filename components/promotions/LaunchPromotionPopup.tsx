@@ -107,7 +107,7 @@ const LaunchPromotionPopup = () => {
 
   return (
     <aside
-      className="launch-promotion-modal fixed inset-0 z-[130] flex items-end justify-center bg-gray-950/55 p-0 backdrop-blur-sm sm:items-center sm:p-5"
+      className="launch-promotion-modal fixed inset-0 z-[130] flex items-center justify-center bg-gray-950/55 p-4 backdrop-blur-sm sm:p-5"
       aria-label="E-Malla launch offer"
     >
       <button
@@ -120,25 +120,25 @@ const LaunchPromotionPopup = () => {
         role="dialog"
         aria-modal="true"
         aria-labelledby="launch-promotion-title"
-        className="promotion-popup-enter relative z-10 w-full max-w-xl overflow-hidden rounded-t-[38px] bg-white shadow-[0_30px_100px_rgba(15,23,42,0.35)] sm:rounded-[38px]"
+        className="promotion-popup-enter relative z-10 max-h-[calc(100dvh-2rem)] w-full max-w-[22rem] overflow-y-auto rounded-[30px] bg-white shadow-[0_30px_100px_rgba(15,23,42,0.35)] sm:max-w-xl sm:rounded-[38px]"
       >
-        <div className="relative overflow-hidden bg-gray-950 px-7 pb-8 pt-7 text-white sm:px-10 sm:pb-10">
+        <div className="relative overflow-hidden bg-gray-950 px-6 pb-6 pt-6 text-white sm:px-10 sm:pb-10 sm:pt-7">
           <div className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-orange-500/25 blur-2xl" />
           <div className="absolute -bottom-24 left-10 h-44 w-44 rounded-full bg-emerald-400/10 blur-2xl" />
           <button
             type="button"
             onClick={dismiss}
-            className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white transition-colors hover:bg-white/20"
+            className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white transition-colors hover:bg-white/20 sm:right-5 sm:top-5 sm:h-10 sm:w-10 sm:rounded-2xl"
             aria-label="Close launch offer"
           >
             <X size={19} />
           </button>
 
-          <span className="relative flex h-14 w-14 items-center justify-center rounded-3xl bg-orange-500 text-white shadow-xl shadow-orange-950/30">
-            <Gift size={28} />
+          <span className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-xl shadow-orange-950/30 sm:h-14 sm:w-14 sm:rounded-3xl">
+            <Gift size={24} />
           </span>
           <div
-            className="absolute left-1/2 top-7 flex -translate-x-1/2 items-center gap-0.5 rounded-2xl border border-white bg-white px-2 py-2.5 shadow-xl shadow-black/25"
+            className="absolute left-1/2 top-5 flex -translate-x-1/2 items-center gap-0.5 rounded-xl border border-white bg-white px-1.5 py-2 shadow-xl shadow-black/25 sm:top-7 sm:rounded-2xl sm:px-2 sm:py-2.5"
             aria-label={`${countdown.days} days, ${countdown.hours} hours, ${countdown.minutes} minutes and ${countdown.seconds} seconds remaining`}
           >
             {[
@@ -147,8 +147,8 @@ const LaunchPromotionPopup = () => {
               { label: 'M', value: countdown.minutes },
               { label: 'S', value: countdown.seconds }
             ].map((item) => (
-              <span key={item.label} className="min-w-9 text-center">
-                <span className="block text-sm font-black tabular-nums leading-none text-gray-950">
+              <span key={item.label} className="min-w-8 text-center sm:min-w-9">
+                <span className="block text-xs font-black tabular-nums leading-none text-gray-950 sm:text-sm">
                   {String(item.value).padStart(2, '0')}
                 </span>
                 <span className="mt-1 block text-[8px] font-black uppercase tracking-[0.12em] text-orange-600">
@@ -157,28 +157,28 @@ const LaunchPromotionPopup = () => {
               </span>
             ))}
           </div>
-          <p className="relative mt-6 text-[10px] font-black uppercase tracking-[0.25em] text-orange-400">Kigali Launch Offer</p>
-          <h2 id="launch-promotion-title" className="relative mt-2 max-w-md text-3xl font-black leading-tight sm:text-4xl">
+          <p className="relative mt-5 text-[9px] font-black uppercase tracking-[0.23em] text-orange-400 sm:mt-6 sm:text-[10px]">Kigali Launch Offer</p>
+          <h2 id="launch-promotion-title" className="relative mt-2 max-w-md text-2xl font-black leading-tight sm:text-4xl">
             Your First Delivery Is On Us
           </h2>
-          <p className="relative mt-4 max-w-md text-sm font-medium leading-7 text-gray-300">
+          <p className="relative mt-3 max-w-md text-xs font-medium leading-6 text-gray-300 sm:mt-4 sm:text-sm sm:leading-7">
             Place your first E-Malla order and enjoy free delivery within Kigali during our limited launch campaign.
           </p>
         </div>
 
-        <div className="space-y-5 px-7 py-7 sm:px-10 sm:py-8">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="flex items-center gap-3 rounded-2xl bg-orange-50 p-4">
+        <div className="space-y-4 px-6 py-5 sm:space-y-5 sm:px-10 sm:py-8">
+          <div className="grid gap-2.5 sm:grid-cols-2 sm:gap-3">
+            <div className="flex items-center gap-3 rounded-2xl bg-orange-50 p-3 sm:p-4">
               <Truck size={19} className="shrink-0 text-orange-600" />
               <span className="text-xs font-black text-gray-800">First order delivery free</span>
             </div>
-            <div className="flex items-center gap-3 rounded-2xl bg-blue-50 p-4">
+            <div className="flex items-center gap-3 rounded-2xl bg-blue-50 p-3 sm:p-4">
               <MapPin size={19} className="shrink-0 text-blue-600" />
               <span className="text-xs font-black text-gray-800">In Kigali</span>
             </div>
           </div>
 
-          <p className="text-xs font-semibold leading-6 text-gray-500">
+          <p className="text-[11px] font-semibold leading-5 text-gray-500 sm:text-xs sm:leading-6">
             Valid through {endDate}. Applied automatically at checkout after first-order eligibility is confirmed.
           </p>
 
@@ -186,14 +186,14 @@ const LaunchPromotionPopup = () => {
             <Link
               to="/shop"
               onClick={dismiss}
-              className="flex flex-1 items-center justify-center rounded-2xl bg-orange-500 px-6 py-4 text-sm font-black text-white shadow-xl shadow-orange-200 transition-colors hover:bg-orange-600"
+              className="flex flex-1 items-center justify-center rounded-2xl bg-orange-500 px-6 py-3.5 text-sm font-black text-white shadow-xl shadow-orange-200 transition-colors hover:bg-orange-600 sm:py-4"
             >
               Shop Now <ArrowRight size={17} className="ml-2" />
             </Link>
             <Link
               to="/terms#launch-offer"
               onClick={dismiss}
-              className="flex items-center justify-center rounded-2xl border border-gray-200 px-6 py-4 text-xs font-black text-gray-600 transition-colors hover:bg-gray-50"
+              className="flex items-center justify-center rounded-2xl border border-gray-200 px-6 py-3.5 text-xs font-black text-gray-600 transition-colors hover:bg-gray-50 sm:py-4"
             >
               Offer Terms
             </Link>

@@ -52,20 +52,23 @@ const CustomerMobileChrome: React.FC<CustomerMobileChromeProps> = ({ cartCount }
       {showFloatingCart && (
         <Link
           to="/cart"
-          aria-label="Open shopping cart"
-          className="floating-cart md:hidden fixed right-4 bottom-[calc(7.1rem+env(safe-area-inset-bottom,0px))] z-[70] flex items-center gap-2 rounded-full bg-orange-500 px-4 py-3 text-white shadow-[0_18px_40px_rgba(249,115,22,0.38)] transition-transform active:scale-95"
+          aria-label={`Open shopping cart${cartCount > 0 ? ` with ${cartCount} item${cartCount === 1 ? '' : 's'}` : ''}`}
+          className="floating-cart fixed bottom-[calc(7.1rem+env(safe-area-inset-bottom,0px))] right-4 z-[70] flex h-14 w-14 items-center justify-center rounded-full bg-orange-500 text-white shadow-[0_18px_40px_rgba(249,115,22,0.38)] transition-all active:scale-95 md:hidden"
         >
-          <ShoppingCart size={18} />
-          <span className="text-xs font-black uppercase tracking-widest">Cart</span>
+          <ShoppingCart size={22} />
+          <span className="sr-only">Cart</span>
           {cartCount > 0 && (
-            <span className="min-w-6 animate-cart-badge rounded-full bg-white px-2 py-1 text-center text-[10px] font-black text-orange-600">
+            <span
+              key={cartCount}
+              className="animate-cart-badge absolute -right-1 -top-1 flex min-h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-gray-900 px-1.5 text-[10px] font-black text-white"
+            >
               {cartCount}
             </span>
           )}
         </Link>
       )}
 
-      <nav className="mobile-bottom-nav bg-white/96 md:hidden" aria-label="Customer navigation">
+      <nav className="mobile-bottom-nav md:hidden" aria-label="Customer navigation">
         <div className="mobile-bottom-nav__inner">
           {NAV_ITEMS.map((item) => {
             const active = isActive(item.to);

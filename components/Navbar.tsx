@@ -72,6 +72,25 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
     };
   }, []);
 
+  useEffect(() => {
+    document.body.classList.toggle('mobile-menu-open', isOpen);
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+    }
+
+    return () => {
+      document.body.classList.remove('mobile-menu-open');
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen]);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -298,7 +317,14 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
 
           {/* Mobile menu button */}
           <div className="md:hidden flex items-center space-x-4">
-            <button onClick={() => setIsOpen(!isOpen)} className="text-gray-900">
+            <button
+              type="button"
+              onClick={() => setIsOpen((current) => !current)}
+              className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-900 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-100"
+              aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={isOpen}
+              aria-controls="mobile-navigation"
+            >
               {isOpen ? <X size={28} /> : <Menu size={28} />}
             </button>
           </div>
@@ -307,7 +333,14 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
 
       {/* Mobile Menu */}
       {isOpen && (
-        <div className="md:hidden bg-white border-t p-6 space-y-6 shadow-2xl animate-in slide-in-from-top duration-300">
+        <div
+          id="mobile-navigation"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mobile navigation"
+          className="mobile-navigation-panel fixed inset-x-0 bottom-0 top-20 z-[55] overflow-y-auto overscroll-contain border-t border-gray-100 bg-white px-6 py-7 shadow-2xl md:hidden"
+        >
+          <div className="mx-auto w-full max-w-lg space-y-6">
           <div className="flex items-center justify-between gap-3 bg-gray-50 rounded-2xl px-4 py-3">
             <div className="flex items-center gap-2 text-gray-500">
               <Globe size={16} />
@@ -372,6 +405,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
                 {navLabelMap[link.name] || link.name}
               </Link>
             ))}
+          </div>
           </div>
         </div>
       )}

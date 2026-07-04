@@ -17,6 +17,10 @@ body {
   overscroll-behavior-y: contain;
 }
 
+body.mobile-menu-open {
+  overflow: hidden;
+}
+
 .imigongo-bg {
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30L30 0ZM30 10L50 30L30 50L10 30L30 10Z' fill='%23f97316' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
 }
@@ -51,7 +55,9 @@ button {
   bottom: 0;
   z-index: 60;
   padding: 0.85rem 0.9rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
   border-top: 1px solid rgba(229, 231, 235, 0.9);
   box-shadow: 0 -20px 45px rgba(17, 24, 39, 0.08);
 }
@@ -326,6 +332,7 @@ button {
   .install-banner-enter,
   .support-bubble-enter,
   .support-welcome-enter,
+  .mobile-navigation-panel,
   .mobile-bottom-nav__item,
   .mobile-bottom-nav__icon,
   .trusted-brands-track {
@@ -339,9 +346,31 @@ button {
 }
 
 @media (max-width: 767px) {
+  .mobile-navigation-panel {
+    animation: mobile-navigation-in 220ms ease-out;
+  }
+
+  .mobile-menu-open .floating-cart,
+  .mobile-menu-open .mobile-bottom-nav,
+  .mobile-menu-open .mobile-product-action-bar,
+  .mobile-menu-open .whatsapp-support {
+    display: none !important;
+  }
+
   .cookie-consent-open .floating-cart,
   .cookie-consent-open .mobile-product-action-bar,
   .cookie-consent-open .whatsapp-support {
     display: none;
+  }
+}
+
+@keyframes mobile-navigation-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.75rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

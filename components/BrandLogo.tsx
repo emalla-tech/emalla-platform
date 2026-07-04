@@ -36,7 +36,7 @@ const BrandLogo = ({
             inverse ? 'text-orange-400' : 'text-orange-600'
           } ${
             revealCountry
-              ? 'ml-0 max-w-0 translate-x-1.5 opacity-0 group-hover:ml-1.5 group-hover:max-w-20 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:ml-1.5 group-focus-visible:max-w-20 group-focus-visible:translate-x-0 group-focus-visible:opacity-100'
+              ? 'ml-1 max-w-20 translate-x-0 opacity-100 md:ml-0 md:max-w-0 md:translate-x-1.5 md:opacity-0 md:group-hover:ml-1.5 md:group-hover:max-w-20 md:group-hover:translate-x-0 md:group-hover:opacity-100 md:group-focus-visible:ml-1.5 md:group-focus-visible:max-w-20 md:group-focus-visible:translate-x-0 md:group-focus-visible:opacity-100'
               : 'ml-1.5 max-w-20 opacity-100'
           }`}
         >

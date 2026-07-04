@@ -50,7 +50,7 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
   return (
     <div className="overflow-hidden">
       {/* Hero Section */}
-      <section className="relative h-[750px] flex items-center bg-gray-900 text-white overflow-hidden">
+      <section className="relative flex min-h-[calc(100svh-5rem)] items-center overflow-hidden bg-gray-900 py-10 pb-36 text-white md:h-[750px] md:min-h-0 md:py-0 md:pb-0">
         <div className="absolute inset-0 z-0">
           <img
             src="https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&q=80&w=1920"
@@ -63,30 +63,30 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
           <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent"></div>
         </div>
         
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="relative z-10 mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
-            <span className="bg-orange-500 text-white px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[2px] mb-8 inline-block shadow-lg">
+            <span className="mb-6 inline-block rounded-full bg-orange-500 px-4 py-2 text-[10px] font-black uppercase leading-relaxed tracking-[2px] text-white shadow-lg md:mb-8 md:px-5 md:py-1.5">
               {t.home.heroBadge}
             </span>
-            <h1 className="text-6xl md:text-8xl font-black leading-[1.05] mb-8 tracking-tight">
+            <h1 className="mb-6 text-[3.25rem] font-black leading-[1.02] tracking-tight sm:text-6xl md:mb-8 md:text-8xl md:leading-[1.05]">
               {t.home.heroTitleLine1} <br/>
               <span className="text-orange-500">{t.home.heroTitleLine2}</span>
             </h1>
-            <p className="text-xl text-gray-200 mb-12 leading-relaxed font-medium max-w-xl">
+            <p className="mb-8 max-w-xl text-base font-medium leading-7 text-gray-200 sm:text-lg md:mb-12 md:text-xl md:leading-relaxed">
               {t.home.heroDescription}
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
               <Link 
                 to="/shop" 
-                className="bg-orange-500 hover:bg-orange-600 text-white px-10 py-5 rounded-2xl font-black text-lg flex items-center justify-center transition-all shadow-2xl shadow-orange-500/20 active:scale-95 group"
+                className="group flex items-center justify-center rounded-2xl bg-orange-500 px-7 py-4 text-base font-black text-white shadow-2xl shadow-orange-500/20 transition-all hover:bg-orange-600 active:scale-95 sm:px-10 sm:py-5 sm:text-lg"
               >
                 <span>{t.home.exploreShop}</span>
                 <ShoppingBag className="ml-3 group-hover:rotate-12 transition-transform" size={22} />
               </Link>
               <Link 
                 to="/become-seller" 
-                className="bg-white hover:bg-gray-100 text-black px-10 py-5 rounded-2xl font-black text-lg flex items-center justify-center transition-all shadow-2xl shadow-white/10 active:scale-95"
+                className="flex items-center justify-center rounded-2xl bg-white px-7 py-4 text-base font-black text-black shadow-2xl shadow-white/10 transition-all hover:bg-gray-100 active:scale-95 sm:px-10 sm:py-5 sm:text-lg"
               >
                 {t.home.sellOnEmalla}
               </Link>

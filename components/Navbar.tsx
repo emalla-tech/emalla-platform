@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Menu, X, Search, Store, User, Truck, ChevronDown, LogOut, LogIn, UserPlus, Globe, Heart } from 'lucide-react';
 import { NAV_LINKS } from '../constants';
 import NotificationBell from './notifications/NotificationBell';
+import BrandLogo from './BrandLogo';
 import { useAuth } from '../auth/AuthContext';
 import { UserRole } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -84,12 +85,14 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
     <nav className="bg-white shadow-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-20 items-center gap-4">
-          {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2 group flex-shrink-0">
-            <div className="w-8 h-8 bg-orange-500 rounded-lg group-hover:rotate-12 transition-transform shadow-lg shadow-orange-100"></div>
-            <span className="text-2xl font-black text-gray-900 whitespace-nowrap">
-              E-Malla <span className="font-light">Rwanda</span>
-            </span>
+          {/* Primary brand: the country name reveals without replacing the accessible label. */}
+          <Link
+            to="/"
+            aria-label="E-Malla Rwanda home"
+            title="E-Malla Rwanda"
+            className="group flex-shrink-0 rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-100"
+          >
+            <BrandLogo revealCountry showTagline />
           </Link>
 
           {/* Desktop Nav */}

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">E-Malla Rwanda</title>
+  <desc id="desc">Shopping cart symbol with an integrated letter E</desc>
+  <path d="M10 22h17l13 65h67" fill="none" stroke="#0B1020" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M34 31h82l-9 48H44z" fill="#F97316"/>
+  <path d="M52 42h47M52 55h37M52 68h47" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="square"/>
+  <circle cx="49" cy="104" r="10" fill="#0B1020"/>
+  <circle cx="99" cy="104" r="10" fill="#0B1020"/>
+</svg>

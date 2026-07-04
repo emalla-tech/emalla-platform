@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 180" role="img" aria-labelledby="title desc">
+  <title id="title">E-Malla Rwanda monochrome logo</title>
+  <desc id="desc">Monochrome E-Malla shopping cart logo</desc>
+  <g transform="translate(12 18)" fill="#111111" stroke="#111111">
+    <path d="M8 20h19l14 72h74" fill="none" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M35 30h91l-10 53H46z" stroke="none"/>
+    <path d="M55 42h52M55 57h41M55 72h52" fill="none" stroke="#FFFFFF" stroke-width="10"/>
+    <circle cx="51" cy="111" r="11" stroke="none"/>
+    <circle cx="106" cy="111" r="11" stroke="none"/>
+  </g>
+  <text x="170" y="94" fill="#111111" font-family="Montserrat, Arial, sans-serif" font-size="72" font-weight="800">E-Malla</text>
+  <text x="174" y="137" fill="#111111" font-family="Montserrat, Arial, sans-serif" font-size="27" font-weight="500" letter-spacing="5">Buy  |  Sell  |  Deliver</text>
+</svg>

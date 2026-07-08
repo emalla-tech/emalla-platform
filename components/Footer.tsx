@@ -153,7 +153,7 @@ const Footer: React.FC = () => {
 
         <div className="border-t border-white/10 pt-8 flex justify-center">
           <p className="text-gray-500 text-[10px] font-black uppercase tracking-[3px] text-center">
-            &copy; {new Date().getFullYear()} E-Malla Rwanda Powered By E-Malla Technologies
+            &copy; {new Date().getFullYear()} E-Malla Rwanda Powered By PERFECT Technologies LTD
           </p>
         </div>
       </div>

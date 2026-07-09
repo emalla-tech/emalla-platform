@@ -76,7 +76,13 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const matchesCategory = currentCategory === 'all' || product.category === currentCategory;
-      const matchesSearch = product.name.toLowerCase().includes(deferredSearchTerm.toLowerCase());
+      const searchableText = [
+        product.name,
+        product.description,
+        CATEGORIES.find((category) => category.id === product.category)?.name,
+        ...(product.tags || [])
+      ].join(' ').toLowerCase();
+      const matchesSearch = searchableText.includes(deferredSearchTerm.toLowerCase());
       return matchesCategory && matchesSearch;
     });
   }, [currentCategory, products, deferredSearchTerm]);
@@ -84,7 +90,7 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
   const searchSuggestions = useMemo(() => {
     if (!deferredSearchTerm.trim()) return [];
     return products
-      .filter(p => p.name.toLowerCase().includes(deferredSearchTerm.toLowerCase()))
+      .filter((p) => [p.name, p.description, ...(p.tags || [])].join(' ').toLowerCase().includes(deferredSearchTerm.toLowerCase()))
       .slice(0, 5)
       .map(p => p.name);
   }, [products, deferredSearchTerm]);

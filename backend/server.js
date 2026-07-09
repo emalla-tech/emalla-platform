@@ -1301,6 +1301,18 @@ const normalizeProductMedia = (product) => {
 const PRODUCT_FULFILLMENT_TYPES = new Set(['ready_stock', 'imported_on_demand', 'preorder']);
 const PRODUCT_PRICING_TYPES = new Set(['fixed', 'quote']);
 
+const normalizeProductTags = (value) => {
+  const rawTags = Array.isArray(value) ? value : String(value || '').split(',');
+  return Array.from(
+    new Set(
+      rawTags
+        .map((tag) => String(tag || '').trim().replace(/\s+/g, ' '))
+        .filter((tag) => tag.length >= 2)
+        .map((tag) => tag.slice(0, 40))
+    )
+  ).slice(0, 12);
+};
+
 const normalizeProductPricingType = (value, fallback = 'fixed') => {
   const pricingType = String(value ?? fallback).trim().toLowerCase();
   if (!PRODUCT_PRICING_TYPES.has(pricingType)) {
@@ -4966,6 +4978,7 @@ const server = http.createServer(async (req, res) => {
       const db = await readDb();
       const canControlApproval = user.role === 'ADMIN';
       const deliverySettings = normalizeProductDeliverySettings(body);
+      const tags = normalizeProductTags(body.tags);
       const product = normalizeProductMedia({
         id: `p${Date.now()}`,
         name: productName,
@@ -4978,6 +4991,7 @@ const server = http.createServer(async (req, res) => {
         rating: body.rating || 0,
         description: body.description || '',
         specifications: body.specifications || '',
+        tags,
         merchantId: canControlApproval ? body.merchantId || user.id : user.id,
         merchantName: canControlApproval ? body.merchantName || user.name : user.name,
         status: canControlApproval ? body.status || 'pending' : 'pending',
@@ -5066,6 +5080,9 @@ const server = http.createServer(async (req, res) => {
       ].some((field) => body[field] !== undefined);
       if (deliveryFieldsChanged) {
         Object.assign(body, normalizeProductDeliverySettings(body, existing));
+      }
+      if (body.tags !== undefined) {
+        body.tags = normalizeProductTags(body.tags);
       }
 
       const previousMediaUrls = getProductMediaUrls(existing);

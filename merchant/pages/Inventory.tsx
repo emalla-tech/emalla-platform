@@ -13,72 +13,23 @@ import { CATEGORIES } from '../../constants';
 import { getProductPrimaryImage, handleProductImageError } from '../../lib/productImages';
 import { PRODUCT_FULFILLMENT_OPTIONS } from '../../lib/productDelivery';
 
-const SPECIFICATION_FIELDS = [
-  { key: 'material', label: 'Material', placeholder: 'e.g. Genuine leather' },
-  { key: 'dimensions', label: 'Dimensions', placeholder: 'e.g. 40 x 30 x 12 cm' },
-  { key: 'weight', label: 'Weight', placeholder: 'e.g. 1.2 kg' },
-  { key: 'warranty', label: 'Warranty', placeholder: 'e.g. 12 months' },
-  { key: 'color', label: 'Color', placeholder: 'e.g. Black, Brown' },
-  { key: 'size', label: 'Size', placeholder: 'e.g. S, M, L or Standard' }
-] as const;
-
-type SpecificationFieldKey = (typeof SPECIFICATION_FIELDS)[number]['key'];
-type StructuredSpecifications = Record<SpecificationFieldKey, string> & { additional: string };
-
-const createEmptySpecifications = (): StructuredSpecifications => ({
-  material: '',
-  dimensions: '',
-  weight: '',
-  warranty: '',
-  color: '',
-  size: '',
-  additional: ''
-});
-
-const parseSpecifications = (raw: string | undefined): StructuredSpecifications => {
-  const parsed = createEmptySpecifications();
-  const remaining: string[] = [];
-  const labelMap = Object.fromEntries(SPECIFICATION_FIELDS.map((field) => [field.label.toLowerCase(), field.key])) as Record<string, SpecificationFieldKey>;
-
-  String(raw || '')
+const normalizeMultilineText = (value: string | undefined) =>
+  String(value || '')
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
-    .forEach((line) => {
-      const separatorIndex = line.indexOf(':');
-      if (separatorIndex === -1) {
-        remaining.push(line);
-        return;
-      }
+    .join('\n');
 
-      const label = line.slice(0, separatorIndex).trim().toLowerCase();
-      const value = line.slice(separatorIndex + 1).trim();
-      const key = labelMap[label];
-
-      if (key) {
-        parsed[key] = value;
-      } else if (value) {
-        remaining.push(line);
-      }
-    });
-
-  parsed.additional = remaining.join('\n');
-  return parsed;
-};
-
-const buildSpecifications = (specifications: StructuredSpecifications) => {
-  const lines = SPECIFICATION_FIELDS.map((field) => {
-    const value = specifications[field.key].trim();
-    return value ? `${field.label}: ${value}` : '';
-  }).filter(Boolean);
-
-  const additionalLines = specifications.additional
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  return [...lines, ...additionalLines].join('\n');
-};
+const normalizeProductTags = (value: string | undefined) =>
+  Array.from(
+    new Set(
+      String(value || '')
+        .split(',')
+        .map((tag) => tag.trim().replace(/\s+/g, ' '))
+        .filter((tag) => tag.length >= 2)
+        .map((tag) => tag.slice(0, 40))
+    )
+  ).slice(0, 12);
 
 const mergeProductIntoInventory = (items: Product[], product: Product) => {
   const existingIndex = items.findIndex((entry) => entry.id === product.id);
@@ -112,7 +63,8 @@ const Inventory: React.FC = () => {
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' | 'info' } | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
-  const [structuredSpecifications, setStructuredSpecifications] = useState<StructuredSpecifications>(createEmptySpecifications());
+  const [specificationsText, setSpecificationsText] = useState('');
+  const [productTags, setProductTags] = useState('');
   
   const [newProduct, setNewProduct] = useState<Partial<Product>>({
     name: '',
@@ -121,6 +73,7 @@ const Inventory: React.FC = () => {
     category: '1',
     description: '',
     specifications: '',
+    tags: [],
     stock: 0,
     fulfillmentType: 'ready_stock',
     deliveryMinDays: 1,
@@ -241,12 +194,14 @@ const Inventory: React.FC = () => {
     setIsSubmitting(true);
     try {
       const description = String(newProduct.description || '').trim();
-      const specifications = buildSpecifications(structuredSpecifications);
+      const specifications = normalizeMultilineText(specificationsText);
+      const tags = normalizeProductTags(productTags);
       const productPayload = {
         ...newProduct,
         price: newProduct.pricingType === 'quote' ? 0 : Number(newProduct.price || 0),
         description,
-        specifications
+        specifications,
+        tags
       };
 
       const savedProduct = editingProductId
@@ -270,6 +225,7 @@ const Inventory: React.FC = () => {
         category: '1',
         description: '',
         specifications: '',
+        tags: [],
         stock: 0,
         fulfillmentType: 'ready_stock',
         deliveryMinDays: 1,
@@ -280,7 +236,8 @@ const Inventory: React.FC = () => {
         status: 'pending',
         featured: true
       });
-      setStructuredSpecifications(createEmptySpecifications());
+      setSpecificationsText('');
+      setProductTags('');
     } catch (err) {
       console.error(err);
       showToast(getErrorMessage(err), 'error');
@@ -310,7 +267,8 @@ const Inventory: React.FC = () => {
       status: product.status || 'pending',
       featured: product.featured ?? false
     });
-    setStructuredSpecifications(parseSpecifications(product.specifications));
+    setSpecificationsText(normalizeMultilineText(product.specifications));
+    setProductTags((product.tags || []).join(', '));
     setIsModalOpen(true);
   };
 
@@ -323,6 +281,7 @@ const Inventory: React.FC = () => {
         category: '1',
         description: '',
         specifications: '',
+        tags: [],
         stock: 0,
         fulfillmentType: 'ready_stock',
         deliveryMinDays: 1,
@@ -333,7 +292,8 @@ const Inventory: React.FC = () => {
       status: 'pending',
       featured: false
     });
-    setStructuredSpecifications(createEmptySpecifications());
+    setSpecificationsText('');
+    setProductTags('');
   };
 
   const visibleProducts = products.filter((product) => {
@@ -788,38 +748,30 @@ const Inventory: React.FC = () => {
               </div>
 
               <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Product Tags</label>
+                <input
+                  type="text"
+                  value={productTags}
+                  onChange={(e) => setProductTags(e.target.value)}
+                  placeholder="laptop, hp, core i5, business laptop, kigali"
+                  className="w-full px-6 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 rounded-2xl outline-none font-bold text-gray-900 transition-all"
+                />
+                <p className="text-[10px] text-gray-400 font-medium italic">
+                  Add up to 12 keywords separated by commas. Tags help customers find this product in search and improve product SEO context.
+                </p>
+              </div>
+
+              <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Specifications</label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {SPECIFICATION_FIELDS.map((field) => (
-                    <input
-                      key={field.key}
-                      type="text"
-                      value={structuredSpecifications[field.key]}
-                      onChange={(e) =>
-                        setStructuredSpecifications((current) => ({
-                          ...current,
-                          [field.key]: e.target.value
-                        }))
-                      }
-                      placeholder={field.placeholder}
-                      className="w-full px-6 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 rounded-2xl outline-none font-bold text-gray-900 transition-all"
-                    />
-                  ))}
-                </div>
                 <textarea
-                  rows={3}
-                  value={structuredSpecifications.additional}
-                  onChange={(e) =>
-                    setStructuredSpecifications((current) => ({
-                      ...current,
-                      additional: e.target.value
-                    }))
-                  }
-                  placeholder="Additional specifications, one detail per line..."
+                  rows={5}
+                  value={specificationsText}
+                  onChange={(e) => setSpecificationsText(e.target.value)}
+                  placeholder="Brand: HP&#10;Model: EliteBook 840 G5&#10;RAM: 8GB&#10;Storage: 256GB SSD&#10;Warranty: 6 months"
                   className="w-full px-6 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 rounded-2xl outline-none font-bold text-gray-900 transition-all resize-none"
                 ></textarea>
                 <p className="text-[10px] text-gray-400 font-medium italic">
-                  Structured fields make the product page cleaner, while extra lines can go in additional specifications.
+                  Use one specification per line. Example: Brand: HP, RAM: 8GB, Warranty: 6 months.
                 </p>
               </div>
 

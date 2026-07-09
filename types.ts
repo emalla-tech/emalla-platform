@@ -183,6 +183,7 @@ export interface Product {
   rating: number;
   description?: string;
   specifications?: string;
+  tags?: string[];
   merchantId?: string;
   merchantName?: string;
   status?: string;

@@ -108,9 +108,20 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 160);
+    const categoryName = CATEGORIES.find((category) => category.id === product.category)?.name || 'General';
+    const keywords = Array.from(new Set([product.name, categoryName, ...(product.tags || []), 'E-Malla Rwanda']))
+      .filter(Boolean)
+      .join(', ');
+    let keywordsMeta = document.querySelector('meta[name="keywords"]');
+    if (!keywordsMeta) {
+      keywordsMeta = document.createElement('meta');
+      keywordsMeta.setAttribute('name', 'keywords');
+      document.head.appendChild(keywordsMeta);
+    }
 
     document.title = title;
     document.querySelector('meta[name="description"]')?.setAttribute('content', description);
+    keywordsMeta.setAttribute('content', keywords);
     document.querySelector('meta[property="og:title"]')?.setAttribute('content', title);
     document.querySelector('meta[property="og:description"]')?.setAttribute('content', description);
   }, [product]);
@@ -192,7 +203,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
       return manualSpecifications.map((line) => {
         const separatorIndex = line.indexOf(':');
         if (separatorIndex === -1) {
-          return { label: 'Detail', value: line };
+          return { label: '', value: line };
         }
 
         return {
@@ -396,6 +407,19 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
           <div className="flex flex-col justify-start">
             <div className="mb-6">
               <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4 leading-tight">{product.name}</h1>
+              {product.tags?.length ? (
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {product.tags.slice(0, 6).map((tag) => (
+                    <Link
+                      key={tag}
+                      to={`/shop?search=${encodeURIComponent(tag)}`}
+                      className="rounded-full border border-orange-100 bg-orange-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-orange-600 transition-colors hover:border-orange-300 hover:bg-orange-100"
+                    >
+                      #{tag}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
               
               <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center text-yellow-500 bg-yellow-50 px-2 py-1 rounded-lg">
@@ -723,7 +747,9 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
                       >
                         <CheckCircle2 size={18} className="text-orange-500 mt-1 flex-shrink-0" />
                         <div>
-                          <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{item.label}</p>
+                          {item.label ? (
+                            <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{item.label}</p>
+                          ) : null}
                           <p className="mt-1 text-sm md:text-base font-medium leading-relaxed text-gray-900">{item.value}</p>
                         </div>
                       </div>

@@ -428,6 +428,17 @@ const OrderManagement: React.FC = () => {
                   </div>
                   <p className="text-sm font-bold text-gray-900">{selectedOrder.riderName || 'Not assigned yet'}</p>
                   {selectedOrder.riderId && <p className="text-xs text-gray-500 mt-1">ID: {selectedOrder.riderId}</p>}
+                  {selectedOrder.deliveryVerificationStatus ? (
+                    <p className={`text-[10px] font-black uppercase tracking-widest mt-3 ${
+                      selectedOrder.deliveryVerificationStatus === 'code_verified' ? 'text-emerald-600' : 'text-orange-500'
+                    }`}>
+                      {selectedOrder.deliveryVerificationStatus === 'code_verified'
+                        ? 'Customer code verified'
+                        : selectedOrder.deliveryVerificationStatus === 'code_generated'
+                          ? 'Delivery code generated'
+                          : 'Delivery code not required'}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="rounded-3xl border border-gray-100 px-5 py-4">
                   <div className="flex items-center gap-2 text-gray-400 mb-3">

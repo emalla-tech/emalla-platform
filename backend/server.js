@@ -754,6 +754,29 @@ const withRiderPayout = (order = {}) => ({
   riderPayoutStatus: getOrderRiderPayoutStatus(order)
 });
 
+const generateDeliveryConfirmationCode = () => String(Math.floor(100000 + Math.random() * 900000));
+
+const canViewDeliveryConfirmationCode = (order = {}, user = null, options = {}) => {
+  if (options.guestMatches) return true;
+  if (!user) return false;
+  if (['ADMIN', 'LOGISTICS', 'SUPPORT'].includes(user.role)) return true;
+  return user.role === 'CUSTOMER' && order.customerId === user.id;
+};
+
+const presentOrderForUser = (order = {}, user = null, options = {}) => {
+  const presented = withRiderPayout(order);
+  if (canViewDeliveryConfirmationCode(order, user, options)) {
+    return presented;
+  }
+
+  const { deliveryConfirmationCode, ...safeOrder } = presented;
+  return {
+    ...safeOrder,
+    deliveryConfirmationRequired: Boolean(order.deliveryConfirmationCode),
+    deliveryVerificationStatus: order.deliveryVerificationStatus || (order.deliveryConfirmationCode ? 'code_generated' : 'not_required')
+  };
+};
+
 const releaseRiderPayoutForOrder = (db, order = {}) => {
   if (!order.riderId) return null;
 
@@ -1013,20 +1036,24 @@ const buildOrderStatusEmailMessage = ({ order, status, actorName }) => {
 
 const buildRiderAssignmentEmailMessage = ({ order, riderName }) => {
   const trackingUrl = buildCustomerTrackingUrl(order);
+  const deliveryCode = String(order.deliveryConfirmationCode || '').trim();
   return {
     subject: `Rider Assigned - ${order.orderNumber || 'E-Malla'}`,
     template: 'rider_assignment_update',
-    body: `Hello ${order.customerName || 'there'}, rider ${riderName || 'E-Malla Rider'} has been assigned to order ${order.orderNumber || ''}. Track it here: ${trackingUrl}`,
+    body: `Hello ${order.customerName || 'there'}, rider ${riderName || 'E-Malla Rider'} has been assigned to order ${order.orderNumber || ''}.${deliveryCode ? ` Your delivery confirmation code is ${deliveryCode}. Share it only after receiving your package.` : ''} Track it here: ${trackingUrl}`,
     html: createEmailHtml({
       title: 'Rider assigned to your order',
       intro: `Muraho ${order.customerName || 'there'}. Rider ${riderName || 'E-Malla Rider'} yamaze guhabwa order yawe kugira ngo ayitware.`,
       sections: [
         { label: 'Order', value: order.orderNumber || 'Pending' },
         { label: 'Rider', value: riderName || 'E-Malla Rider' },
+        deliveryCode ? { label: 'Delivery Code', value: deliveryCode } : null,
         { label: 'Delivery Address', value: order.address || 'To be confirmed' },
         { label: 'Tracking', value: trackingUrl }
-      ],
-      closing: 'Ushobora gukurikirana order yawe uko rider ayegera kugeza igeze aho yagenewe.',
+      ].filter(Boolean),
+      closing: deliveryCode
+        ? 'Bika iyi code neza. Uyisangize rider gusa nyuma yo kwakira package yawe.'
+        : 'Ushobora gukurikirana order yawe uko rider ayegera kugeza igeze aho yagenewe.',
       primaryAction: { label: 'Track Delivery', url: trackingUrl },
       support: {
         email: 'support@emallarwanda.com',
@@ -5427,7 +5454,7 @@ const server = http.createServer(async (req, res) => {
         orders = orders.filter((order) => order.riderId === user.id);
       }
 
-      sendJson(res, 200, { orders: orders.map(withRiderPayout) });
+      sendJson(res, 200, { orders: orders.map((order) => presentOrderForUser(order, user)) });
       return;
     }
 
@@ -5463,7 +5490,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      sendJson(res, 200, { order: withRiderPayout(order) });
+      sendJson(res, 200, { order: presentOrderForUser(order, user, { guestMatches }) });
       return;
     }
 
@@ -5852,6 +5879,11 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      if (user.role === 'DELIVERY' && body.status === 'delivered') {
+        sendJson(res, 400, { error: 'Enter the customer delivery confirmation code to confirm delivery.' });
+        return;
+      }
+
       const shouldRestockInventory =
         body.status === 'cancelled' &&
         current.inventoryReservedAt &&
@@ -5961,7 +5993,112 @@ const server = http.createServer(async (req, res) => {
       } else {
         await writeDb(db);
       }
-      sendJson(res, 200, { order: withRiderPayout(db.orders[index]) });
+      sendJson(res, 200, { order: presentOrderForUser(db.orders[index], user) });
+      return;
+    }
+
+    if (pathname.startsWith('/api/orders/') && pathname.endsWith('/verify-delivery-code') && req.method === 'POST') {
+      const user = await requireRole(req, res, ['DELIVERY', 'ADMIN', 'LOGISTICS']);
+      if (!user) return;
+
+      const orderId = pathname.split('/')[3];
+      const body = await readBody(req);
+      const submittedCode = String(body.code || '').replace(/\D/g, '');
+      const db = await readDb();
+      const index = db.orders.findIndex((order) => order.id === orderId);
+
+      if (index === -1) {
+        sendJson(res, 404, { error: 'Order not found' });
+        return;
+      }
+
+      const current = db.orders[index];
+      const isAssignedRider = user.role === 'DELIVERY' && current.riderId === user.id;
+      const isOperationsUser = ['ADMIN', 'LOGISTICS'].includes(user.role);
+      if (!isAssignedRider && !isOperationsUser) {
+        sendJson(res, 403, { error: 'Forbidden' });
+        return;
+      }
+
+      if (current.status !== 'out_for_delivery') {
+        sendJson(res, 400, { error: 'Delivery code can only be verified when the order is out for delivery.' });
+        return;
+      }
+
+      if (!current.deliveryConfirmationCode) {
+        sendJson(res, 400, { error: 'Delivery confirmation code has not been generated for this order.' });
+        return;
+      }
+
+      if (submittedCode.length !== 6 || submittedCode !== String(current.deliveryConfirmationCode)) {
+        createAuditLog(db, {
+          event: `Invalid delivery code attempt: ${current.orderNumber}`,
+          actor: user.name || user.email,
+          category: 'orders',
+          status: 'warning',
+          metadata: {
+            orderId: current.id,
+            orderNumber: current.orderNumber,
+            riderId: current.riderId,
+            actorRole: user.role
+          }
+        });
+        await writeDb(db);
+        sendJson(res, 400, { error: 'Invalid delivery confirmation code.' });
+        return;
+      }
+
+      const verifiedAt = new Date().toISOString();
+      db.orders[index] = {
+        ...current,
+        status: 'delivered',
+        deliveryVerificationStatus: 'code_verified',
+        deliveryConfirmationVerifiedAt: verifiedAt,
+        deliveryConfirmationVerifiedBy: user.id,
+        riderPayout: getOrderRiderPayout(current),
+        riderPayoutStatus: getOrderRiderPayoutStatus(current),
+        updatedAt: verifiedAt
+      };
+
+      createNotification(db, {
+        userId: current.customerId,
+        role: 'CUSTOMER',
+        title: 'Delivery Code Verified',
+        message: `${current.orderNumber} was verified with your delivery code. Please confirm received well after checking the package.`,
+        type: 'success',
+        metadata: { orderId: current.id }
+      });
+      createNotification(db, {
+        userId: current.merchantId,
+        role: 'MERCHANT',
+        title: 'Delivery Verified by Customer Code',
+        message: `${current.orderNumber} was delivered and verified using the customer confirmation code.`,
+        type: 'success',
+        metadata: { orderId: current.id }
+      });
+      createNotification(db, {
+        userId: current.riderId,
+        role: 'DELIVERY',
+        title: 'Delivery Code Accepted',
+        message: `${current.orderNumber} was verified successfully. Customer final receipt confirmation is still pending.`,
+        type: 'success',
+        metadata: { orderId: current.id }
+      });
+      createAuditLog(db, {
+        event: `Delivery code verified: ${current.orderNumber}`,
+        actor: user.name || user.email,
+        category: 'orders',
+        status: 'success',
+        metadata: {
+          orderId: current.id,
+          orderNumber: current.orderNumber,
+          riderId: current.riderId,
+          verifiedAt
+        }
+      });
+
+      await writeDb(db);
+      sendJson(res, 200, { order: presentOrderForUser(db.orders[index], user) });
       return;
     }
 
@@ -6052,6 +6189,9 @@ const server = http.createServer(async (req, res) => {
         ...current,
         riderId: riderRecord.id,
         riderName: riderRecord.name || body.riderName || user.name,
+        deliveryConfirmationCode: current.deliveryConfirmationCode || generateDeliveryConfirmationCode(),
+        deliveryConfirmationGeneratedAt: current.deliveryConfirmationGeneratedAt || new Date().toISOString(),
+        deliveryVerificationStatus: 'code_generated',
         riderPayout: getOrderRiderPayout(current),
         riderPayoutStatus: 'assigned',
         status: 'assigned',
@@ -6071,7 +6211,7 @@ const server = http.createServer(async (req, res) => {
         userId: assignedOrder.customerId,
         role: 'CUSTOMER',
         title: 'Rider Assigned to Your Order',
-        message: `${assignedOrder.riderName || 'An E-Malla rider'} accepted ${assignedOrder.orderNumber} and will deliver it to you.`,
+        message: `${assignedOrder.riderName || 'An E-Malla rider'} accepted ${assignedOrder.orderNumber}. Your delivery code is ${assignedOrder.deliveryConfirmationCode}. Share it only after receiving your package.`,
         type: 'success',
         metadata: { orderId: assignedOrder.id }
       });
@@ -6116,7 +6256,7 @@ const server = http.createServer(async (req, res) => {
       });
 
       await writeDb(db);
-      sendJson(res, 200, { order: withRiderPayout(db.orders[index]) });
+      sendJson(res, 200, { order: presentOrderForUser(db.orders[index], user) });
       return;
     }
 

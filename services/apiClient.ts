@@ -255,6 +255,13 @@ export const apiClient = {
     });
   },
 
+  async verifyDeliveryCode(orderId: string, code: string) {
+    return request(`/orders/${orderId}/verify-delivery-code`, {
+      method: 'POST',
+      body: JSON.stringify({ code })
+    });
+  },
+
   async assignRider(orderId: string, riderId: string, riderName: string) {
     return request(`/orders/${orderId}/assign-rider`, {
       method: 'PUT',

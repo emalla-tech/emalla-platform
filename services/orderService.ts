@@ -54,6 +54,11 @@ export const OrderService = {
     return response.order as Order;
   },
 
+  verifyDeliveryCode: async (orderId: string, code: string): Promise<Order> => {
+    const response = await apiClient.verifyDeliveryCode(orderId, code);
+    return response.order as Order;
+  },
+
   assignRider: async (orderId: string, riderId: string, riderName: string): Promise<boolean> => {
     await apiClient.assignRider(orderId, riderId, riderName);
     return true;

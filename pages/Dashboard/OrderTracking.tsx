@@ -110,6 +110,8 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
   const [statusError, setStatusError] = useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isConfirmingReceipt, setIsConfirmingReceipt] = useState(false);
+  const [deliveryCodeInput, setDeliveryCodeInput] = useState('');
+  const [isVerifyingDeliveryCode, setIsVerifyingDeliveryCode] = useState(false);
 
   const isSellerView = location.pathname.includes('/seller');
   const isRiderView = location.pathname.includes('/rider');
@@ -146,6 +148,13 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
   const currentStep = useMemo(() => trackingData.find((step) => step.current) || trackingData.find((step) => step.completed), [trackingData]);
   const totalItems = useMemo(() => (order?.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0), [order]);
   const nextRiderAction = order && isRiderView ? RIDER_NEXT_ACTIONS[order.status] : null;
+  const requiresDeliveryCode = isRiderView && order?.status === OrderStatus.OUT_FOR_DELIVERY && Boolean(order.deliveryConfirmationRequired || order.deliveryVerificationStatus === 'code_generated');
+  const customerCanSeeDeliveryCode =
+    !isSellerView &&
+    !isRiderView &&
+    Boolean(order?.deliveryConfirmationCode) &&
+    order?.deliveryVerificationStatus !== 'code_verified' &&
+    ![OrderStatus.COMPLETED, OrderStatus.CANCELLED, OrderStatus.REFUNDED].includes(order.status);
 
   const handleRiderStatusUpdate = async () => {
     if (!order || !nextRiderAction) return;
@@ -179,6 +188,31 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
       setStatusError(confirmationError instanceof Error ? confirmationError.message : 'Unable to confirm receipt right now.');
     } finally {
       setIsConfirmingReceipt(false);
+    }
+  };
+
+  const handleVerifyDeliveryCode = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!order) return;
+
+    const code = deliveryCodeInput.replace(/\D/g, '');
+    if (code.length !== 6) {
+      setStatusError('Enter the 6-digit code shared by the customer.');
+      return;
+    }
+
+    setIsVerifyingDeliveryCode(true);
+    setStatusMessage(null);
+    setStatusError(null);
+    try {
+      await OrderService.verifyDeliveryCode(order.id, code);
+      setDeliveryCodeInput('');
+      setStatusMessage('Delivery code verified. The order is now marked delivered.');
+      await loadOrder();
+    } catch (verificationError) {
+      setStatusError(verificationError instanceof Error ? verificationError.message : 'Unable to verify delivery code right now.');
+    } finally {
+      setIsVerifyingDeliveryCode(false);
     }
   };
 
@@ -369,6 +403,18 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
             </p>
           </div>
 
+          {customerCanSeeDeliveryCode ? (
+            <div className="bg-orange-50 rounded-[40px] p-8 border border-orange-100 shadow-sm">
+              <h4 className="font-black text-orange-900 mb-2">Delivery Confirmation Code</h4>
+              <p className="text-xs text-orange-700 mb-5">
+                Share this code only after you receive your package from the rider.
+              </p>
+              <div className="rounded-3xl bg-white border border-orange-100 px-5 py-4 text-center">
+                <p className="text-3xl font-black tracking-[0.35em] text-gray-900">{order.deliveryConfirmationCode}</p>
+              </div>
+            </div>
+          ) : null}
+
           <div className="bg-white rounded-[40px] p-8 border border-gray-100 shadow-sm">
             <h4 className="font-bold text-gray-900 mb-2">Need help?</h4>
             <p className="text-xs text-gray-500 mb-6">Is there an issue with your tracking or delivery status?</p>
@@ -385,7 +431,32 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
               </p>
               {statusMessage ? <p className="mb-4 text-sm font-bold text-emerald-600">{statusMessage}</p> : null}
               {statusError ? <p className="mb-4 text-sm font-bold text-red-600">{statusError}</p> : null}
-              {nextRiderAction ? (
+              {requiresDeliveryCode ? (
+                <form onSubmit={handleVerifyDeliveryCode} className="space-y-4">
+                  <div className="rounded-3xl bg-emerald-50 border border-emerald-100 px-4 py-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">Customer Code Required</p>
+                    <p className="mt-2 text-xs font-bold text-emerald-900">
+                      Ask the customer for the 6-digit delivery code after handing over the package.
+                    </p>
+                  </div>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={deliveryCodeInput}
+                    onChange={(event) => setDeliveryCodeInput(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Enter 6-digit code"
+                    className="w-full rounded-2xl border-2 border-gray-100 bg-gray-50 px-5 py-4 text-center text-xl font-black tracking-[0.25em] text-gray-900 outline-none focus:border-emerald-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isVerifyingDeliveryCode}
+                    className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black text-sm hover:bg-emerald-600 transition-all disabled:opacity-60"
+                  >
+                    {isVerifyingDeliveryCode ? 'Verifying Code...' : 'Verify & Mark Delivered'}
+                  </button>
+                </form>
+              ) : nextRiderAction ? (
                 <button
                   type="button"
                   onClick={handleRiderStatusUpdate}

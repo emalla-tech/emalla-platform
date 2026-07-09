@@ -129,6 +129,12 @@ export interface Order {
   promotionSubsidy?: number;
   riderPayout?: number;
   riderPayoutStatus?: 'pending_assignment' | 'ready' | 'assigned' | 'released';
+  deliveryConfirmationCode?: string;
+  deliveryConfirmationRequired?: boolean;
+  deliveryConfirmationGeneratedAt?: string;
+  deliveryConfirmationVerifiedAt?: string;
+  deliveryConfirmationVerifiedBy?: string;
+  deliveryVerificationStatus?: 'not_required' | 'code_generated' | 'code_verified';
   totalAmount: number;
   tx_ref: string;
   address: string;

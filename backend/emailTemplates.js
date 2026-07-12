@@ -13,8 +13,14 @@ const EMAIL_TEMPLATE_NAMES = [
 
 const formatMoney = (value) => `RWF ${Number(value || 0).toLocaleString()}`;
 
+const normalizePublicBaseUrl = (value = '') =>
+  String(value || 'http://127.0.0.1:3000')
+    .trim()
+    .replace(/\/#?$/, '')
+    .replace(/^https:\/\/emallarwanda\.com$/i, 'https://www.emallarwanda.com');
+
 const normalizePublicRoute = (path = '') => {
-  const base = String(getAppConfig().publicAppUrl || 'http://127.0.0.1:3000').replace(/\/#?$/, '');
+  const base = normalizePublicBaseUrl(getAppConfig().publicAppUrl);
   const normalizedPath = String(path || '').replace(/^#?\/?/, '');
   return normalizedPath ? `${base}/${normalizedPath}` : base;
 };

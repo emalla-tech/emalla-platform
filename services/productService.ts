@@ -1,4 +1,3 @@
-import { CATALOG_PRODUCTS } from '../data/catalog';
 import { Product } from '../types';
 import { apiUrl } from './apiConfig';
 
@@ -41,6 +40,18 @@ const emitProducts = (products: Product[]) => {
 
 const cloneProducts = (products: Product[]) => JSON.parse(JSON.stringify(products)) as Product[];
 
+const shouldUseCatalogFallback = (options?: { fallbackToCatalog?: boolean }) =>
+  options?.fallbackToCatalog ?? import.meta.env.DEV;
+
+const loadCatalogFallback = async () => {
+  if (import.meta.env.PROD) {
+    return [];
+  }
+
+  const { CATALOG_PRODUCTS } = await import('../data/catalog');
+  return cloneProducts(CATALOG_PRODUCTS);
+};
+
 export const ProductService = {
   eventName: PRODUCTS_UPDATED_EVENT,
 
@@ -69,10 +80,7 @@ export const ProductService = {
         const response = await request();
         cachedProducts = response.products;
       } catch (error) {
-        if (options?.fallbackToCatalog === false) {
-          throw error;
-        }
-        cachedProducts = cloneProducts(CATALOG_PRODUCTS);
+        cachedProducts = shouldUseCatalogFallback(options) ? await loadCatalogFallback() : [];
       } finally {
         inflightProductsRequest = null;
       }

@@ -13,6 +13,7 @@ import {
   Sparkles,
   Users
 } from 'lucide-react';
+import { buildAffiliateLink, normalizeAffiliateCode } from '../services/affiliateReferralService';
 import { InquiryService } from '../services/inquiryService';
 
 const steps = [
@@ -56,6 +57,7 @@ const AffiliateProgram: React.FC = () => {
     email: '',
     phone: '',
     partnerType: '',
+    preferredCode: '',
     channel: '',
     audienceSize: '',
     message: ''
@@ -82,6 +84,8 @@ const AffiliateProgram: React.FC = () => {
         message: [
           `Phone: ${formData.phone}`,
           `Partner type: ${formData.partnerType}`,
+          `Preferred referral code: ${normalizeAffiliateCode(formData.preferredCode) || 'Not specified'}`,
+          `Referral link preview: ${normalizeAffiliateCode(formData.preferredCode) ? buildAffiliateLink(formData.preferredCode) : 'Not generated yet'}`,
           `Primary channel: ${formData.channel}`,
           `Estimated audience/reach: ${formData.audienceSize || 'Not specified'}`,
           '',
@@ -95,6 +99,7 @@ const AffiliateProgram: React.FC = () => {
         email: '',
         phone: '',
         partnerType: '',
+        preferredCode: '',
         channel: '',
         audienceSize: '',
         message: ''
@@ -105,6 +110,14 @@ const AffiliateProgram: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  const normalizedPreferredCode = normalizeAffiliateCode(formData.preferredCode);
+  const referralPreviewLink = normalizedPreferredCode
+    ? buildAffiliateLink(normalizedPreferredCode)
+    : 'https://www.emallarwanda.com/?ref=YOURCODE';
+  const shopPreviewLink = normalizedPreferredCode
+    ? buildAffiliateLink(normalizedPreferredCode, '/shop')
+    : 'https://www.emallarwanda.com/shop?ref=YOURCODE';
 
   return (
   <div className="min-h-screen bg-[#fffaf6]">
@@ -155,7 +168,8 @@ const AffiliateProgram: React.FC = () => {
               {[
                 ['Program status', 'Application interest'],
                 ['Best for', 'Creators, communities, sales partners'],
-                ['Tracking', 'Referral links and codes planned'],
+                ['Link format', 'emallarwanda.com/?ref=CODE'],
+                ['Tracking', '30-day local attribution prepared'],
                 ['Payout review', 'Finance controlled']
               ].map(([label, value]) => (
                 <div key={label} className="rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4">
@@ -225,6 +239,31 @@ const AffiliateProgram: React.FC = () => {
             </li>
           ))}
         </ul>
+      </div>
+    </section>
+
+    <section className="mx-auto max-w-7xl px-4 pb-16 md:pb-20">
+      <div className="grid gap-6 rounded-[42px] border border-orange-100 bg-white p-8 shadow-sm md:grid-cols-[0.9fr_1.1fr] md:p-10">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-orange-500">Referral structure</p>
+          <h2 className="mt-3 text-3xl font-black text-gray-950 md:text-5xl">Simple links now, full tracking next.</h2>
+          <p className="mt-5 text-sm font-medium leading-7 text-gray-600">
+            Affiliate links use one clean structure that can work across home, shop, and product pages. The site now captures approved referral codes from URL parameters and keeps them ready for future order attribution.
+          </p>
+        </div>
+        <div className="grid gap-4">
+          {[
+            ['Homepage referral', 'https://www.emallarwanda.com/?ref=AFFILIATECODE'],
+            ['Shop referral', 'https://www.emallarwanda.com/shop?ref=AFFILIATECODE'],
+            ['Accepted aliases', '?ref=CODE, ?affiliate=CODE, ?aff=CODE'],
+            ['Code format', '3-40 characters: letters, numbers, dash, underscore']
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{label}</p>
+              <p className="mt-1 break-all text-sm font-black text-gray-900">{value}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
 
@@ -326,6 +365,24 @@ const AffiliateProgram: React.FC = () => {
                     </select>
                   </label>
                 </div>
+
+                <label className="block rounded-[28px] border border-orange-100 bg-orange-50/70 p-5">
+                  <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-orange-600">Preferred referral code</span>
+                  <input
+                    value={formData.preferredCode}
+                    onChange={(event) => updateField('preferredCode', event.target.value)}
+                    className="w-full rounded-2xl border-2 border-transparent bg-white px-5 py-4 text-sm font-bold uppercase outline-none transition-all focus:border-orange-500"
+                    placeholder="e.g. KIGALI-TECH"
+                  />
+                  <div className="mt-4 grid gap-2 rounded-2xl bg-white px-4 py-4 text-xs font-bold text-gray-600">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Preview links</p>
+                    <p className="break-all text-gray-950">{referralPreviewLink}</p>
+                    <p className="break-all text-gray-500">{shopPreviewLink}</p>
+                    {formData.preferredCode && !normalizedPreferredCode ? (
+                      <p className="text-red-600">Use 3-40 characters: letters, numbers, dash, or underscore.</p>
+                    ) : null}
+                  </div>
+                </label>
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="block">

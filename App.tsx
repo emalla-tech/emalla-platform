@@ -35,6 +35,7 @@ import ProtectedRoute from './auth/ProtectedRoute';
 import RoleRoute from './auth/RoleRoute';
 import { useAuth } from './auth/AuthContext';
 import { getRoleHome } from './auth/roleRouting';
+import { captureAffiliateReferralFromLocation } from './services/affiliateReferralService';
 
 const Home = lazy(() => import('./pages/Home'));
 const BecomeSeller = lazy(() => import('./pages/BecomeSeller'));
@@ -287,6 +288,16 @@ const SeoMetaUpdater = () => {
   return null;
 };
 
+const AffiliateReferralTracker = () => {
+  const { pathname, search } = useLocation();
+
+  useEffect(() => {
+    captureAffiliateReferralFromLocation(search, pathname);
+  }, [pathname, search]);
+
+  return null;
+};
+
 const BackToTop = () => {
   const [isVisible, setIsVisible] = React.useState(false);
 
@@ -329,6 +340,7 @@ const App: React.FC = () => {
         <LegacyHashRedirect />
         <ScrollToTop />
         <SeoMetaUpdater />
+        <AffiliateReferralTracker />
         <BackToTop />
         <CookieConsent />
         <div className="min-h-screen flex flex-col app-shell">

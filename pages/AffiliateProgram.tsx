@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -6,11 +6,14 @@ import {
   BarChart3,
   CheckCircle2,
   Link2,
+  Loader2,
   Megaphone,
+  Send,
   ShieldCheck,
   Sparkles,
   Users
 } from 'lucide-react';
+import { InquiryService } from '../services/inquiryService';
 
 const steps = [
   {
@@ -47,7 +50,63 @@ const rules = [
   'Future affiliate dashboards will show clicks, orders, pending commission, and paid commission.'
 ];
 
-const AffiliateProgram: React.FC = () => (
+const AffiliateProgram: React.FC = () => {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    partnerType: '',
+    channel: '',
+    audienceSize: '',
+    message: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const updateField = (field: keyof typeof formData, value: string) => {
+    setFormData((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      await InquiryService.submitContact({
+        name: formData.name,
+        email: formData.email,
+        subject: 'Affiliate Program Application',
+        message: [
+          `Phone: ${formData.phone}`,
+          `Partner type: ${formData.partnerType}`,
+          `Primary channel: ${formData.channel}`,
+          `Estimated audience/reach: ${formData.audienceSize || 'Not specified'}`,
+          '',
+          'Application message:',
+          formData.message
+        ].join('\n')
+      });
+      setSubmitted(true);
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        partnerType: '',
+        channel: '',
+        audienceSize: '',
+        message: ''
+      });
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Unable to submit affiliate application right now.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
   <div className="min-h-screen bg-[#fffaf6]">
     <section className="relative overflow-hidden bg-gray-950 text-white">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.3),transparent_34rem)]" />
@@ -65,13 +124,13 @@ const AffiliateProgram: React.FC = () => (
             The E-Malla Affiliate Program is being prepared for creators, communities, and trusted partners who can bring qualified buyers to the marketplace.
           </p>
           <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-            <Link
-              to="/contact?topic=affiliate"
+            <a
+              href="#affiliate-application"
               className="inline-flex items-center justify-center rounded-2xl bg-orange-500 px-7 py-4 text-sm font-black text-white shadow-2xl shadow-orange-500/20 transition-all hover:bg-orange-600 active:scale-95"
             >
               Apply as Affiliate
               <ArrowRight size={18} className="ml-2" />
-            </Link>
+            </a>
             <Link
               to="/how-it-works"
               className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-7 py-4 text-sm font-black text-white transition-all hover:bg-white/10 active:scale-95"
@@ -169,27 +228,162 @@ const AffiliateProgram: React.FC = () => (
       </div>
     </section>
 
-    <section className="mx-auto max-w-7xl px-4 pb-20">
+    <section id="affiliate-application" className="mx-auto max-w-7xl scroll-mt-24 px-4 pb-20">
       <div className="overflow-hidden rounded-[42px] bg-gradient-to-r from-orange-500 to-gray-950 p-8 text-white md:p-12">
-        <div className="grid gap-8 md:grid-cols-[1fr_auto] md:items-center">
+        <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.26em] text-orange-100">Affiliate launch queue</p>
             <h2 className="mt-3 max-w-3xl text-3xl font-black md:text-5xl">Want to promote E-Malla Rwanda?</h2>
             <p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-orange-50/90">
-              Contact the team now. We will review partner fit first, then enable tracking and payout tools in the next affiliate system phase.
+              Apply now and our team will review your audience, channels, and fit. Approved partners will be prioritized when referral links, tracking, and payout tools go live.
             </p>
+            <div className="mt-8 grid gap-3 text-sm font-bold text-orange-50/90">
+              {['Admin review through the existing inquiries desk', 'No payment or customer flow changes yet', 'Designed for future referral-code tracking'].map((item) => (
+                <div key={item} className="flex items-center gap-3">
+                  <CheckCircle2 size={17} className="text-white" />
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <Link
-            to="/contact?topic=affiliate"
-            className="inline-flex items-center justify-center rounded-2xl bg-white px-7 py-4 text-sm font-black text-gray-950 transition-all hover:bg-orange-50 active:scale-95"
-          >
-            Contact E-Malla
-            <ArrowRight size={18} className="ml-2" />
-          </Link>
+
+          <div className="rounded-[34px] bg-white p-6 text-gray-950 shadow-2xl shadow-black/20 md:p-8">
+            {submitted ? (
+              <div className="py-8 text-center">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                  <CheckCircle2 size={34} />
+                </div>
+                <h3 className="mt-6 text-2xl font-black text-gray-950">Application received</h3>
+                <p className="mx-auto mt-3 max-w-sm text-sm font-medium leading-7 text-gray-600">
+                  Thank you for applying. E-Malla team will review your affiliate profile and contact you with the next steps.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSubmitted(false)}
+                  className="mt-7 rounded-2xl bg-gray-950 px-6 py-3 text-sm font-black text-white transition-all hover:bg-orange-600"
+                >
+                  Submit another application
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-500">Affiliate application</p>
+                  <h3 className="mt-2 text-2xl font-black text-gray-950">Tell us how you will promote E-Malla.</h3>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">Full name</span>
+                    <input
+                      required
+                      value={formData.name}
+                      onChange={(event) => updateField('name', event.target.value)}
+                      className="w-full rounded-2xl border-2 border-transparent bg-gray-50 px-5 py-4 text-sm font-bold outline-none transition-all focus:border-orange-500 focus:bg-white"
+                      placeholder="Your name"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">Email</span>
+                    <input
+                      required
+                      type="email"
+                      value={formData.email}
+                      onChange={(event) => updateField('email', event.target.value)}
+                      className="w-full rounded-2xl border-2 border-transparent bg-gray-50 px-5 py-4 text-sm font-bold outline-none transition-all focus:border-orange-500 focus:bg-white"
+                      placeholder="you@example.com"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">Phone / WhatsApp</span>
+                    <input
+                      required
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(event) => updateField('phone', event.target.value)}
+                      className="w-full rounded-2xl border-2 border-transparent bg-gray-50 px-5 py-4 text-sm font-bold outline-none transition-all focus:border-orange-500 focus:bg-white"
+                      placeholder="+250 7xx xxx xxx"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">Partner type</span>
+                    <select
+                      required
+                      value={formData.partnerType}
+                      onChange={(event) => updateField('partnerType', event.target.value)}
+                      className="w-full rounded-2xl border-2 border-transparent bg-gray-50 px-5 py-4 text-sm font-bold outline-none transition-all focus:border-orange-500 focus:bg-white"
+                    >
+                      <option value="">Select type</option>
+                      <option>Content creator</option>
+                      <option>Influencer / social page</option>
+                      <option>Campus ambassador</option>
+                      <option>Business partner</option>
+                      <option>Community leader</option>
+                      <option>Other</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">Primary channel</span>
+                    <input
+                      required
+                      value={formData.channel}
+                      onChange={(event) => updateField('channel', event.target.value)}
+                      className="w-full rounded-2xl border-2 border-transparent bg-gray-50 px-5 py-4 text-sm font-bold outline-none transition-all focus:border-orange-500 focus:bg-white"
+                      placeholder="Instagram, TikTok, WhatsApp, blog..."
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">Audience size</span>
+                    <input
+                      value={formData.audienceSize}
+                      onChange={(event) => updateField('audienceSize', event.target.value)}
+                      className="w-full rounded-2xl border-2 border-transparent bg-gray-50 px-5 py-4 text-sm font-bold outline-none transition-all focus:border-orange-500 focus:bg-white"
+                      placeholder="e.g. 2,000 followers"
+                    />
+                  </label>
+                </div>
+
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">Promotion plan</span>
+                  <textarea
+                    required
+                    rows={5}
+                    value={formData.message}
+                    onChange={(event) => updateField('message', event.target.value)}
+                    className="w-full resize-none rounded-2xl border-2 border-transparent bg-gray-50 px-5 py-4 text-sm font-bold outline-none transition-all focus:border-orange-500 focus:bg-white"
+                    placeholder="Tell us what audience you reach and how you plan to promote E-Malla Rwanda."
+                  />
+                </label>
+
+                {submitError ? (
+                  <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm font-bold text-red-600">
+                    {submitError}
+                  </div>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="inline-flex w-full items-center justify-center rounded-2xl bg-orange-500 px-7 py-4 text-sm font-black text-white shadow-xl shadow-orange-500/20 transition-all hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isSubmitting ? <Loader2 size={18} className="mr-2 animate-spin" /> : <Send size={18} className="mr-2" />}
+                  {isSubmitting ? 'Submitting...' : 'Submit Affiliate Application'}
+                </button>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     </section>
   </div>
 );
+
+};
 
 export default AffiliateProgram;

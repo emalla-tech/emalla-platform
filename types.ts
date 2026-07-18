@@ -127,6 +127,12 @@ export interface Order {
   promotionCode?: string | null;
   promotionApplied?: boolean;
   promotionSubsidy?: number;
+  affiliateCode?: string;
+  affiliateId?: string | null;
+  affiliateName?: string;
+  affiliateReferralSourcePath?: string;
+  affiliateReferralCapturedAt?: string;
+  affiliateAttributionStatus?: 'none' | 'matched' | 'unmatched';
   riderPayout?: number;
   riderPayoutStatus?: 'pending_assignment' | 'ready' | 'assigned' | 'released';
   deliveryConfirmationCode?: string;

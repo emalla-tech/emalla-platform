@@ -19,6 +19,7 @@ import {
   DeliveryPromotionPreview,
   promotionService
 } from '../services/promotionService';
+import { getStoredAffiliateReferral } from '../services/affiliateReferralService';
 
 const DISTRICTS = [
   'Nyarugenge', 'Gasabo', 'Kicukiro', 
@@ -139,6 +140,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
     let createdOrderId: string | null = null;
     try {
       const primaryMerchant = cartItems[0]?.product;
+      const affiliateReferral = getStoredAffiliateReferral();
       const checkoutResult = await OrderService.createCheckoutOrder({
         customerId: user?.id || '',
         customerName: formData.fullName,
@@ -158,7 +160,14 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
         address: `${formData.street}, ${formData.sector}, ${formData.district}`,
         phone: formData.phone,
         paymentMethod: formData.paymentMethod,
-        notes: formData.notes
+        notes: formData.notes,
+        affiliateReferral: affiliateReferral
+          ? {
+              code: affiliateReferral.code,
+              capturedAt: affiliateReferral.capturedAt,
+              sourcePath: affiliateReferral.sourcePath
+            }
+          : undefined
       });
       const order = checkoutResult.order;
       createdOrderId = order.id;

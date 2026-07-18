@@ -31,6 +31,21 @@ type FinanceSummary = {
     merchantNet: number;
     successfulOrders: number;
   }>;
+  affiliateSummary: {
+    attributedOrders: number;
+    successfulOrders: number;
+    pendingOrders: number;
+    attributedRevenue: number;
+    pendingAttributedRevenue: number;
+    topCodes: Array<{
+      code: string;
+      affiliateName: string;
+      orders: number;
+      successfulOrders: number;
+      revenue: number;
+      pendingRevenue: number;
+    }>;
+  };
   paymentBreakdown: Array<{
     label: string;
     method: string;
@@ -61,6 +76,14 @@ const defaultSummary: FinanceSummary = {
     successfulOrders: 0
   },
   categoryCommission: [],
+  affiliateSummary: {
+    attributedOrders: 0,
+    successfulOrders: 0,
+    pendingOrders: 0,
+    attributedRevenue: 0,
+    pendingAttributedRevenue: 0,
+    topCodes: []
+  },
   paymentBreakdown: [],
   payoutSummary: {
     totalRequests: 0,
@@ -128,6 +151,7 @@ const FinanceOverview: React.FC = () => {
         setSummary({
           overview: data.overview || defaultSummary.overview,
           categoryCommission: data.categoryCommission || [],
+          affiliateSummary: data.affiliateSummary || defaultSummary.affiliateSummary,
           paymentBreakdown: data.paymentBreakdown || [],
           payoutSummary: data.payoutSummary || defaultSummary.payoutSummary
         });
@@ -170,6 +194,7 @@ const FinanceOverview: React.FC = () => {
       setSummary({
         overview: latestSummary.overview || defaultSummary.overview,
         categoryCommission: latestSummary.categoryCommission || [],
+        affiliateSummary: latestSummary.affiliateSummary || defaultSummary.affiliateSummary,
         paymentBreakdown: latestSummary.paymentBreakdown || [],
         payoutSummary: latestSummary.payoutSummary || defaultSummary.payoutSummary
       });
@@ -588,6 +613,61 @@ const FinanceOverview: React.FC = () => {
               <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl inline-flex mb-5"><Wallet size={22} /></div>
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Pending COD Value</p>
               <p className="text-3xl font-black text-gray-900">{money(summary.overview.pendingCodValue)}</p>
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-emerald-100 bg-emerald-50/50 p-6 md:p-8">
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-emerald-700">Affiliate Attribution</p>
+                <h2 className="mt-2 text-xl font-black text-gray-950">Referral orders tracked for future commission review</h2>
+                <p className="mt-1 max-w-2xl text-sm text-gray-600">
+                  These numbers only track approved affiliate codes attached at checkout. Payout calculation remains manual until the commission rules are activated.
+                </p>
+              </div>
+              <div className="grid w-full gap-3 sm:grid-cols-3 xl:max-w-xl">
+                <div className="rounded-2xl border border-emerald-100 bg-white px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Attributed Orders</p>
+                  <p className="mt-2 text-2xl font-black text-gray-950">{summary.affiliateSummary.attributedOrders}</p>
+                </div>
+                <div className="rounded-2xl border border-emerald-100 bg-white px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Successful Revenue</p>
+                  <p className="mt-2 text-lg font-black text-gray-950">{money(summary.affiliateSummary.attributedRevenue)}</p>
+                </div>
+                <div className="rounded-2xl border border-amber-100 bg-white px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Pending Revenue</p>
+                  <p className="mt-2 text-lg font-black text-gray-950">{money(summary.affiliateSummary.pendingAttributedRevenue)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 grid gap-3 lg:grid-cols-2">
+              {summary.affiliateSummary.topCodes.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-emerald-200 bg-white/70 px-5 py-6 text-sm font-bold text-gray-500">
+                  No affiliate-attributed orders yet.
+                </div>
+              ) : summary.affiliateSummary.topCodes.map((entry) => (
+                <div key={entry.code} className="rounded-2xl border border-emerald-100 bg-white px-5 py-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-black text-gray-950">{entry.code}</p>
+                      <p className="mt-1 text-xs font-bold text-gray-500">{entry.affiliateName}</p>
+                    </div>
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-black uppercase text-emerald-700">
+                      {entry.successfulOrders}/{entry.orders} successful
+                    </span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-emerald-50 px-3 py-2">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600">Revenue</p>
+                      <p className="mt-1 text-sm font-black text-gray-950">{money(entry.revenue)}</p>
+                    </div>
+                    <div className="rounded-xl bg-amber-50 px-3 py-2">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-amber-600">Pending</p>
+                      <p className="mt-1 text-sm font-black text-gray-950">{money(entry.pendingRevenue)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

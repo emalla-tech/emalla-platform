@@ -59,6 +59,21 @@ export type AdminFinanceResponse = {
     merchantNet: number;
     successfulOrders: number;
   }>;
+  affiliateSummary: {
+    attributedOrders: number;
+    successfulOrders: number;
+    pendingOrders: number;
+    attributedRevenue: number;
+    pendingAttributedRevenue: number;
+    topCodes: Array<{
+      code: string;
+      affiliateName: string;
+      orders: number;
+      successfulOrders: number;
+      revenue: number;
+      pendingRevenue: number;
+    }>;
+  };
   paymentBreakdown: Array<{
     label: string;
     method: string;

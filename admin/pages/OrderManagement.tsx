@@ -114,7 +114,8 @@ const OrderManagement: React.FC = () => {
 
   const filteredOrders = orders.filter(o => {
     const matchesSearch = o.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          o.customerName.toLowerCase().includes(searchTerm.toLowerCase());
+                          o.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          String(o.affiliateCode || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = activeFilter === 'all' || o.status === activeFilter;
     const matchesPayment = paymentFilter === 'all' || o.paymentMethod === PaymentMethod.CASH_ON_DELIVERY;
     return matchesSearch && matchesFilter && matchesPayment;
@@ -324,6 +325,11 @@ const OrderManagement: React.FC = () => {
                        <p className={`text-[9px] font-black uppercase mt-1 ${order.paymentStatus === 'SUCCESS' ? 'text-emerald-500' : 'text-red-400'}`}>
                          {order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY ? 'COD' : order.paymentMethod} • {order.paymentStatus}
                        </p>
+                       {order.affiliateAttributionStatus === 'matched' && order.affiliateCode ? (
+                         <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-600">
+                           Affiliate {order.affiliateCode}
+                         </p>
+                       ) : null}
                     </div>
                   </td>
                   <td className="px-6 md:px-10 py-8">
@@ -408,6 +414,22 @@ const OrderManagement: React.FC = () => {
                   }`}>
                     {selectedOrder.paymentStatus}
                   </p>
+                </div>
+                <div className="rounded-3xl border border-emerald-100 bg-emerald-50 px-5 py-4 md:col-span-2">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-2">Affiliate Attribution</p>
+                  {selectedOrder.affiliateAttributionStatus === 'matched' && selectedOrder.affiliateCode ? (
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <p className="text-sm font-black text-gray-900">{selectedOrder.affiliateCode}</p>
+                      <p className="text-sm font-bold text-gray-700">{selectedOrder.affiliateName || 'Affiliate Partner'}</p>
+                      <p className="text-xs font-bold text-gray-500 break-all">{selectedOrder.affiliateReferralSourcePath || 'Captured before checkout'}</p>
+                    </div>
+                  ) : (
+                    <p className="text-sm font-bold text-gray-600">
+                      {selectedOrder.affiliateAttributionStatus === 'unmatched'
+                        ? 'Referral code was submitted but did not match an approved affiliate.'
+                        : 'No approved affiliate code was attached to this order.'}
+                    </p>
+                  )}
                 </div>
               </div>
 

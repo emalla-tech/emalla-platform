@@ -1108,6 +1108,17 @@ const normalizeAffiliateCode = (value) =>
     .replace(/[^A-Z0-9_-]/g, '')
     .slice(0, 32);
 
+const findApprovedAffiliateByCode = (db, code) => {
+  const normalizedCode = normalizeAffiliateCode(code);
+  if (!normalizedCode) return null;
+
+  return (db.contactSubmissions || []).find((entry) =>
+    entry.type === 'affiliate' &&
+    normalizeAffiliateApplicationStatus(entry.affiliateStatus) === 'approved' &&
+    normalizeAffiliateCode(entry.affiliateCode || entry.preferredCode) === normalizedCode
+  ) || null;
+};
+
 const generateSupportTicketNumber = () =>
   `SUP-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
@@ -1670,6 +1681,31 @@ const buildAdminFinanceSummary = (db, reportRange = null) => {
   const deliveryFeesCollected = successfulOrders.reduce((sum, order) => sum + Number(order.deliveryFee || 0), 0);
   const promotionSubsidies = successfulOrders.reduce((sum, order) => sum + Number(order.promotionSubsidy || 0), 0);
   const promotedOrders = successfulOrders.filter((order) => order.promotionApplied).length;
+  const affiliateAttributedOrders = orders.filter((order) => order.affiliateAttributionStatus === 'matched' && order.affiliateCode);
+  const successfulAffiliateOrders = successfulOrders.filter((order) => order.affiliateAttributionStatus === 'matched' && order.affiliateCode);
+  const pendingAffiliateOrders = affiliateAttributedOrders.filter((order) => order.paymentStatus !== 'SUCCESS');
+  const affiliateSummaryMap = new Map();
+  affiliateAttributedOrders.forEach((order) => {
+    const code = normalizeAffiliateCode(order.affiliateCode);
+    if (!code) return;
+    const existing = affiliateSummaryMap.get(code) || {
+      code,
+      affiliateName: order.affiliateName || 'Affiliate Partner',
+      orders: 0,
+      successfulOrders: 0,
+      revenue: 0,
+      pendingRevenue: 0
+    };
+
+    existing.orders += 1;
+    if (order.paymentStatus === 'SUCCESS') {
+      existing.successfulOrders += 1;
+      existing.revenue += Number(order.totalAmount || 0);
+    } else {
+      existing.pendingRevenue += Number(order.totalAmount || 0);
+    }
+    affiliateSummaryMap.set(code, existing);
+  });
   const totalCommissionEarned = categoryCommission.reduce((sum, entry) => sum + entry.commissionEarned, 0);
   const merchantNetRevenue = categoryCommission.reduce((sum, entry) => sum + entry.merchantNet, 0);
   const pendingCodValue = orders
@@ -1698,6 +1734,21 @@ const buildAdminFinanceSummary = (db, reportRange = null) => {
       successfulOrders: successfulOrders.length
     },
     categoryCommission,
+    affiliateSummary: {
+      attributedOrders: affiliateAttributedOrders.length,
+      successfulOrders: successfulAffiliateOrders.length,
+      pendingOrders: pendingAffiliateOrders.length,
+      attributedRevenue: Math.round(successfulAffiliateOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
+      pendingAttributedRevenue: Math.round(pendingAffiliateOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
+      topCodes: Array.from(affiliateSummaryMap.values())
+        .map((entry) => ({
+          ...entry,
+          revenue: Math.round(entry.revenue),
+          pendingRevenue: Math.round(entry.pendingRevenue)
+        }))
+        .sort((left, right) => right.revenue - left.revenue)
+        .slice(0, 8)
+    },
     paymentBreakdown: [
       { label: 'GTBank MoMo Pay', method: 'GTBANK_MOMO_PAY' },
       { label: 'MoMo', method: 'MOMO' },
@@ -5776,6 +5827,9 @@ const server = http.createServer(async (req, res) => {
         ? `EMALLA-TX-${orderId}-${Date.now()}`
         : body.tx_ref || `TX-${Date.now()}`;
       const isCashOnDelivery = shouldInitializePayment && paymentMethod === 'CASH_ON_DELIVERY';
+      const affiliateReferral = body.affiliateReferral || {};
+      const requestedAffiliateCode = normalizeAffiliateCode(body.affiliateCode || affiliateReferral.code);
+      const matchedAffiliate = requestedAffiliateCode ? findApprovedAffiliateByCode(db, requestedAffiliateCode) : null;
       const riderPayout = calculateDefaultRiderPayout({
         deliveryFee: baseDeliveryFee,
         totalAmount,
@@ -5799,6 +5853,12 @@ const server = http.createServer(async (req, res) => {
         promotionCode: promotion.eligible ? promotion.code : null,
         promotionApplied: promotion.eligible,
         promotionSubsidy: promotion.discount,
+        affiliateCode: matchedAffiliate ? normalizeAffiliateCode(matchedAffiliate.affiliateCode || matchedAffiliate.preferredCode) : '',
+        affiliateId: matchedAffiliate?.id || null,
+        affiliateName: matchedAffiliate?.name || '',
+        affiliateReferralSourcePath: matchedAffiliate ? String(affiliateReferral.sourcePath || '').slice(0, 300) : '',
+        affiliateReferralCapturedAt: matchedAffiliate ? String(affiliateReferral.capturedAt || '').slice(0, 40) : '',
+        affiliateAttributionStatus: requestedAffiliateCode ? (matchedAffiliate ? 'matched' : 'unmatched') : 'none',
         deliveryDistrict: String(body.deliveryDistrict || '').trim(),
         riderPayout,
         riderPayoutStatus: 'pending_assignment',
@@ -5876,6 +5936,8 @@ const server = http.createServer(async (req, res) => {
           totalAmount: order.totalAmount,
           promotionCode: order.promotionCode,
           deliveryDiscount: order.deliveryDiscount,
+          affiliateCode: order.affiliateCode || '',
+          affiliateAttributionStatus: order.affiliateAttributionStatus,
           riderPayoutProtected: promotion.eligible
         }
       });

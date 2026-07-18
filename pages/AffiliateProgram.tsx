@@ -25,7 +25,7 @@ const steps = [
   {
     icon: BarChart3,
     title: 'Track qualified orders',
-    text: 'The next platform phase will connect affiliate links or codes to clicks, buyers, approved orders, and commission records.'
+    text: 'Approved referral codes are captured at checkout and attached to orders so finance can review qualified performance.'
   },
   {
     icon: BadgeDollarSign,
@@ -48,7 +48,7 @@ const rules = [
   'Canceled, refunded, test, duplicate, or fraudulent orders are excluded.',
   'Affiliate payouts are reviewed by the E-Malla finance team before release.',
   'Affiliate links and codes must not mislead customers or impersonate E-Malla Rwanda.',
-  'Future affiliate dashboards will show clicks, orders, pending commission, and paid commission.'
+  'Future affiliate dashboards will add clicks, pending commission, and paid commission after commission rules are activated.'
 ];
 
 const AffiliateProgram: React.FC = () => {
@@ -244,7 +244,7 @@ const AffiliateProgram: React.FC = () => {
           <p className="text-[10px] font-black uppercase tracking-[0.28em] text-orange-500">Referral structure</p>
           <h2 className="mt-3 text-3xl font-black text-gray-950 md:text-5xl">Simple links now, full tracking next.</h2>
           <p className="mt-5 text-sm font-medium leading-7 text-gray-600">
-            Affiliate links use one clean structure that can work across home, shop, and product pages. The site now captures approved referral codes from URL parameters and keeps them ready for future order attribution.
+            Affiliate links use one clean structure that can work across home, shop, and product pages. The site captures approved referral codes from URL parameters and attaches them to checkout orders for finance review.
           </p>
         </div>
         <div className="grid gap-4">
@@ -273,7 +273,7 @@ const AffiliateProgram: React.FC = () => {
               Apply now and our team will review your audience, channels, and fit. Approved partners will be prioritized when referral links, tracking, and payout tools go live.
             </p>
             <div className="mt-8 grid gap-3 text-sm font-bold text-orange-50/90">
-              {['Admin review through the existing inquiries desk', 'No payment or customer flow changes yet', 'Designed for future referral-code tracking'].map((item) => (
+              {['Admin review through the existing inquiries desk', 'No automatic payout changes yet', 'Approved referral codes are attached to checkout orders'].map((item) => (
                 <div key={item} className="flex items-center gap-3">
                   <CheckCircle2 size={17} className="text-white" />
                   <span>{item}</span>

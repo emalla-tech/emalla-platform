@@ -297,7 +297,13 @@ export const AdminService = {
 
   updateInquiry: async (
     inquiryId: string,
-    params: { status?: 'new' | 'replied' | 'resolved'; internalNotes?: string; responseMessage?: string; assignToSelf?: boolean }
+    params: {
+      status?: 'new' | 'replied' | 'resolved';
+      internalNotes?: string;
+      responseMessage?: string;
+      assignToSelf?: boolean;
+      affiliateStatus?: 'pending' | 'approved' | 'rejected' | 'suspended';
+    }
   ) => {
     const response = await apiClient.updateAdminInquiry(inquiryId, params);
     return response.inquiry;

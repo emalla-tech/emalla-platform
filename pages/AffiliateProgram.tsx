@@ -77,21 +77,17 @@ const AffiliateProgram: React.FC = () => {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      await InquiryService.submitContact({
+      const normalizedCode = normalizeAffiliateCode(formData.preferredCode);
+      await InquiryService.submitAffiliateApplication({
         name: formData.name,
         email: formData.email,
-        subject: 'Affiliate Program Application',
-        message: [
-          `Phone: ${formData.phone}`,
-          `Partner type: ${formData.partnerType}`,
-          `Preferred referral code: ${normalizeAffiliateCode(formData.preferredCode) || 'Not specified'}`,
-          `Referral link preview: ${normalizeAffiliateCode(formData.preferredCode) ? buildAffiliateLink(formData.preferredCode) : 'Not generated yet'}`,
-          `Primary channel: ${formData.channel}`,
-          `Estimated audience/reach: ${formData.audienceSize || 'Not specified'}`,
-          '',
-          'Application message:',
-          formData.message
-        ].join('\n')
+        phone: formData.phone,
+        partnerType: formData.partnerType,
+        preferredCode: normalizedCode,
+        channel: formData.channel,
+        audienceSize: formData.audienceSize,
+        message: formData.message,
+        referralLinkPreview: normalizedCode ? buildAffiliateLink(normalizedCode) : ''
       });
       setSubmitted(true);
       setFormData({

@@ -144,6 +144,23 @@ export const apiClient = {
     });
   },
 
+  async submitAffiliateApplication(params: {
+    name: string;
+    email: string;
+    phone: string;
+    partnerType: string;
+    preferredCode?: string;
+    channel: string;
+    audienceSize?: string;
+    message: string;
+    referralLinkPreview?: string;
+  }) {
+    return request('/affiliate-applications', {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+  },
+
   async getAddresses() {
     return request('/addresses');
   },
@@ -534,7 +551,13 @@ export const apiClient = {
 
   async updateAdminInquiry(
     inquiryId: string,
-    params: { status?: 'new' | 'replied' | 'resolved'; internalNotes?: string; responseMessage?: string; assignToSelf?: boolean }
+    params: {
+      status?: 'new' | 'replied' | 'resolved';
+      internalNotes?: string;
+      responseMessage?: string;
+      assignToSelf?: boolean;
+      affiliateStatus?: 'pending' | 'approved' | 'rejected' | 'suspended';
+    }
   ) {
     return request(`/admin/inquiries/${inquiryId}`, {
       method: 'PUT',

@@ -5,11 +5,12 @@ import { useAuth } from '../../auth/AuthContext';
 import { AdminService } from '../../services/adminService';
 
 type InquiryStatus = 'new' | 'replied' | 'resolved';
+type AffiliateStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
 
 type Inquiry = {
   id: string;
   ticketNumber?: string;
-  type: 'contact' | 'investor' | 'support' | 'return' | 'refund' | 'product_quote';
+  type: 'contact' | 'investor' | 'support' | 'return' | 'refund' | 'product_quote' | 'affiliate';
   name: string;
   email: string;
   subject: string;
@@ -30,14 +31,29 @@ type Inquiry = {
   location?: string;
   productName?: string;
   quantity?: number;
+  affiliateStatus?: AffiliateStatus;
+  preferredCode?: string;
+  affiliateCode?: string;
+  referralLink?: string;
+  referralLinkPreview?: string;
+  partnerType?: string;
+  channel?: string;
+  audienceSize?: string;
 };
 
-const FILTERS = ['all', 'product_quote', 'support', 'return', 'refund', 'contact', 'investor'] as const;
+const FILTERS = ['all', 'affiliate', 'product_quote', 'support', 'return', 'refund', 'contact', 'investor'] as const;
 
 const STATUS_STYLES: Record<InquiryStatus, string> = {
   new: 'bg-amber-100 text-amber-700',
   replied: 'bg-blue-100 text-blue-700',
   resolved: 'bg-emerald-100 text-emerald-700'
+};
+
+const AFFILIATE_STATUS_STYLES: Record<AffiliateStatus, string> = {
+  pending: 'bg-amber-100 text-amber-700',
+  approved: 'bg-emerald-100 text-emerald-700',
+  rejected: 'bg-rose-100 text-rose-700',
+  suspended: 'bg-gray-200 text-gray-700'
 };
 
 const InquiryManagement: React.FC = () => {
@@ -83,6 +99,10 @@ const InquiryManagement: React.FC = () => {
           entry.subject,
           entry.company || '',
           entry.message,
+          entry.partnerType || '',
+          entry.channel || '',
+          entry.preferredCode || '',
+          entry.affiliateCode || '',
           entry.assignedAdminName || '',
           entry.internalNotes || ''
         ].some((value) => value.toLowerCase().includes(keyword));
@@ -115,6 +135,19 @@ const InquiryManagement: React.FC = () => {
       showToast(message, status === 'resolved' ? 'success' : 'info');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to update inquiry status.', 'error');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleAffiliateStatusUpdate = async (inquiryId: string, affiliateStatus: AffiliateStatus) => {
+    setBusyId(inquiryId);
+    try {
+      const updated = await AdminService.updateInquiry(inquiryId, { affiliateStatus });
+      syncInquiry(updated);
+      showToast(`Affiliate application ${affiliateStatus}.`, affiliateStatus === 'approved' ? 'success' : 'info');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to update affiliate application.', 'error');
     } finally {
       setBusyId(null);
     }
@@ -174,7 +207,7 @@ const InquiryManagement: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
           <h1 className="text-3xl font-black text-gray-900">Inquiries Desk</h1>
-          <p className="text-gray-500">Manage product quotes, customer support, returns, refunds, contact messages, and investor inquiries.</p>
+          <p className="text-gray-500">Manage affiliate applications, product quotes, customer support, returns, refunds, contact messages, and investor inquiries.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {FILTERS.map((item) => (
@@ -224,6 +257,8 @@ const InquiryManagement: React.FC = () => {
                       <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
                         entry.type === 'investor'
                           ? 'bg-purple-100 text-purple-700'
+                          : entry.type === 'affiliate'
+                            ? 'bg-emerald-100 text-emerald-700'
                           : entry.type === 'product_quote'
                             ? 'bg-cyan-100 text-cyan-700'
                           : entry.type === 'refund'
@@ -260,6 +295,45 @@ const InquiryManagement: React.FC = () => {
                         <span className="flex items-center"><Package size={16} className="mr-2 text-cyan-600" />{entry.productName} x {entry.quantity}</span>
                         <span className="flex items-center"><Phone size={16} className="mr-2 text-gray-400" />{entry.phone}</span>
                         <span className="flex items-center sm:col-span-2"><MapPin size={16} className="mr-2 text-gray-400" />{entry.location}</span>
+                      </div>
+                    )}
+
+                    {entry.type === 'affiliate' && (
+                      <div className="grid gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm sm:grid-cols-2">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Affiliate Status</p>
+                          <span className={`mt-2 inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase ${AFFILIATE_STATUS_STYLES[entry.affiliateStatus || 'pending']}`}>
+                            {entry.affiliateStatus || 'pending'}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Phone / WhatsApp</p>
+                          <p className="mt-1 font-black text-gray-900">{entry.phone || 'Not supplied'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Partner Type</p>
+                          <p className="mt-1 font-black text-gray-900">{entry.partnerType || 'Not supplied'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Primary Channel</p>
+                          <p className="mt-1 font-black text-gray-900">{entry.channel || 'Not supplied'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Preferred Code</p>
+                          <p className="mt-1 font-black text-gray-900">{entry.preferredCode || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Official Code</p>
+                          <p className="mt-1 font-black text-gray-900">{entry.affiliateCode || 'Not approved yet'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Audience / Reach</p>
+                          <p className="mt-1 font-black text-gray-900">{entry.audienceSize || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Referral Link</p>
+                          <p className="mt-1 break-all font-black text-gray-900">{entry.referralLink || entry.referralLinkPreview || 'Generated after approval'}</p>
+                        </div>
                       </div>
                     )}
 
@@ -373,6 +447,38 @@ const InquiryManagement: React.FC = () => {
                       </div>
                     </div>
                     <div className="mt-5 pt-5 border-t border-gray-200 space-y-3">
+                      {entry.type === 'affiliate' ? (
+                        <div className="space-y-3 rounded-2xl border border-emerald-100 bg-white p-3">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Affiliate Review</p>
+                          <button
+                            type="button"
+                            onClick={() => handleAffiliateStatusUpdate(entry.id, 'approved')}
+                            disabled={isBusy || entry.affiliateStatus === 'approved'}
+                            className="w-full px-4 py-3 rounded-2xl bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all disabled:opacity-60"
+                          >
+                            Approve Affiliate
+                          </button>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleAffiliateStatusUpdate(entry.id, 'rejected')}
+                              disabled={isBusy || entry.affiliateStatus === 'rejected'}
+                              className="px-4 py-3 rounded-2xl bg-rose-50 text-rose-700 text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all disabled:opacity-60"
+                            >
+                              Reject
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleAffiliateStatusUpdate(entry.id, 'suspended')}
+                              disabled={isBusy || entry.affiliateStatus === 'suspended'}
+                              className="px-4 py-3 rounded-2xl bg-gray-200 text-gray-700 text-[10px] font-black uppercase tracking-widest hover:bg-gray-300 transition-all disabled:opacity-60"
+                            >
+                              Suspend
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+
                       {entry.status !== 'replied' ? (
                         <button
                           type="button"

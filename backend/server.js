@@ -1096,6 +1096,18 @@ const normalizeInquiryStatus = (value) => {
   return ['new', 'replied', 'resolved'].includes(normalized) ? normalized : 'new';
 };
 
+const normalizeAffiliateApplicationStatus = (value) => {
+  const normalized = String(value || '').toLowerCase();
+  return ['pending', 'approved', 'rejected', 'suspended'].includes(normalized) ? normalized : 'pending';
+};
+
+const normalizeAffiliateCode = (value) =>
+  String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, '')
+    .slice(0, 32);
+
 const generateSupportTicketNumber = () =>
   `SUP-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
@@ -3043,6 +3055,111 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/affiliate-applications' && req.method === 'POST') {
+      const body = await readBody(req);
+      const db = await readDb();
+      const preferredCode = normalizeAffiliateCode(body.preferredCode);
+      const referralLinkPreview = preferredCode ? buildPublicRoute(`/?ref=${preferredCode}`) : '';
+      const submission = {
+        id: `aff-${Date.now()}`,
+        type: 'affiliate',
+        name: String(body.name || '').trim(),
+        email: String(body.email || '').trim().toLowerCase(),
+        phone: String(body.phone || '').trim(),
+        subject: 'Affiliate Program Application',
+        company: '',
+        message: String(body.message || '').trim(),
+        status: 'new',
+        affiliateStatus: 'pending',
+        preferredCode,
+        affiliateCode: '',
+        referralLink: '',
+        referralLinkPreview,
+        partnerType: String(body.partnerType || '').trim(),
+        channel: String(body.channel || '').trim(),
+        audienceSize: String(body.audienceSize || '').trim(),
+        assignedAdminId: null,
+        assignedAdminName: null,
+        internalNotes: '',
+        repliedAt: null,
+        updatedAt: new Date().toISOString(),
+        updatedBy: 'SYSTEM',
+        createdAt: new Date().toISOString()
+      };
+
+      if (!submission.name || !submission.email || !submission.phone || !submission.partnerType || !submission.channel || submission.message.length < 8) {
+        sendJson(res, 400, { error: 'Please complete all required affiliate application fields.' });
+        return;
+      }
+
+      db.contactSubmissions = db.contactSubmissions || [];
+      db.contactSubmissions.unshift(submission);
+      await sendPlatformEmail(db, {
+        to: submission.email,
+        subject: 'E-Malla Affiliate Application Received',
+        template: 'affiliate_application_received',
+        body: `Hello ${submission.name}, we received your E-Malla affiliate application and our team will review it.`,
+        replyTo: submission.email,
+        html: createEmailHtml({
+          title: 'Affiliate application received',
+          intro: `Muraho ${submission.name}, twakiriye application yawe ya E-Malla Affiliate Program kandi team yacu izagisuzuma.`,
+          sections: [
+            { label: 'Partner Type', value: submission.partnerType },
+            { label: 'Primary Channel', value: submission.channel },
+            { label: 'Preferred Code', value: submission.preferredCode || 'Not specified' },
+            { label: 'Status', value: 'Pending review' }
+          ],
+          closing: 'Nitugisuzuma, tuzakumenyesha niba cyemejwe nuko official referral code izakoreshwa.'
+        })
+      });
+      await sendPlatformEmail(db, {
+        to: getEmailConfig().adminAlertEmail,
+        subject: `New Affiliate Application: ${submission.name}`,
+        template: 'affiliate_admin_alert',
+        body: `New affiliate application from ${submission.name} (${submission.email}). Partner type: ${submission.partnerType}.`,
+        replyTo: submission.email,
+        html: createEmailHtml({
+          title: 'New affiliate application',
+          intro: 'A new affiliate application has been submitted from the public website.',
+          sections: [
+            { label: 'Name', value: submission.name },
+            { label: 'Email', value: submission.email },
+            { label: 'Phone', value: submission.phone },
+            { label: 'Partner Type', value: submission.partnerType },
+            { label: 'Preferred Code', value: submission.preferredCode || 'Not specified' },
+            { label: 'Channel', value: submission.channel }
+          ],
+          closing: 'Open Admin Inquiries Desk, filter Affiliate, then approve, reject, suspend, or assign follow-up.'
+        })
+      });
+      for (const admin of (db.users || []).filter((entry) => entry.role === 'ADMIN' && entry.status === 'active')) {
+        createNotification(db, {
+          userId: admin.id,
+          role: 'ADMIN',
+          title: 'New Affiliate Application',
+          message: `${submission.name} applied for the affiliate program.`,
+          type: 'info',
+          metadata: { inquiryId: submission.id, inquiryType: submission.type, preferredCode: submission.preferredCode }
+        });
+      }
+      createAuditLog(db, {
+        event: `Affiliate application received from ${submission.name}`,
+        actor: submission.email,
+        category: 'system',
+        status: 'info',
+        metadata: {
+          inquiryId: submission.id,
+          inquiryType: submission.type,
+          partnerType: submission.partnerType,
+          preferredCode: submission.preferredCode
+        }
+      });
+
+      await writeDb(db);
+      sendJson(res, 201, { submission });
+      return;
+    }
+
     if (pathname === '/api/admin/stats' && req.method === 'GET') {
       const user = await requireRole(req, res, ['ADMIN']);
       if (!user) return;
@@ -3565,15 +3682,56 @@ const server = http.createServer(async (req, res) => {
 
       const currentInquiry = db.contactSubmissions[index];
       const nextStatus = body.status !== undefined ? normalizeInquiryStatus(body.status) : currentInquiry.status;
+      const nextAffiliateStatus =
+        currentInquiry.type === 'affiliate' && body.affiliateStatus !== undefined
+          ? normalizeAffiliateApplicationStatus(body.affiliateStatus)
+          : currentInquiry.affiliateStatus || 'pending';
       const shouldAssignToSelf = Boolean(body.assignToSelf);
       const nextNotes = body.internalNotes !== undefined ? String(body.internalNotes || '').trim() : currentInquiry.internalNotes || '';
       const responseMessage = body.responseMessage !== undefined ? String(body.responseMessage || '').trim() : '';
       const now = new Date().toISOString();
       const effectiveStatus = responseMessage ? 'replied' : nextStatus;
+      const officialAffiliateCode =
+        currentInquiry.type === 'affiliate' && nextAffiliateStatus === 'approved'
+          ? normalizeAffiliateCode(currentInquiry.affiliateCode || currentInquiry.preferredCode || currentInquiry.name || currentInquiry.email)
+            || `AFF${Date.now().toString().slice(-6)}`
+          : currentInquiry.affiliateCode || '';
+
+      if (currentInquiry.type === 'affiliate' && nextAffiliateStatus === 'approved') {
+        const duplicateAffiliate = (db.contactSubmissions || []).find((entry) =>
+          entry.id !== currentInquiry.id &&
+          entry.type === 'affiliate' &&
+          normalizeAffiliateApplicationStatus(entry.affiliateStatus) === 'approved' &&
+          normalizeAffiliateCode(entry.affiliateCode || entry.preferredCode) === officialAffiliateCode
+        );
+
+        if (duplicateAffiliate) {
+          sendJson(res, 409, { error: 'This affiliate code is already approved for another partner.' });
+          return;
+        }
+      }
 
       const updatedInquiry = {
         ...currentInquiry,
         status: effectiveStatus,
+        ...(currentInquiry.type === 'affiliate'
+          ? {
+              affiliateStatus: nextAffiliateStatus,
+              affiliateCode: officialAffiliateCode,
+              referralLink:
+                nextAffiliateStatus === 'approved' && officialAffiliateCode
+                  ? buildPublicRoute(`/?ref=${officialAffiliateCode}`)
+                  : currentInquiry.referralLink || '',
+              reviewedAt:
+                body.affiliateStatus !== undefined && nextAffiliateStatus !== (currentInquiry.affiliateStatus || 'pending')
+                  ? now
+                  : currentInquiry.reviewedAt || null,
+              reviewedBy:
+                body.affiliateStatus !== undefined && nextAffiliateStatus !== (currentInquiry.affiliateStatus || 'pending')
+                  ? user.id
+                  : currentInquiry.reviewedBy || null
+            }
+          : {}),
         assignedAdminId: shouldAssignToSelf ? user.id : currentInquiry.assignedAdminId || null,
         assignedAdminName: shouldAssignToSelf ? (user.name || user.email) : currentInquiry.assignedAdminName || null,
         internalNotes: nextNotes,
@@ -3612,6 +3770,57 @@ const server = http.createServer(async (req, res) => {
             inquiryType: updatedInquiry.type,
             notesLength: nextNotes.length
           }
+        });
+      }
+
+      if (currentInquiry.type === 'affiliate' && nextAffiliateStatus !== (currentInquiry.affiliateStatus || 'pending')) {
+        createAuditLog(db, {
+          event: `Affiliate application ${nextAffiliateStatus}: ${updatedInquiry.name}`,
+          actor: user.name || user.email,
+          category: 'system',
+          status: nextAffiliateStatus === 'approved' ? 'success' : nextAffiliateStatus === 'rejected' ? 'error' : 'info',
+          metadata: {
+            inquiryId: updatedInquiry.id,
+            affiliateStatus: nextAffiliateStatus,
+            affiliateCode: updatedInquiry.affiliateCode || '',
+            referralLink: updatedInquiry.referralLink || ''
+          }
+        });
+        await sendPlatformEmail(db, {
+          to: updatedInquiry.email,
+          subject:
+            nextAffiliateStatus === 'approved'
+              ? 'Your E-Malla Affiliate Application Was Approved'
+              : nextAffiliateStatus === 'rejected'
+                ? 'E-Malla Affiliate Application Update'
+                : 'E-Malla Affiliate Account Update',
+          template: `affiliate_application_${nextAffiliateStatus}`,
+          body:
+            nextAffiliateStatus === 'approved'
+              ? `Hello ${updatedInquiry.name}, your affiliate application was approved. Your code is ${updatedInquiry.affiliateCode}.`
+              : `Hello ${updatedInquiry.name}, there is an update on your E-Malla affiliate application.`,
+          html: createEmailHtml({
+            title:
+              nextAffiliateStatus === 'approved'
+                ? 'Affiliate application approved'
+                : nextAffiliateStatus === 'rejected'
+                  ? 'Affiliate application reviewed'
+                  : 'Affiliate status updated',
+            intro:
+              nextAffiliateStatus === 'approved'
+                ? `Muraho ${updatedInquiry.name}, application yawe ya E-Malla Affiliate Program yemejwe.`
+                : `Muraho ${updatedInquiry.name}, hari update kuri application yawe ya E-Malla Affiliate Program.`,
+            sections: [
+              { label: 'Status', value: nextAffiliateStatus },
+              { label: 'Official Code', value: updatedInquiry.affiliateCode || 'Not active' },
+              { label: 'Referral Link', value: updatedInquiry.referralLink || 'Not active' },
+              { label: 'Reviewed By', value: user.name || user.email }
+            ],
+            closing:
+              nextAffiliateStatus === 'approved'
+                ? 'Ushobora gukoresha referral link yawe mu kwamamaza E-Malla Rwanda. Commission dashboard izongerwaho muri next phase.'
+                : 'Niba ukeneye ibisobanuro, subiza iyi email cyangwa wandikire support.'
+          })
         });
       }
 

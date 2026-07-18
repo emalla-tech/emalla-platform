@@ -7,5 +7,19 @@ export const InquiryService = {
 
   submitInvestorInquiry: async (params: { name: string; email: string; company: string; message: string }) => {
     return apiClient.submitInvestorInquiry(params);
+  },
+
+  submitAffiliateApplication: async (params: {
+    name: string;
+    email: string;
+    phone: string;
+    partnerType: string;
+    preferredCode?: string;
+    channel: string;
+    audienceSize?: string;
+    message: string;
+    referralLinkPreview?: string;
+  }) => {
+    return apiClient.submitAffiliateApplication(params);
   }
 };

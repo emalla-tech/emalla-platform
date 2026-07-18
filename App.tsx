@@ -46,7 +46,7 @@ const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const ReturnsPolicy = lazy(() => import('./pages/ReturnsPolicy'));
 const SellerAgreement = lazy(() => import('./pages/SellerAgreement'));
-const CompanyInformation = lazy(() => import('./pages/CompanyInformation'));
+const AffiliateProgram = lazy(() => import('./pages/AffiliateProgram'));
 const Contact = lazy(() => import('./pages/Contact'));
 const HowItWorks = lazy(() => import('./pages/HowItWorks'));
 const Cart = lazy(() => import('./pages/Cart'));
@@ -200,9 +200,9 @@ const buildSeoConfig = (pathname: string) => {
       title: 'Seller Agreement | E-Malla Rwanda',
       description: 'Review the standards and responsibilities for sellers operating on E-Malla Rwanda.',
     },
-    '/company-information': {
-      title: 'Company Information | E-Malla Rwanda',
-      description: 'View official platform operator and contact information for E-Malla Rwanda.',
+    '/affiliate-program': {
+      title: 'Affiliate Program | E-Malla Rwanda',
+      description: 'Join the E-Malla Rwanda affiliate program and earn by helping buyers discover trusted marketplace products.',
     },
     '/contact': {
       title: 'Contact Us | E-Malla Rwanda',
@@ -355,7 +355,8 @@ const App: React.FC = () => {
             <Route path="/privacy" element={withSuspense(<PrivacyPolicy />)} />
             <Route path="/returns" element={withSuspense(<ReturnsPolicy />)} />
             <Route path="/seller-agreement" element={withSuspense(<SellerAgreement />)} />
-            <Route path="/company-information" element={withSuspense(<CompanyInformation />)} />
+            <Route path="/affiliate-program" element={withSuspense(<AffiliateProgram />)} />
+            <Route path="/company-information" element={<Navigate to="/affiliate-program" replace />} />
             <Route path="/contact" element={withSuspense(<Contact />)} />
             <Route path="/how-it-works" element={withSuspense(<HowItWorks />)} />
             <Route path="/become-seller" element={withSuspense(<BecomeSeller />)} />

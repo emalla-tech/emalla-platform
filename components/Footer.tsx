@@ -130,9 +130,9 @@ const Footer: React.FC = () => {
                 <ArrowRight size={12} className="mr-2 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-orange-500" />
                 {t.footer.terms}
               </Link></li>
-              <li><Link to="/company-information" className={linkClass('/company-information')}>
+              <li><Link to="/affiliate-program" className={linkClass('/affiliate-program', true)}>
                 <ArrowRight size={12} className="mr-2 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-orange-500" />
-                Company Information
+                Affiliate Program
               </Link></li>
             </ul>
           </div>

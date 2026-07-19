@@ -28,6 +28,7 @@ const AdminSettings: React.FC = () => {
   const { user, changePassword } = useAuth();
   const [preferences, setPreferences] = useState<AdminPreferences>(defaultPreferences);
   const [categoryCommissionRates, setCategoryCommissionRates] = useState<Record<string, number>>(defaultCategoryCommissionRates);
+  const [affiliateCommissionRate, setAffiliateCommissionRate] = useState(2);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -52,6 +53,7 @@ const AdminSettings: React.FC = () => {
           ...defaultCategoryCommissionRates,
           ...(settings.categoryCommissionRates || {})
         });
+        setAffiliateCommissionRate(Number(settings.affiliateCommissionRate ?? 2));
       } catch (error) {
         setToastTone('error');
         setToast(error instanceof Error ? error.message : 'Failed to load admin settings.');
@@ -69,10 +71,11 @@ const AdminSettings: React.FC = () => {
     try {
       await AdminService.updateSettings({
         preferences,
-        categoryCommissionRates
+        categoryCommissionRates,
+        affiliateCommissionRate
       });
       setToastTone('success');
-      setToast('Admin settings and category commissions saved successfully.');
+      setToast('Admin settings, category commissions, and affiliate commission rate saved successfully.');
     } catch (error) {
       setToastTone('error');
       setToast(error instanceof Error ? error.message : 'Failed to save admin settings.');
@@ -92,6 +95,11 @@ const AdminSettings: React.FC = () => {
       ...current,
       [categoryId]: Number.isFinite(nextValue) ? Math.max(0, Math.min(100, nextValue)) : 0
     }));
+  };
+
+  const updateAffiliateCommissionRate = (value: string) => {
+    const nextValue = Number(value);
+    setAffiliateCommissionRate(Number.isFinite(nextValue) ? Math.max(0, Math.min(50, nextValue)) : 0);
   };
 
   const handlePasswordChange = async (event: React.FormEvent) => {
@@ -259,6 +267,38 @@ const AdminSettings: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-[32px] border border-emerald-100 shadow-sm p-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-3">
+            <Percent size={22} className="mt-1 text-emerald-600" />
+            <div>
+              <h2 className="text-xl font-black text-gray-900">Affiliate Commission Rule</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">
+                Set the global affiliate commission percentage. It is only estimated for approved referral orders and becomes eligible after the order is completed and revenue is released.
+              </p>
+            </div>
+          </div>
+          <label className="block min-w-[220px]">
+            <span className="block text-[10px] font-black uppercase tracking-widest text-emerald-700">Affiliate Commission</span>
+            <div className="relative mt-2">
+              <input
+                type="number"
+                min={0}
+                max={50}
+                step={0.5}
+                value={affiliateCommissionRate}
+                onChange={(event) => updateAffiliateCommissionRate(event.target.value)}
+                className="w-full rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 pr-12 font-black text-gray-900 outline-none focus:border-emerald-300"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-black text-emerald-600">%</span>
+            </div>
+          </label>
+        </div>
+        <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-4 text-sm text-emerald-800">
+          <span className="font-black">Payout safety:</span> this setting does not create automatic payouts. Finance will review eligible affiliate commission before any future payout action.
         </div>
       </div>
 

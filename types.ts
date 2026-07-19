@@ -133,6 +133,9 @@ export interface Order {
   affiliateReferralSourcePath?: string;
   affiliateReferralCapturedAt?: string;
   affiliateAttributionStatus?: 'none' | 'matched' | 'unmatched';
+  affiliateCommissionRate?: number;
+  affiliateCommissionAmount?: number;
+  affiliateCommissionStatus?: 'not_applicable' | 'pending_review' | 'eligible' | 'paid';
   riderPayout?: number;
   riderPayoutStatus?: 'pending_assignment' | 'ready' | 'assigned' | 'released';
   deliveryConfirmationCode?: string;

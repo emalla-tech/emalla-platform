@@ -422,6 +422,12 @@ const OrderManagement: React.FC = () => {
                       <p className="text-sm font-black text-gray-900">{selectedOrder.affiliateCode}</p>
                       <p className="text-sm font-bold text-gray-700">{selectedOrder.affiliateName || 'Affiliate Partner'}</p>
                       <p className="text-xs font-bold text-gray-500 break-all">{selectedOrder.affiliateReferralSourcePath || 'Captured before checkout'}</p>
+                      <p className="text-xs font-black text-emerald-700">
+                        Commission: RWF {Number(selectedOrder.affiliateCommissionAmount || 0).toLocaleString()} at {Number(selectedOrder.affiliateCommissionRate || 0)}%
+                      </p>
+                      <p className="text-xs font-black uppercase tracking-widest text-emerald-700">
+                        Status: {selectedOrder.status === OrderStatus.COMPLETED ? 'eligible' : selectedOrder.affiliateCommissionStatus || 'pending_review'}
+                      </p>
                     </div>
                   ) : (
                     <p className="text-sm font-bold text-gray-600">

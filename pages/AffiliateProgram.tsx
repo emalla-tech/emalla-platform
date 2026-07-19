@@ -48,7 +48,7 @@ const rules = [
   'Canceled, refunded, test, duplicate, or fraudulent orders are excluded.',
   'Affiliate payouts are reviewed by the E-Malla finance team before release.',
   'Affiliate links and codes must not mislead customers or impersonate E-Malla Rwanda.',
-  'Future affiliate dashboards will add clicks, pending commission, and paid commission after commission rules are activated.'
+  'Finance can review eligible and pending commission, while future affiliate dashboards will add clicks and self-service payout history.'
 ];
 
 const AffiliateProgram: React.FC = () => {
@@ -270,7 +270,7 @@ const AffiliateProgram: React.FC = () => {
             <p className="text-[10px] font-black uppercase tracking-[0.26em] text-orange-100">Affiliate launch queue</p>
             <h2 className="mt-3 max-w-3xl text-3xl font-black md:text-5xl">Want to promote E-Malla Rwanda?</h2>
             <p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-orange-50/90">
-              Apply now and our team will review your audience, channels, and fit. Approved partners will be prioritized when referral links, tracking, and payout tools go live.
+              Apply now and our team will review your audience, channels, and fit. Approved partners can receive referral links that attach orders to finance-reviewed commission tracking.
             </p>
             <div className="mt-8 grid gap-3 text-sm font-bold text-orange-50/90">
               {['Admin review through the existing inquiries desk', 'No automatic payout changes yet', 'Approved referral codes are attached to checkout orders'].map((item) => (

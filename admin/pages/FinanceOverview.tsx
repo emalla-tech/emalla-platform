@@ -21,6 +21,8 @@ type FinanceSummary = {
     completedPayouts: number;
     pendingPayouts: number;
     successfulOrders: number;
+    affiliateCommissionEligible: number;
+    affiliateCommissionPendingReview: number;
   };
   categoryCommission: Array<{
     categoryId: string;
@@ -32,11 +34,16 @@ type FinanceSummary = {
     successfulOrders: number;
   }>;
   affiliateSummary: {
+    commissionRate: number;
     attributedOrders: number;
     successfulOrders: number;
     pendingOrders: number;
+    eligibleOrders: number;
+    pendingReviewOrders: number;
     attributedRevenue: number;
     pendingAttributedRevenue: number;
+    affiliateCommissionEligible: number;
+    affiliateCommissionPendingReview: number;
     topCodes: Array<{
       code: string;
       affiliateName: string;
@@ -44,6 +51,8 @@ type FinanceSummary = {
       successfulOrders: number;
       revenue: number;
       pendingRevenue: number;
+      eligibleCommission: number;
+      pendingReviewCommission: number;
     }>;
   };
   paymentBreakdown: Array<{
@@ -73,15 +82,22 @@ const defaultSummary: FinanceSummary = {
     platformNetRevenue: 0,
     completedPayouts: 0,
     pendingPayouts: 0,
-    successfulOrders: 0
+    successfulOrders: 0,
+    affiliateCommissionEligible: 0,
+    affiliateCommissionPendingReview: 0
   },
   categoryCommission: [],
   affiliateSummary: {
+    commissionRate: 2,
     attributedOrders: 0,
     successfulOrders: 0,
     pendingOrders: 0,
+    eligibleOrders: 0,
+    pendingReviewOrders: 0,
     attributedRevenue: 0,
     pendingAttributedRevenue: 0,
+    affiliateCommissionEligible: 0,
+    affiliateCommissionPendingReview: 0,
     topCodes: []
   },
   paymentBreakdown: [],
@@ -103,7 +119,8 @@ const financeMetricOptions: Array<{
   { key: 'grossRevenue', label: 'Gross Revenue', description: 'Successful payments recorded in the period.' },
   { key: 'platformNetRevenue', label: 'Platform Net Revenue', description: 'Commission plus collected delivery fees.' },
   { key: 'totalCommissionEarned', label: 'Commission Earned', description: 'Category commission from successful sales.' },
-  { key: 'pendingCodValue', label: 'Pending COD Value', description: 'Current outstanding COD orders created in the period.' }
+  { key: 'pendingCodValue', label: 'Pending COD Value', description: 'Current outstanding COD orders created in the period.' },
+  { key: 'affiliateCommissionEligible', label: 'Affiliate Commission', description: 'Eligible affiliate commission from completed attributed orders.' }
 ];
 const defaultReportMetrics = financeMetricOptions.map((option) => option.key);
 const toDateInput = (date: Date) => {
@@ -620,23 +637,27 @@ const FinanceOverview: React.FC = () => {
             <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-emerald-700">Affiliate Attribution</p>
-                <h2 className="mt-2 text-xl font-black text-gray-950">Referral orders tracked for future commission review</h2>
+                <h2 className="mt-2 text-xl font-black text-gray-950">Referral orders and eligible commission review</h2>
                 <p className="mt-1 max-w-2xl text-sm text-gray-600">
-                  These numbers only track approved affiliate codes attached at checkout. Payout calculation remains manual until the commission rules are activated.
+                  Current rule: {summary.affiliateSummary.commissionRate}% of attributed merchandise value. Commission becomes eligible only after the order is completed and revenue is released.
                 </p>
               </div>
-              <div className="grid w-full gap-3 sm:grid-cols-3 xl:max-w-xl">
+              <div className="grid w-full gap-3 sm:grid-cols-2 xl:max-w-2xl">
                 <div className="rounded-2xl border border-emerald-100 bg-white px-4 py-3">
                   <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Attributed Orders</p>
                   <p className="mt-2 text-2xl font-black text-gray-950">{summary.affiliateSummary.attributedOrders}</p>
                 </div>
                 <div className="rounded-2xl border border-emerald-100 bg-white px-4 py-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Successful Revenue</p>
-                  <p className="mt-2 text-lg font-black text-gray-950">{money(summary.affiliateSummary.attributedRevenue)}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Eligible Commission</p>
+                  <p className="mt-2 text-lg font-black text-gray-950">{money(summary.affiliateSummary.affiliateCommissionEligible)}</p>
                 </div>
                 <div className="rounded-2xl border border-amber-100 bg-white px-4 py-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Pending Revenue</p>
-                  <p className="mt-2 text-lg font-black text-gray-950">{money(summary.affiliateSummary.pendingAttributedRevenue)}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Pending Review</p>
+                  <p className="mt-2 text-lg font-black text-gray-950">{money(summary.affiliateSummary.affiliateCommissionPendingReview)}</p>
+                </div>
+                <div className="rounded-2xl border border-gray-100 bg-white px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Eligible Orders</p>
+                  <p className="mt-2 text-lg font-black text-gray-950">{summary.affiliateSummary.eligibleOrders}/{summary.affiliateSummary.attributedOrders}</p>
                 </div>
               </div>
             </div>
@@ -658,12 +679,12 @@ const FinanceOverview: React.FC = () => {
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     <div className="rounded-xl bg-emerald-50 px-3 py-2">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600">Revenue</p>
-                      <p className="mt-1 text-sm font-black text-gray-950">{money(entry.revenue)}</p>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600">Eligible Commission</p>
+                      <p className="mt-1 text-sm font-black text-gray-950">{money(entry.eligibleCommission)}</p>
                     </div>
                     <div className="rounded-xl bg-amber-50 px-3 py-2">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-amber-600">Pending</p>
-                      <p className="mt-1 text-sm font-black text-gray-950">{money(entry.pendingRevenue)}</p>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-amber-600">Pending Review</p>
+                      <p className="mt-1 text-sm font-black text-gray-950">{money(entry.pendingReviewCommission)}</p>
                     </div>
                   </div>
                 </div>

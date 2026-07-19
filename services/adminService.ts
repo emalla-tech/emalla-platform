@@ -30,6 +30,7 @@ type AdminSettingsResponse = {
   settings: {
     preferences?: Record<string, boolean>;
     categoryCommissionRates?: Record<string, number>;
+    affiliateCommissionRate?: number;
     updatedAt?: string;
     updatedBy?: string;
   };
@@ -49,6 +50,8 @@ export type AdminFinanceResponse = {
     completedPayouts: number;
     pendingPayouts: number;
     successfulOrders: number;
+    affiliateCommissionEligible: number;
+    affiliateCommissionPendingReview: number;
   };
   categoryCommission: Array<{
     categoryId: string;
@@ -60,11 +63,16 @@ export type AdminFinanceResponse = {
     successfulOrders: number;
   }>;
   affiliateSummary: {
+    commissionRate: number;
     attributedOrders: number;
     successfulOrders: number;
     pendingOrders: number;
+    eligibleOrders: number;
+    pendingReviewOrders: number;
     attributedRevenue: number;
     pendingAttributedRevenue: number;
+    affiliateCommissionEligible: number;
+    affiliateCommissionPendingReview: number;
     topCodes: Array<{
       code: string;
       affiliateName: string;
@@ -72,6 +80,8 @@ export type AdminFinanceResponse = {
       successfulOrders: number;
       revenue: number;
       pendingRevenue: number;
+      eligibleCommission: number;
+      pendingReviewCommission: number;
     }>;
   };
   paymentBreakdown: Array<{
@@ -92,7 +102,8 @@ export type FinanceReportMetricKey =
   | 'grossRevenue'
   | 'platformNetRevenue'
   | 'totalCommissionEarned'
-  | 'pendingCodValue';
+  | 'pendingCodValue'
+  | 'affiliateCommissionEligible';
 
 export type FinanceReport = {
   range: {
@@ -222,7 +233,7 @@ export const AdminService = {
     return response.payout;
   },
 
-  updateSettings: async (params: { preferences?: Record<string, boolean>; categoryCommissionRates?: Record<string, number> }) => {
+  updateSettings: async (params: { preferences?: Record<string, boolean>; categoryCommissionRates?: Record<string, number>; affiliateCommissionRate?: number }) => {
     const response = await apiClient.updateAdminSettings(params);
     return response.settings || {};
   },

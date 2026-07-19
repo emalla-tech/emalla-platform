@@ -1317,6 +1317,12 @@ const getCategoryCommissionRate = (db, categoryId) => {
   return Number.isFinite(normalized) ? normalized : 10;
 };
 
+const getAffiliateCommissionRate = (db) => {
+  const rawRate = db.adminSettings?.affiliateCommissionRate;
+  const normalized = Number(rawRate);
+  return Number.isFinite(normalized) ? Math.max(0, Math.min(50, normalized)) : 2;
+};
+
 const getCategoryFallbackImage = (categoryId) => {
   const map = {
     '1': '/catalog/electronics.svg',
@@ -1546,7 +1552,8 @@ const FINANCE_REPORT_METRICS = {
   grossRevenue: 'Gross Revenue',
   platformNetRevenue: 'Platform Net Revenue',
   totalCommissionEarned: 'Commission Earned',
-  pendingCodValue: 'Pending COD Value'
+  pendingCodValue: 'Pending COD Value',
+  affiliateCommissionEligible: 'Affiliate Commission Eligible'
 };
 
 const parseFinanceReportRange = (from, to) => {
@@ -1681,9 +1688,20 @@ const buildAdminFinanceSummary = (db, reportRange = null) => {
   const deliveryFeesCollected = successfulOrders.reduce((sum, order) => sum + Number(order.deliveryFee || 0), 0);
   const promotionSubsidies = successfulOrders.reduce((sum, order) => sum + Number(order.promotionSubsidy || 0), 0);
   const promotedOrders = successfulOrders.filter((order) => order.promotionApplied).length;
+  const affiliateCommissionRate = getAffiliateCommissionRate(db);
   const affiliateAttributedOrders = orders.filter((order) => order.affiliateAttributionStatus === 'matched' && order.affiliateCode);
   const successfulAffiliateOrders = successfulOrders.filter((order) => order.affiliateAttributionStatus === 'matched' && order.affiliateCode);
   const pendingAffiliateOrders = affiliateAttributedOrders.filter((order) => order.paymentStatus !== 'SUCCESS');
+  const releasedAffiliateOrders = affiliateAttributedOrders.filter((order) => isOrderRevenueReleased(order));
+  const pendingReviewAffiliateOrders = affiliateAttributedOrders.filter((order) => !isOrderRevenueReleased(order));
+  const getOrderAffiliateCommission = (order) => {
+    const storedAmount = Number(order.affiliateCommissionAmount);
+    if (Number.isFinite(storedAmount) && storedAmount > 0) return Math.round(storedAmount);
+
+    const rate = Number(order.affiliateCommissionRate ?? affiliateCommissionRate);
+    const subtotal = (order.items || []).reduce((sum, item) => sum + Number(item.subtotal || item.price * item.quantity || 0), 0);
+    return Math.round(subtotal * (Number.isFinite(rate) ? rate : affiliateCommissionRate) / 100);
+  };
   const affiliateSummaryMap = new Map();
   affiliateAttributedOrders.forEach((order) => {
     const code = normalizeAffiliateCode(order.affiliateCode);
@@ -1694,7 +1712,9 @@ const buildAdminFinanceSummary = (db, reportRange = null) => {
       orders: 0,
       successfulOrders: 0,
       revenue: 0,
-      pendingRevenue: 0
+      pendingRevenue: 0,
+      eligibleCommission: 0,
+      pendingReviewCommission: 0
     };
 
     existing.orders += 1;
@@ -1703,6 +1723,11 @@ const buildAdminFinanceSummary = (db, reportRange = null) => {
       existing.revenue += Number(order.totalAmount || 0);
     } else {
       existing.pendingRevenue += Number(order.totalAmount || 0);
+    }
+    if (isOrderRevenueReleased(order)) {
+      existing.eligibleCommission += getOrderAffiliateCommission(order);
+    } else {
+      existing.pendingReviewCommission += getOrderAffiliateCommission(order);
     }
     affiliateSummaryMap.set(code, existing);
   });
@@ -1731,22 +1756,31 @@ const buildAdminFinanceSummary = (db, reportRange = null) => {
       platformNetRevenue: Math.round(totalCommissionEarned + deliveryFeesCollected),
       completedPayouts: Math.round(completedPayouts),
       pendingPayouts: Math.round(pendingPayouts),
-      successfulOrders: successfulOrders.length
+      successfulOrders: successfulOrders.length,
+      affiliateCommissionEligible: Math.round(releasedAffiliateOrders.reduce((sum, order) => sum + getOrderAffiliateCommission(order), 0)),
+      affiliateCommissionPendingReview: Math.round(pendingReviewAffiliateOrders.reduce((sum, order) => sum + getOrderAffiliateCommission(order), 0))
     },
     categoryCommission,
     affiliateSummary: {
+      commissionRate: affiliateCommissionRate,
       attributedOrders: affiliateAttributedOrders.length,
       successfulOrders: successfulAffiliateOrders.length,
       pendingOrders: pendingAffiliateOrders.length,
+      eligibleOrders: releasedAffiliateOrders.length,
+      pendingReviewOrders: pendingReviewAffiliateOrders.length,
       attributedRevenue: Math.round(successfulAffiliateOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
       pendingAttributedRevenue: Math.round(pendingAffiliateOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
+      affiliateCommissionEligible: Math.round(releasedAffiliateOrders.reduce((sum, order) => sum + getOrderAffiliateCommission(order), 0)),
+      affiliateCommissionPendingReview: Math.round(pendingReviewAffiliateOrders.reduce((sum, order) => sum + getOrderAffiliateCommission(order), 0)),
       topCodes: Array.from(affiliateSummaryMap.values())
         .map((entry) => ({
           ...entry,
           revenue: Math.round(entry.revenue),
-          pendingRevenue: Math.round(entry.pendingRevenue)
+          pendingRevenue: Math.round(entry.pendingRevenue),
+          eligibleCommission: Math.round(entry.eligibleCommission),
+          pendingReviewCommission: Math.round(entry.pendingReviewCommission)
         }))
-        .sort((left, right) => right.revenue - left.revenue)
+        .sort((left, right) => right.eligibleCommission - left.eligibleCommission)
         .slice(0, 8)
     },
     paymentBreakdown: [
@@ -1787,9 +1821,12 @@ const buildFinanceReport = (db, range, metrics) => {
       key,
       label: FINANCE_REPORT_METRICS[key],
       value: Number(summary.overview[key] || 0),
-      basis: key === 'pendingCodValue'
-        ? 'Current outstanding COD orders created in the selected period'
-        : 'Successful payments recorded in the selected period'
+      basis:
+        key === 'pendingCodValue'
+          ? 'Current outstanding COD orders created in the selected period'
+          : key === 'affiliateCommissionEligible'
+            ? 'Completed affiliate-attributed orders with released revenue in the selected period'
+            : 'Successful payments recorded in the selected period'
     })),
     successfulOrders: summary.overview.successfulOrders
   };
@@ -4009,10 +4046,15 @@ const server = http.createServer(async (req, res) => {
         ...(db.adminSettings?.categoryCommissionRates || {}),
         ...(body.categoryCommissionRates || {})
       };
+      const nextAffiliateCommissionRate =
+        body.affiliateCommissionRate !== undefined
+          ? Math.max(0, Math.min(50, Number(body.affiliateCommissionRate) || 0))
+          : getAffiliateCommissionRate(db);
 
       db.adminSettings = {
         preferences: nextPreferences,
         categoryCommissionRates: nextCommissionRates,
+        affiliateCommissionRate: nextAffiliateCommissionRate,
         updatedAt: new Date().toISOString(),
         updatedBy: user.id
       };
@@ -4025,7 +4067,8 @@ const server = http.createServer(async (req, res) => {
         metadata: {
           updatedSections: [
             body.preferences ? 'preferences' : null,
-            body.categoryCommissionRates ? 'category commissions' : null
+            body.categoryCommissionRates ? 'category commissions' : null,
+            body.affiliateCommissionRate !== undefined ? 'affiliate commission rate' : null
           ].filter(Boolean)
         }
       });
@@ -5830,6 +5873,10 @@ const server = http.createServer(async (req, res) => {
       const affiliateReferral = body.affiliateReferral || {};
       const requestedAffiliateCode = normalizeAffiliateCode(body.affiliateCode || affiliateReferral.code);
       const matchedAffiliate = requestedAffiliateCode ? findApprovedAffiliateByCode(db, requestedAffiliateCode) : null;
+      const affiliateCommissionRate = matchedAffiliate ? getAffiliateCommissionRate(db) : 0;
+      const affiliateCommissionAmount = matchedAffiliate
+        ? Math.round(subtotal * (affiliateCommissionRate / 100))
+        : 0;
       const riderPayout = calculateDefaultRiderPayout({
         deliveryFee: baseDeliveryFee,
         totalAmount,
@@ -5859,6 +5906,9 @@ const server = http.createServer(async (req, res) => {
         affiliateReferralSourcePath: matchedAffiliate ? String(affiliateReferral.sourcePath || '').slice(0, 300) : '',
         affiliateReferralCapturedAt: matchedAffiliate ? String(affiliateReferral.capturedAt || '').slice(0, 40) : '',
         affiliateAttributionStatus: requestedAffiliateCode ? (matchedAffiliate ? 'matched' : 'unmatched') : 'none',
+        affiliateCommissionRate,
+        affiliateCommissionAmount,
+        affiliateCommissionStatus: matchedAffiliate ? 'pending_review' : 'not_applicable',
         deliveryDistrict: String(body.deliveryDistrict || '').trim(),
         riderPayout,
         riderPayoutStatus: 'pending_assignment',

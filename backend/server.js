@@ -1571,6 +1571,37 @@ const isOrderRevenueReleased = (order = {}) =>
   order.status === 'completed' &&
   (order.paymentStatus === 'SUCCESS' || order.paymentMethod === 'CASH_ON_DELIVERY');
 
+const getOrderAffiliateCommissionAmount = (db, order = {}) => {
+  if (order.affiliateAttributionStatus !== 'matched' || !normalizeAffiliateCode(order.affiliateCode)) return 0;
+
+  const storedAmount = Number(order.affiliateCommissionAmount);
+  if (Number.isFinite(storedAmount) && storedAmount > 0) return Math.round(storedAmount);
+
+  const rate = Number(order.affiliateCommissionRate ?? getAffiliateCommissionRate(db));
+  const subtotal = (order.items || []).reduce((sum, item) => sum + Number(item.subtotal || item.price * item.quantity || 0), 0);
+  return Math.round(subtotal * (Number.isFinite(rate) ? rate : getAffiliateCommissionRate(db)) / 100);
+};
+
+const withAffiliateCommissionRelease = (db, order = {}) => {
+  if (order.affiliateAttributionStatus !== 'matched' || !normalizeAffiliateCode(order.affiliateCode)) return order;
+
+  const commissionAmount = getOrderAffiliateCommissionAmount(db, order);
+  if (!isOrderRevenueReleased(order)) {
+    return {
+      ...order,
+      affiliateCommissionAmount: commissionAmount,
+      affiliateCommissionStatus: order.affiliateCommissionStatus || 'pending_review'
+    };
+  }
+
+  return {
+    ...order,
+    affiliateCommissionAmount: commissionAmount,
+    affiliateCommissionStatus: 'eligible',
+    affiliateCommissionEligibleAt: order.affiliateCommissionEligibleAt || new Date().toISOString()
+  };
+};
+
 const calculateMerchantAvailableBalance = (db, merchantId) => {
   const commissionSummary = buildMerchantCommissionSummary(db, merchantId);
   const payoutTotal = (db.transactions || [])
@@ -1594,15 +1625,6 @@ const buildAffiliatePartnerDashboard = (db, affiliate) => {
     )
     .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime());
 
-  const getOrderCommissionAmount = (order) => {
-    const storedAmount = Number(order.affiliateCommissionAmount);
-    if (Number.isFinite(storedAmount) && storedAmount > 0) return Math.round(storedAmount);
-
-    const rate = Number(order.affiliateCommissionRate ?? commissionRate);
-    const subtotal = (order.items || []).reduce((sum, item) => sum + Number(item.subtotal || item.price * item.quantity || 0), 0);
-    return Math.round(subtotal * (Number.isFinite(rate) ? rate : commissionRate) / 100);
-  };
-
   const orders = attributedOrders.map((order) => {
     const eligible = isOrderRevenueReleased(order);
     return {
@@ -1613,7 +1635,7 @@ const buildAffiliatePartnerDashboard = (db, affiliate) => {
       paymentMethod: order.paymentMethod,
       totalAmount: Math.round(Number(order.totalAmount || 0)),
       itemCount: (order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
-      commissionAmount: getOrderCommissionAmount(order),
+      commissionAmount: getOrderAffiliateCommissionAmount(db, order),
       commissionStatus: eligible ? 'eligible' : order.affiliateCommissionStatus || 'pending_review',
       createdAt: order.createdAt,
       updatedAt: order.updatedAt
@@ -1801,18 +1823,10 @@ const buildAdminFinanceSummary = (db, reportRange = null) => {
   const promotedOrders = successfulOrders.filter((order) => order.promotionApplied).length;
   const affiliateCommissionRate = getAffiliateCommissionRate(db);
   const affiliateAttributedOrders = orders.filter((order) => order.affiliateAttributionStatus === 'matched' && order.affiliateCode);
-  const successfulAffiliateOrders = successfulOrders.filter((order) => order.affiliateAttributionStatus === 'matched' && order.affiliateCode);
-  const pendingAffiliateOrders = affiliateAttributedOrders.filter((order) => order.paymentStatus !== 'SUCCESS');
   const releasedAffiliateOrders = affiliateAttributedOrders.filter((order) => isOrderRevenueReleased(order));
   const pendingReviewAffiliateOrders = affiliateAttributedOrders.filter((order) => !isOrderRevenueReleased(order));
-  const getOrderAffiliateCommission = (order) => {
-    const storedAmount = Number(order.affiliateCommissionAmount);
-    if (Number.isFinite(storedAmount) && storedAmount > 0) return Math.round(storedAmount);
-
-    const rate = Number(order.affiliateCommissionRate ?? affiliateCommissionRate);
-    const subtotal = (order.items || []).reduce((sum, item) => sum + Number(item.subtotal || item.price * item.quantity || 0), 0);
-    return Math.round(subtotal * (Number.isFinite(rate) ? rate : affiliateCommissionRate) / 100);
-  };
+  const successfulAffiliateOrders = releasedAffiliateOrders;
+  const pendingAffiliateOrders = pendingReviewAffiliateOrders;
   const affiliateSummaryMap = new Map();
   affiliateAttributedOrders.forEach((order) => {
     const code = normalizeAffiliateCode(order.affiliateCode);
@@ -1829,16 +1843,16 @@ const buildAdminFinanceSummary = (db, reportRange = null) => {
     };
 
     existing.orders += 1;
-    if (order.paymentStatus === 'SUCCESS') {
+    if (isOrderRevenueReleased(order)) {
       existing.successfulOrders += 1;
       existing.revenue += Number(order.totalAmount || 0);
     } else {
       existing.pendingRevenue += Number(order.totalAmount || 0);
     }
     if (isOrderRevenueReleased(order)) {
-      existing.eligibleCommission += getOrderAffiliateCommission(order);
+      existing.eligibleCommission += getOrderAffiliateCommissionAmount(db, order);
     } else {
-      existing.pendingReviewCommission += getOrderAffiliateCommission(order);
+      existing.pendingReviewCommission += getOrderAffiliateCommissionAmount(db, order);
     }
     affiliateSummaryMap.set(code, existing);
   });
@@ -1868,8 +1882,8 @@ const buildAdminFinanceSummary = (db, reportRange = null) => {
       completedPayouts: Math.round(completedPayouts),
       pendingPayouts: Math.round(pendingPayouts),
       successfulOrders: successfulOrders.length,
-      affiliateCommissionEligible: Math.round(releasedAffiliateOrders.reduce((sum, order) => sum + getOrderAffiliateCommission(order), 0)),
-      affiliateCommissionPendingReview: Math.round(pendingReviewAffiliateOrders.reduce((sum, order) => sum + getOrderAffiliateCommission(order), 0))
+      affiliateCommissionEligible: Math.round(releasedAffiliateOrders.reduce((sum, order) => sum + getOrderAffiliateCommissionAmount(db, order), 0)),
+      affiliateCommissionPendingReview: Math.round(pendingReviewAffiliateOrders.reduce((sum, order) => sum + getOrderAffiliateCommissionAmount(db, order), 0))
     },
     categoryCommission,
     affiliateSummary: {
@@ -1881,8 +1895,8 @@ const buildAdminFinanceSummary = (db, reportRange = null) => {
       pendingReviewOrders: pendingReviewAffiliateOrders.length,
       attributedRevenue: Math.round(successfulAffiliateOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
       pendingAttributedRevenue: Math.round(pendingAffiliateOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
-      affiliateCommissionEligible: Math.round(releasedAffiliateOrders.reduce((sum, order) => sum + getOrderAffiliateCommission(order), 0)),
-      affiliateCommissionPendingReview: Math.round(pendingReviewAffiliateOrders.reduce((sum, order) => sum + getOrderAffiliateCommission(order), 0)),
+      affiliateCommissionEligible: Math.round(releasedAffiliateOrders.reduce((sum, order) => sum + getOrderAffiliateCommissionAmount(db, order), 0)),
+      affiliateCommissionPendingReview: Math.round(pendingReviewAffiliateOrders.reduce((sum, order) => sum + getOrderAffiliateCommissionAmount(db, order), 0)),
       topCodes: Array.from(affiliateSummaryMap.values())
         .map((entry) => ({
           ...entry,
@@ -6238,14 +6252,14 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      db.orders[index] = {
+      db.orders[index] = withAffiliateCommissionRelease(db, {
         ...current,
         status: 'completed',
         paymentStatus: current.paymentMethod === 'CASH_ON_DELIVERY' ? 'SUCCESS' : current.paymentStatus,
         riderPayout: getOrderRiderPayout(current),
         riderPayoutStatus: current.riderId ? 'released' : getOrderRiderPayoutStatus(current),
         updatedAt: new Date().toISOString()
-      };
+      });
       const riderPayoutTransaction = releaseRiderPayoutForOrder(db, db.orders[index]);
 
       if (current.paymentMethod === 'CASH_ON_DELIVERY') {
@@ -6365,10 +6379,14 @@ const server = http.createServer(async (req, res) => {
       const auditLogCountBefore = db.auditLogs.length;
       const emailLogCountBefore = db.emailLogs.length;
       const nextRiderPayout = getOrderRiderPayout(current);
-      db.orders[index] = {
+      const nextPaymentStatus =
+        body.status === 'paid' || (body.status === 'completed' && current.paymentMethod === 'CASH_ON_DELIVERY')
+          ? 'SUCCESS'
+          : current.paymentStatus;
+      db.orders[index] = withAffiliateCommissionRelease(db, {
         ...current,
         status: body.status,
-        paymentStatus: body.status === 'paid' ? 'SUCCESS' : current.paymentStatus,
+        paymentStatus: nextPaymentStatus,
         riderPayout: nextRiderPayout,
         riderPayoutStatus:
           body.status === 'completed' && current.riderId
@@ -6378,10 +6396,23 @@ const server = http.createServer(async (req, res) => {
               : getOrderRiderPayoutStatus(current),
         inventoryRestockedAt: shouldRestockInventory ? new Date().toISOString() : current.inventoryRestockedAt,
         updatedAt: new Date().toISOString()
-      };
+      });
       const riderPayoutTransaction = body.status === 'completed'
         ? releaseRiderPayoutForOrder(db, db.orders[index])
         : null;
+
+      if (body.status === 'completed' && current.paymentMethod === 'CASH_ON_DELIVERY') {
+        db.payments = (db.payments || []).map((payment) =>
+          payment.orderId === current.id
+            ? {
+                ...payment,
+                status: 'SUCCESS',
+                verifiedAt: payment.verifiedAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              }
+            : payment
+        );
+      }
 
       const customerUpdate = getOrderStatusNotification(db.orders[index], body.status);
       createNotification(db, {

@@ -141,6 +141,12 @@ const AffiliateProgram: React.FC = () => {
               <ArrowRight size={18} className="ml-2" />
             </a>
             <Link
+              to="/affiliate"
+              className="inline-flex items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-7 py-4 text-sm font-black text-emerald-100 transition-all hover:bg-emerald-500/20 active:scale-95"
+            >
+              Partner Dashboard
+            </Link>
+            <Link
               to="/how-it-works"
               className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-7 py-4 text-sm font-black text-white transition-all hover:bg-white/10 active:scale-95"
             >

@@ -161,6 +161,13 @@ export const apiClient = {
     });
   },
 
+  async getAffiliateDashboard(params: { email: string; code: string }) {
+    return request('/affiliate/dashboard', {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+  },
+
   async getAddresses() {
     return request('/addresses');
   },

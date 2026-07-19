@@ -1119,6 +1119,19 @@ const findApprovedAffiliateByCode = (db, code) => {
   ) || null;
 };
 
+const findApprovedAffiliateByEmailAndCode = (db, email, code) => {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const normalizedCode = normalizeAffiliateCode(code);
+  if (!normalizedEmail || !normalizedCode) return null;
+
+  return (db.contactSubmissions || []).find((entry) =>
+    entry.type === 'affiliate' &&
+    normalizeAffiliateApplicationStatus(entry.affiliateStatus) === 'approved' &&
+    String(entry.email || '').trim().toLowerCase() === normalizedEmail &&
+    normalizeAffiliateCode(entry.affiliateCode || entry.preferredCode) === normalizedCode
+  ) || null;
+};
+
 const generateSupportTicketNumber = () =>
   `SUP-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
@@ -1537,6 +1550,72 @@ const calculateMerchantAvailableBalance = (db, merchantId) => {
     .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
 
   return Math.max(0, commissionSummary.netRevenue - payoutTotal);
+};
+
+const buildAffiliatePartnerDashboard = (db, affiliate) => {
+  const affiliateCode = normalizeAffiliateCode(affiliate.affiliateCode || affiliate.preferredCode);
+  const commissionRate = getAffiliateCommissionRate(db);
+  const attributedOrders = (db.orders || [])
+    .filter((order) =>
+      order.affiliateAttributionStatus === 'matched' &&
+      normalizeAffiliateCode(order.affiliateCode) === affiliateCode
+    )
+    .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime());
+
+  const getOrderCommissionAmount = (order) => {
+    const storedAmount = Number(order.affiliateCommissionAmount);
+    if (Number.isFinite(storedAmount) && storedAmount > 0) return Math.round(storedAmount);
+
+    const rate = Number(order.affiliateCommissionRate ?? commissionRate);
+    const subtotal = (order.items || []).reduce((sum, item) => sum + Number(item.subtotal || item.price * item.quantity || 0), 0);
+    return Math.round(subtotal * (Number.isFinite(rate) ? rate : commissionRate) / 100);
+  };
+
+  const orders = attributedOrders.map((order) => {
+    const eligible = isOrderRevenueReleased(order);
+    return {
+      id: order.id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      paymentMethod: order.paymentMethod,
+      totalAmount: Math.round(Number(order.totalAmount || 0)),
+      itemCount: (order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+      commissionAmount: getOrderCommissionAmount(order),
+      commissionStatus: eligible ? 'eligible' : order.affiliateCommissionStatus || 'pending_review',
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt
+    };
+  });
+
+  const eligibleOrders = orders.filter((order) => order.commissionStatus === 'eligible');
+  const pendingOrders = orders.filter((order) => order.commissionStatus !== 'eligible');
+
+  return {
+    affiliate: {
+      name: affiliate.name,
+      email: affiliate.email,
+      phone: affiliate.phone || '',
+      partnerType: affiliate.partnerType || '',
+      channel: affiliate.channel || '',
+      code: affiliateCode,
+      referralLink: buildPublicRoute(`/?ref=${affiliateCode}`),
+      shopReferralLink: buildPublicRoute(`/shop?ref=${affiliateCode}`),
+      status: normalizeAffiliateApplicationStatus(affiliate.affiliateStatus),
+      approvedAt: affiliate.reviewedAt || affiliate.updatedAt || affiliate.createdAt
+    },
+    summary: {
+      commissionRate,
+      attributedOrders: orders.length,
+      eligibleOrders: eligibleOrders.length,
+      pendingOrders: pendingOrders.length,
+      attributedRevenue: Math.round(orders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
+      eligibleCommission: Math.round(eligibleOrders.reduce((sum, order) => sum + Number(order.commissionAmount || 0), 0)),
+      pendingCommission: Math.round(pendingOrders.reduce((sum, order) => sum + Number(order.commissionAmount || 0), 0)),
+      paidCommission: 0
+    },
+    orders: orders.slice(0, 50)
+  };
 };
 
 const CATEGORY_LABELS = {
@@ -3245,6 +3324,28 @@ const server = http.createServer(async (req, res) => {
 
       await writeDb(db);
       sendJson(res, 201, { submission });
+      return;
+    }
+
+    if (pathname === '/api/affiliate/dashboard' && req.method === 'POST') {
+      const body = await readBody(req);
+      const email = String(body.email || '').trim().toLowerCase();
+      const code = normalizeAffiliateCode(body.code);
+
+      if (!email || !code || !isValidEmail(email)) {
+        sendJson(res, 400, { error: 'Enter the email and official affiliate code linked to your approved application.' });
+        return;
+      }
+
+      const db = await readDb();
+      const affiliate = findApprovedAffiliateByEmailAndCode(db, email, code);
+
+      if (!affiliate) {
+        sendJson(res, 404, { error: 'Approved affiliate partner not found for this email and code.' });
+        return;
+      }
+
+      sendJson(res, 200, { dashboard: buildAffiliatePartnerDashboard(db, affiliate) });
       return;
     }
 

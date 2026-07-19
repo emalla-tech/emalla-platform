@@ -48,6 +48,7 @@ const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const ReturnsPolicy = lazy(() => import('./pages/ReturnsPolicy'));
 const SellerAgreement = lazy(() => import('./pages/SellerAgreement'));
 const AffiliateProgram = lazy(() => import('./pages/AffiliateProgram'));
+const AffiliateDashboard = lazy(() => import('./pages/AffiliateDashboard'));
 const Contact = lazy(() => import('./pages/Contact'));
 const HowItWorks = lazy(() => import('./pages/HowItWorks'));
 const Cart = lazy(() => import('./pages/Cart'));
@@ -204,6 +205,10 @@ const buildSeoConfig = (pathname: string) => {
     '/affiliate-program': {
       title: 'Affiliate Program | E-Malla Rwanda',
       description: 'Join the E-Malla Rwanda affiliate program and earn by helping buyers discover trusted marketplace products.',
+    },
+    '/affiliate': {
+      title: 'Affiliate Dashboard | E-Malla Rwanda',
+      description: 'Track E-Malla Rwanda affiliate referral links, attributed orders and commission performance.',
     },
     '/contact': {
       title: 'Contact Us | E-Malla Rwanda',
@@ -368,6 +373,7 @@ const App: React.FC = () => {
             <Route path="/returns" element={withSuspense(<ReturnsPolicy />)} />
             <Route path="/seller-agreement" element={withSuspense(<SellerAgreement />)} />
             <Route path="/affiliate-program" element={withSuspense(<AffiliateProgram />)} />
+            <Route path="/affiliate" element={withSuspense(<AffiliateDashboard />)} />
             <Route path="/company-information" element={<Navigate to="/affiliate-program" replace />} />
             <Route path="/contact" element={withSuspense(<Contact />)} />
             <Route path="/how-it-works" element={withSuspense(<HowItWorks />)} />

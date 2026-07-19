@@ -116,6 +116,9 @@ const AffiliateDashboard: React.FC = () => {
                   placeholder="YOURCODE"
                   required
                 />
+                <span className="mt-2 block text-xs font-semibold text-gray-500">
+                  Use the exact official code from your approval email or Admin Inquiries record.
+                </span>
               </label>
             </div>
 

@@ -1132,6 +1132,16 @@ const findApprovedAffiliateByEmailAndCode = (db, email, code) => {
   ) || null;
 };
 
+const getAffiliateApplicationsByEmail = (db, email) => {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) return [];
+
+  return (db.contactSubmissions || []).filter((entry) =>
+    entry.type === 'affiliate' &&
+    String(entry.email || '').trim().toLowerCase() === normalizedEmail
+  );
+};
+
 const generateSupportTicketNumber = () =>
   `SUP-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
@@ -3341,7 +3351,26 @@ const server = http.createServer(async (req, res) => {
       const affiliate = findApprovedAffiliateByEmailAndCode(db, email, code);
 
       if (!affiliate) {
-        sendJson(res, 404, { error: 'Approved affiliate partner not found for this email and code.' });
+        const applications = getAffiliateApplicationsByEmail(db, email);
+        if (applications.length === 0) {
+          sendJson(res, 404, { error: 'No affiliate application was found for this email. Please apply first or use the email from your approved application.' });
+          return;
+        }
+
+        const approvedApplication = applications.find((entry) =>
+          normalizeAffiliateApplicationStatus(entry.affiliateStatus) === 'approved'
+        );
+
+        if (!approvedApplication) {
+          const latestApplication = applications
+            .slice()
+            .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime())[0];
+          const status = normalizeAffiliateApplicationStatus(latestApplication?.affiliateStatus);
+          sendJson(res, 403, { error: `Your affiliate application is ${status}. Dashboard access opens after admin approval.` });
+          return;
+        }
+
+        sendJson(res, 401, { error: 'Official affiliate code does not match this approved email. Use the code sent in the approval email or shown in Admin Inquiries.' });
         return;
       }
 

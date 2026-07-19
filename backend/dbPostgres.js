@@ -21,8 +21,8 @@ const READ_COLUMNS = {
   rider_applications: 'id, name, email, phone, vehicle_number, status, rider_id, temporary_username, rejected_reason, created_at, updated_at, approved_at, approved_by, rejected_at, rejected_by',
   transactions: 'id, user_id, amount, status, method, tx_ref, timestamp, metadata',
   payments: 'id, order_id, user_id, amount, status, method, tx_ref, created_at, updated_at, metadata',
-  support_tickets: 'id, type, name, email, subject, company, message, status, assigned_to, internal_notes, replied_at, resolved_at, created_at, updated_at',
-  inquiries: 'id, type, name, email, subject, company, message, status, assigned_to, internal_notes, replied_at, resolved_at, created_at, updated_at',
+  support_tickets: 'id, type, name, email, subject, company, message, status, assigned_to, internal_notes, replied_at, resolved_at, created_at, updated_at, metadata',
+  inquiries: 'id, type, name, email, subject, company, message, status, assigned_to, internal_notes, replied_at, resolved_at, created_at, updated_at, metadata',
   notifications: 'id, user_id, role, title, message, type, read, created_at, metadata',
   audit_logs: 'id, event, actor, category, status, time, metadata',
   email_logs: 'id, to_addresses, subject, template, body, html, sent_at, status, provider, provider_message_id, error, note',
@@ -91,13 +91,22 @@ const databaseUserRef = (value) => {
     : null;
 };
 const STAFF_ROLES = ['LOGISTICS', 'FINANCE', 'SUPPORT'];
+const getRecordTime = (item = {}) => {
+  const value = item.updatedAt || item.updated_at || item.createdAt || item.created_at || 0;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+};
+
 const dedupeById = (items = []) => {
-  const seen = new Set();
-  return items.filter((item) => {
-    if (!item?.id || seen.has(item.id)) return false;
-    seen.add(item.id);
-    return true;
-  });
+  const byId = new Map();
+  for (const item of items) {
+    if (!item?.id) continue;
+    const current = byId.get(item.id);
+    if (!current || getRecordTime(item) >= getRecordTime(current)) {
+      byId.set(item.id, item);
+    }
+  }
+  return [...byId.values()];
 };
 
 const getPg = async () => {

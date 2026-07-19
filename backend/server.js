@@ -1108,14 +1108,36 @@ const normalizeAffiliateCode = (value) =>
     .replace(/[^A-Z0-9_-]/g, '')
     .slice(0, 32);
 
+const getAffiliateField = (entry = {}, field) => {
+  const values = [entry[field], entry.metadata?.[field], entry.affiliate?.[field]];
+  return values.find((value) => String(value ?? '').trim()) ?? '';
+};
+
+const getAffiliateEmail = (entry = {}) =>
+  String(getAffiliateField(entry, 'email') || entry.email || '').trim().toLowerCase();
+
+const getAffiliateOfficialCode = (entry = {}) =>
+  normalizeAffiliateCode(
+    getAffiliateField(entry, 'affiliateCode') ||
+      getAffiliateField(entry, 'preferredCode') ||
+      entry.affiliateCode ||
+      entry.preferredCode
+  );
+
+const getAffiliateApplicationStatus = (entry = {}) => {
+  const status = getAffiliateField(entry, 'affiliateStatus') || entry.affiliateStatus;
+  if (status) return normalizeAffiliateApplicationStatus(status);
+  return getAffiliateOfficialCode(entry) ? 'approved' : 'pending';
+};
+
 const findApprovedAffiliateByCode = (db, code) => {
   const normalizedCode = normalizeAffiliateCode(code);
   if (!normalizedCode) return null;
 
   return (db.contactSubmissions || []).find((entry) =>
     entry.type === 'affiliate' &&
-    normalizeAffiliateApplicationStatus(entry.affiliateStatus) === 'approved' &&
-    normalizeAffiliateCode(entry.affiliateCode || entry.preferredCode) === normalizedCode
+    getAffiliateApplicationStatus(entry) === 'approved' &&
+    getAffiliateOfficialCode(entry) === normalizedCode
   ) || null;
 };
 
@@ -1126,9 +1148,9 @@ const findApprovedAffiliateByEmailAndCode = (db, email, code) => {
 
   return (db.contactSubmissions || []).find((entry) =>
     entry.type === 'affiliate' &&
-    normalizeAffiliateApplicationStatus(entry.affiliateStatus) === 'approved' &&
-    String(entry.email || '').trim().toLowerCase() === normalizedEmail &&
-    normalizeAffiliateCode(entry.affiliateCode || entry.preferredCode) === normalizedCode
+    getAffiliateApplicationStatus(entry) === 'approved' &&
+    getAffiliateEmail(entry) === normalizedEmail &&
+    getAffiliateOfficialCode(entry) === normalizedCode
   ) || null;
 };
 
@@ -1138,7 +1160,7 @@ const getAffiliateApplicationsByEmail = (db, email) => {
 
   return (db.contactSubmissions || []).filter((entry) =>
     entry.type === 'affiliate' &&
-    String(entry.email || '').trim().toLowerCase() === normalizedEmail
+    getAffiliateEmail(entry) === normalizedEmail
   );
 };
 
@@ -1563,7 +1585,7 @@ const calculateMerchantAvailableBalance = (db, merchantId) => {
 };
 
 const buildAffiliatePartnerDashboard = (db, affiliate) => {
-  const affiliateCode = normalizeAffiliateCode(affiliate.affiliateCode || affiliate.preferredCode);
+  const affiliateCode = getAffiliateOfficialCode(affiliate);
   const commissionRate = getAffiliateCommissionRate(db);
   const attributedOrders = (db.orders || [])
     .filter((order) =>
@@ -1603,15 +1625,15 @@ const buildAffiliatePartnerDashboard = (db, affiliate) => {
 
   return {
     affiliate: {
-      name: affiliate.name,
-      email: affiliate.email,
-      phone: affiliate.phone || '',
-      partnerType: affiliate.partnerType || '',
-      channel: affiliate.channel || '',
+      name: getAffiliateField(affiliate, 'name') || affiliate.name,
+      email: getAffiliateEmail(affiliate),
+      phone: getAffiliateField(affiliate, 'phone') || '',
+      partnerType: getAffiliateField(affiliate, 'partnerType') || '',
+      channel: getAffiliateField(affiliate, 'channel') || '',
       code: affiliateCode,
       referralLink: buildPublicRoute(`/?ref=${affiliateCode}`),
       shopReferralLink: buildPublicRoute(`/shop?ref=${affiliateCode}`),
-      status: normalizeAffiliateApplicationStatus(affiliate.affiliateStatus),
+      status: getAffiliateApplicationStatus(affiliate),
       approvedAt: affiliate.reviewedAt || affiliate.updatedAt || affiliate.createdAt
     },
     summary: {
@@ -3358,14 +3380,14 @@ const server = http.createServer(async (req, res) => {
         }
 
         const approvedApplication = applications.find((entry) =>
-          normalizeAffiliateApplicationStatus(entry.affiliateStatus) === 'approved'
+          getAffiliateApplicationStatus(entry) === 'approved'
         );
 
         if (!approvedApplication) {
           const latestApplication = applications
             .slice()
             .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime())[0];
-          const status = normalizeAffiliateApplicationStatus(latestApplication?.affiliateStatus);
+          const status = getAffiliateApplicationStatus(latestApplication);
           sendJson(res, 403, { error: `Your affiliate application is ${status}. Dashboard access opens after admin approval.` });
           return;
         }
@@ -3903,7 +3925,7 @@ const server = http.createServer(async (req, res) => {
       const nextAffiliateStatus =
         currentInquiry.type === 'affiliate' && body.affiliateStatus !== undefined
           ? normalizeAffiliateApplicationStatus(body.affiliateStatus)
-          : currentInquiry.affiliateStatus || 'pending';
+          : getAffiliateApplicationStatus(currentInquiry);
       const shouldAssignToSelf = Boolean(body.assignToSelf);
       const nextNotes = body.internalNotes !== undefined ? String(body.internalNotes || '').trim() : currentInquiry.internalNotes || '';
       const responseMessage = body.responseMessage !== undefined ? String(body.responseMessage || '').trim() : '';
@@ -3911,16 +3933,16 @@ const server = http.createServer(async (req, res) => {
       const effectiveStatus = responseMessage ? 'replied' : nextStatus;
       const officialAffiliateCode =
         currentInquiry.type === 'affiliate' && nextAffiliateStatus === 'approved'
-          ? normalizeAffiliateCode(currentInquiry.affiliateCode || currentInquiry.preferredCode || currentInquiry.name || currentInquiry.email)
+          ? normalizeAffiliateCode(getAffiliateOfficialCode(currentInquiry) || currentInquiry.name || getAffiliateEmail(currentInquiry))
             || `AFF${Date.now().toString().slice(-6)}`
-          : currentInquiry.affiliateCode || '';
+          : getAffiliateOfficialCode(currentInquiry);
 
       if (currentInquiry.type === 'affiliate' && nextAffiliateStatus === 'approved') {
         const duplicateAffiliate = (db.contactSubmissions || []).find((entry) =>
           entry.id !== currentInquiry.id &&
           entry.type === 'affiliate' &&
-          normalizeAffiliateApplicationStatus(entry.affiliateStatus) === 'approved' &&
-          normalizeAffiliateCode(entry.affiliateCode || entry.preferredCode) === officialAffiliateCode
+          getAffiliateApplicationStatus(entry) === 'approved' &&
+          getAffiliateOfficialCode(entry) === officialAffiliateCode
         );
 
         if (duplicateAffiliate) {
@@ -3941,11 +3963,11 @@ const server = http.createServer(async (req, res) => {
                   ? buildPublicRoute(`/?ref=${officialAffiliateCode}`)
                   : currentInquiry.referralLink || '',
               reviewedAt:
-                body.affiliateStatus !== undefined && nextAffiliateStatus !== (currentInquiry.affiliateStatus || 'pending')
+                body.affiliateStatus !== undefined && nextAffiliateStatus !== getAffiliateApplicationStatus(currentInquiry)
                   ? now
                   : currentInquiry.reviewedAt || null,
               reviewedBy:
-                body.affiliateStatus !== undefined && nextAffiliateStatus !== (currentInquiry.affiliateStatus || 'pending')
+                body.affiliateStatus !== undefined && nextAffiliateStatus !== getAffiliateApplicationStatus(currentInquiry)
                   ? user.id
                   : currentInquiry.reviewedBy || null
             }
@@ -3991,7 +4013,7 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
-      if (currentInquiry.type === 'affiliate' && nextAffiliateStatus !== (currentInquiry.affiliateStatus || 'pending')) {
+      if (currentInquiry.type === 'affiliate' && nextAffiliateStatus !== getAffiliateApplicationStatus(currentInquiry)) {
         createAuditLog(db, {
           event: `Affiliate application ${nextAffiliateStatus}: ${updatedInquiry.name}`,
           actor: user.name || user.email,
@@ -6030,7 +6052,7 @@ const server = http.createServer(async (req, res) => {
         promotionCode: promotion.eligible ? promotion.code : null,
         promotionApplied: promotion.eligible,
         promotionSubsidy: promotion.discount,
-        affiliateCode: matchedAffiliate ? normalizeAffiliateCode(matchedAffiliate.affiliateCode || matchedAffiliate.preferredCode) : '',
+        affiliateCode: matchedAffiliate ? getAffiliateOfficialCode(matchedAffiliate) : '',
         affiliateId: matchedAffiliate?.id || null,
         affiliateName: matchedAffiliate?.name || '',
         affiliateReferralSourcePath: matchedAffiliate ? String(affiliateReferral.sourcePath || '').slice(0, 300) : '',

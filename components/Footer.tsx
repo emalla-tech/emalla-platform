@@ -147,13 +147,13 @@ const Footer: React.FC = () => {
             <button type="button" onClick={openCookiePreferences} className="hover:text-white">Cookie Preferences</button>
           </div>
           <p className="mt-6 text-center text-xs font-semibold text-gray-500">
-            Operated by E-Malla Technologies · Kigali, Rwanda · support@emallarwanda.com
+            Operated by Perfect Technologies Ltd · Kigali, Rwanda · support@emallarwanda.com
           </p>
         </div>
 
         <div className="border-t border-white/10 pt-8 flex justify-center">
           <p className="text-gray-500 text-[10px] font-black uppercase tracking-[3px] text-center">
-            &copy; {new Date().getFullYear()} E-Malla Rwanda Powered By PERFECT Technologies LTD
+            &copy; {new Date().getFullYear()} E-Malla Rwanda Powered by E-Malla Technologies
           </p>
         </div>
       </div>

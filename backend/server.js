@@ -1108,6 +1108,15 @@ const normalizeAffiliateCode = (value) =>
     .replace(/[^A-Z0-9_-]/g, '')
     .slice(0, 32);
 
+const compactAffiliateCode = (value) => normalizeAffiliateCode(value).replace(/[-_]/g, '');
+
+const affiliateCodesMatch = (left, right) => {
+  const normalizedLeft = normalizeAffiliateCode(left);
+  const normalizedRight = normalizeAffiliateCode(right);
+  if (!normalizedLeft || !normalizedRight) return false;
+  return normalizedLeft === normalizedRight || compactAffiliateCode(normalizedLeft) === compactAffiliateCode(normalizedRight);
+};
+
 const getAffiliateField = (entry = {}, field) => {
   const values = [entry[field], entry.metadata?.[field], entry.affiliate?.[field]];
   return values.find((value) => String(value ?? '').trim()) ?? '';
@@ -1119,25 +1128,50 @@ const getAffiliateEmail = (entry = {}) =>
 const getAffiliateOfficialCode = (entry = {}) =>
   normalizeAffiliateCode(
     getAffiliateField(entry, 'affiliateCode') ||
+      getAffiliateField(entry, 'officialCode') ||
+      getAffiliateField(entry, 'referralCode') ||
       getAffiliateField(entry, 'preferredCode') ||
+      getAffiliateField(entry, 'code') ||
       entry.affiliateCode ||
+      entry.officialCode ||
+      entry.referralCode ||
+      entry.code ||
       entry.preferredCode
   );
 
 const getAffiliateApplicationStatus = (entry = {}) => {
-  const status = getAffiliateField(entry, 'affiliateStatus') || entry.affiliateStatus;
-  if (status) return normalizeAffiliateApplicationStatus(status);
+  const explicitStatus = getAffiliateField(entry, 'affiliateStatus') || entry.affiliateStatus;
+  if (explicitStatus) return normalizeAffiliateApplicationStatus(explicitStatus);
+
+  const inquiryStatus = String(entry.type === 'affiliate' ? entry.status || '' : '').toLowerCase();
+  if (['pending', 'approved', 'rejected', 'suspended'].includes(inquiryStatus)) {
+    return normalizeAffiliateApplicationStatus(inquiryStatus);
+  }
+
   return getAffiliateOfficialCode(entry) ? 'approved' : 'pending';
+};
+
+const getAffiliateApplications = (db = {}) => {
+  const byId = new Map();
+  for (const entry of [...(db.contactSubmissions || []), ...(db.inquiries || []), ...(db.supportTickets || [])]) {
+    if (entry?.type !== 'affiliate') continue;
+    const id = entry.id || `${getAffiliateEmail(entry)}:${getAffiliateOfficialCode(entry)}`;
+    const current = byId.get(id);
+    const currentTime = new Date(current?.updatedAt || current?.createdAt || 0).getTime();
+    const entryTime = new Date(entry.updatedAt || entry.createdAt || 0).getTime();
+    if (!current || entryTime >= currentTime) byId.set(id, entry);
+  }
+  return [...byId.values()];
 };
 
 const findApprovedAffiliateByCode = (db, code) => {
   const normalizedCode = normalizeAffiliateCode(code);
   if (!normalizedCode) return null;
 
-  return (db.contactSubmissions || []).find((entry) =>
+  return getAffiliateApplications(db).find((entry) =>
     entry.type === 'affiliate' &&
     getAffiliateApplicationStatus(entry) === 'approved' &&
-    getAffiliateOfficialCode(entry) === normalizedCode
+    affiliateCodesMatch(getAffiliateOfficialCode(entry), normalizedCode)
   ) || null;
 };
 
@@ -1146,11 +1180,11 @@ const findApprovedAffiliateByEmailAndCode = (db, email, code) => {
   const normalizedCode = normalizeAffiliateCode(code);
   if (!normalizedEmail || !normalizedCode) return null;
 
-  return (db.contactSubmissions || []).find((entry) =>
+  return getAffiliateApplications(db).find((entry) =>
     entry.type === 'affiliate' &&
     getAffiliateApplicationStatus(entry) === 'approved' &&
     getAffiliateEmail(entry) === normalizedEmail &&
-    getAffiliateOfficialCode(entry) === normalizedCode
+    affiliateCodesMatch(getAffiliateOfficialCode(entry), normalizedCode)
   ) || null;
 };
 
@@ -1158,7 +1192,7 @@ const getAffiliateApplicationsByEmail = (db, email) => {
   const normalizedEmail = String(email || '').trim().toLowerCase();
   if (!normalizedEmail) return [];
 
-  return (db.contactSubmissions || []).filter((entry) =>
+  return getAffiliateApplications(db).filter((entry) =>
     entry.type === 'affiliate' &&
     getAffiliateEmail(entry) === normalizedEmail
   );
@@ -1602,6 +1636,38 @@ const withAffiliateCommissionRelease = (db, order = {}) => {
   };
 };
 
+const reconcileAffiliateOrdersForAffiliate = (db, affiliate) => {
+  const affiliateCode = getAffiliateOfficialCode(affiliate);
+  if (!affiliateCode || getAffiliateApplicationStatus(affiliate) !== 'approved') return 0;
+
+  let reconciledCount = 0;
+  db.orders = (db.orders || []).map((order) => {
+    if (order.affiliateAttributionStatus === 'matched') return order;
+
+    const requestedCode = normalizeAffiliateCode(order.affiliateRequestedCode || order.affiliateCode);
+    if (!affiliateCodesMatch(requestedCode, affiliateCode)) return order;
+
+    reconciledCount += 1;
+    const commissionRate = getAffiliateCommissionRate(db);
+    const reconciledOrder = {
+      ...order,
+      affiliateCode,
+      affiliateRequestedCode: requestedCode,
+      affiliateId: affiliate.id || order.affiliateId || null,
+      affiliateName: getAffiliateField(affiliate, 'name') || affiliate.name || order.affiliateName || '',
+      affiliateAttributionStatus: 'matched',
+      affiliateAttributionMessage: 'Referral code matched an approved affiliate after reconciliation.',
+      affiliateAttributionReconciledAt: new Date().toISOString(),
+      affiliateCommissionRate: Number(order.affiliateCommissionRate || 0) > 0 ? order.affiliateCommissionRate : commissionRate,
+      affiliateCommissionStatus: order.affiliateCommissionStatus === 'not_applicable' ? 'pending_review' : order.affiliateCommissionStatus || 'pending_review'
+    };
+
+    return withAffiliateCommissionRelease(db, reconciledOrder);
+  });
+
+  return reconciledCount;
+};
+
 const calculateMerchantAvailableBalance = (db, merchantId) => {
   const commissionSummary = buildMerchantCommissionSummary(db, merchantId);
   const payoutTotal = (db.transactions || [])
@@ -1621,7 +1687,7 @@ const buildAffiliatePartnerDashboard = (db, affiliate) => {
   const attributedOrders = (db.orders || [])
     .filter((order) =>
       order.affiliateAttributionStatus === 'matched' &&
-      normalizeAffiliateCode(order.affiliateCode) === affiliateCode
+      affiliateCodesMatch(order.affiliateCode, affiliateCode)
     )
     .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime());
 
@@ -3956,7 +4022,7 @@ const server = http.createServer(async (req, res) => {
           entry.id !== currentInquiry.id &&
           entry.type === 'affiliate' &&
           getAffiliateApplicationStatus(entry) === 'approved' &&
-          getAffiliateOfficialCode(entry) === officialAffiliateCode
+          affiliateCodesMatch(getAffiliateOfficialCode(entry), officialAffiliateCode)
         );
 
         if (duplicateAffiliate) {
@@ -3997,6 +4063,10 @@ const server = http.createServer(async (req, res) => {
       };
 
       db.contactSubmissions[index] = updatedInquiry;
+      const reconciledAffiliateOrders =
+        currentInquiry.type === 'affiliate' && nextAffiliateStatus === 'approved'
+          ? reconcileAffiliateOrdersForAffiliate(db, updatedInquiry)
+          : 0;
 
       if (shouldAssignToSelf && currentInquiry.assignedAdminId !== user.id) {
         createAuditLog(db, {
@@ -4037,7 +4107,8 @@ const server = http.createServer(async (req, res) => {
             inquiryId: updatedInquiry.id,
             affiliateStatus: nextAffiliateStatus,
             affiliateCode: updatedInquiry.affiliateCode || '',
-            referralLink: updatedInquiry.referralLink || ''
+            referralLink: updatedInquiry.referralLink || '',
+            reconciledAffiliateOrders
           }
         });
         await sendPlatformEmail(db, {
@@ -6039,6 +6110,7 @@ const server = http.createServer(async (req, res) => {
       const affiliateReferral = body.affiliateReferral || {};
       const requestedAffiliateCode = normalizeAffiliateCode(body.affiliateCode || affiliateReferral.code);
       const matchedAffiliate = requestedAffiliateCode ? findApprovedAffiliateByCode(db, requestedAffiliateCode) : null;
+      const matchedAffiliateCode = matchedAffiliate ? getAffiliateOfficialCode(matchedAffiliate) : '';
       const affiliateCommissionRate = matchedAffiliate ? getAffiliateCommissionRate(db) : 0;
       const affiliateCommissionAmount = matchedAffiliate
         ? Math.round(subtotal * (affiliateCommissionRate / 100))
@@ -6066,12 +6138,19 @@ const server = http.createServer(async (req, res) => {
         promotionCode: promotion.eligible ? promotion.code : null,
         promotionApplied: promotion.eligible,
         promotionSubsidy: promotion.discount,
-        affiliateCode: matchedAffiliate ? getAffiliateOfficialCode(matchedAffiliate) : '',
+        affiliateCode: matchedAffiliateCode || requestedAffiliateCode,
+        affiliateRequestedCode: requestedAffiliateCode,
         affiliateId: matchedAffiliate?.id || null,
-        affiliateName: matchedAffiliate?.name || '',
-        affiliateReferralSourcePath: matchedAffiliate ? String(affiliateReferral.sourcePath || '').slice(0, 300) : '',
-        affiliateReferralCapturedAt: matchedAffiliate ? String(affiliateReferral.capturedAt || '').slice(0, 40) : '',
+        affiliateName: matchedAffiliate ? getAffiliateField(matchedAffiliate, 'name') || matchedAffiliate.name || '' : '',
+        affiliateReferralSourcePath: requestedAffiliateCode ? String(affiliateReferral.sourcePath || '').slice(0, 300) : '',
+        affiliateReferralCapturedAt: requestedAffiliateCode ? String(affiliateReferral.capturedAt || '').slice(0, 40) : '',
         affiliateAttributionStatus: requestedAffiliateCode ? (matchedAffiliate ? 'matched' : 'unmatched') : 'none',
+        affiliateAttributionCheckedAt: requestedAffiliateCode ? createdAt : null,
+        affiliateAttributionMessage: requestedAffiliateCode
+          ? matchedAffiliate
+            ? 'Referral code matched an approved affiliate.'
+            : 'Referral code was submitted but did not match an approved affiliate.'
+          : '',
         affiliateCommissionRate,
         affiliateCommissionAmount,
         affiliateCommissionStatus: matchedAffiliate ? 'pending_review' : 'not_applicable',

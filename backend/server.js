@@ -1122,6 +1122,9 @@ const getAffiliateField = (entry = {}, field) => {
   return values.find((value) => String(value ?? '').trim()) ?? '';
 };
 
+const isAffiliateApplication = (entry = {}) =>
+  String(getAffiliateField(entry, 'type') || entry.type || '').trim().toLowerCase() === 'affiliate';
+
 const getAffiliateEmail = (entry = {}) =>
   String(getAffiliateField(entry, 'email') || entry.email || '').trim().toLowerCase();
 
@@ -1139,11 +1142,27 @@ const getAffiliateOfficialCode = (entry = {}) =>
       entry.preferredCode
   );
 
+const getAffiliateCodeAliases = (entry = {}) =>
+  [
+    getAffiliateField(entry, 'affiliateCode'),
+    getAffiliateField(entry, 'officialCode'),
+    getAffiliateField(entry, 'referralCode'),
+    getAffiliateField(entry, 'preferredCode'),
+    getAffiliateField(entry, 'code'),
+    entry.affiliateCode,
+    entry.officialCode,
+    entry.referralCode,
+    entry.preferredCode,
+    entry.code
+  ]
+    .map(normalizeAffiliateCode)
+    .filter(Boolean);
+
 const getAffiliateApplicationStatus = (entry = {}) => {
   const explicitStatus = getAffiliateField(entry, 'affiliateStatus') || entry.affiliateStatus;
   if (explicitStatus) return normalizeAffiliateApplicationStatus(explicitStatus);
 
-  const inquiryStatus = String(entry.type === 'affiliate' ? entry.status || '' : '').toLowerCase();
+  const inquiryStatus = String(isAffiliateApplication(entry) ? entry.status || '' : '').toLowerCase();
   if (['pending', 'approved', 'rejected', 'suspended'].includes(inquiryStatus)) {
     return normalizeAffiliateApplicationStatus(inquiryStatus);
   }
@@ -1154,7 +1173,7 @@ const getAffiliateApplicationStatus = (entry = {}) => {
 const getAffiliateApplications = (db = {}) => {
   const byId = new Map();
   for (const entry of [...(db.contactSubmissions || []), ...(db.inquiries || []), ...(db.supportTickets || [])]) {
-    if (entry?.type !== 'affiliate') continue;
+    if (!isAffiliateApplication(entry)) continue;
     const id = entry.id || `${getAffiliateEmail(entry)}:${getAffiliateOfficialCode(entry)}`;
     const current = byId.get(id);
     const currentTime = new Date(current?.updatedAt || current?.createdAt || 0).getTime();
@@ -1169,9 +1188,9 @@ const findApprovedAffiliateByCode = (db, code) => {
   if (!normalizedCode) return null;
 
   return getAffiliateApplications(db).find((entry) =>
-    entry.type === 'affiliate' &&
+    isAffiliateApplication(entry) &&
     getAffiliateApplicationStatus(entry) === 'approved' &&
-    affiliateCodesMatch(getAffiliateOfficialCode(entry), normalizedCode)
+    getAffiliateCodeAliases(entry).some((entryCode) => affiliateCodesMatch(entryCode, normalizedCode))
   ) || null;
 };
 
@@ -1181,10 +1200,10 @@ const findApprovedAffiliateByEmailAndCode = (db, email, code) => {
   if (!normalizedEmail || !normalizedCode) return null;
 
   return getAffiliateApplications(db).find((entry) =>
-    entry.type === 'affiliate' &&
+    isAffiliateApplication(entry) &&
     getAffiliateApplicationStatus(entry) === 'approved' &&
     getAffiliateEmail(entry) === normalizedEmail &&
-    affiliateCodesMatch(getAffiliateOfficialCode(entry), normalizedCode)
+    getAffiliateCodeAliases(entry).some((entryCode) => affiliateCodesMatch(entryCode, normalizedCode))
   ) || null;
 };
 
@@ -1193,7 +1212,7 @@ const getAffiliateApplicationsByEmail = (db, email) => {
   if (!normalizedEmail) return [];
 
   return getAffiliateApplications(db).filter((entry) =>
-    entry.type === 'affiliate' &&
+    isAffiliateApplication(entry) &&
     getAffiliateEmail(entry) === normalizedEmail
   );
 };
@@ -4001,9 +4020,10 @@ const server = http.createServer(async (req, res) => {
       }
 
       const currentInquiry = db.contactSubmissions[index];
+      const isCurrentAffiliateApplication = isAffiliateApplication(currentInquiry);
       const nextStatus = body.status !== undefined ? normalizeInquiryStatus(body.status) : currentInquiry.status;
       const nextAffiliateStatus =
-        currentInquiry.type === 'affiliate' && body.affiliateStatus !== undefined
+        isCurrentAffiliateApplication && body.affiliateStatus !== undefined
           ? normalizeAffiliateApplicationStatus(body.affiliateStatus)
           : getAffiliateApplicationStatus(currentInquiry);
       const shouldAssignToSelf = Boolean(body.assignToSelf);
@@ -4012,15 +4032,15 @@ const server = http.createServer(async (req, res) => {
       const now = new Date().toISOString();
       const effectiveStatus = responseMessage ? 'replied' : nextStatus;
       const officialAffiliateCode =
-        currentInquiry.type === 'affiliate' && nextAffiliateStatus === 'approved'
+        isCurrentAffiliateApplication && nextAffiliateStatus === 'approved'
           ? normalizeAffiliateCode(getAffiliateOfficialCode(currentInquiry) || currentInquiry.name || getAffiliateEmail(currentInquiry))
             || `AFF${Date.now().toString().slice(-6)}`
           : getAffiliateOfficialCode(currentInquiry);
 
-      if (currentInquiry.type === 'affiliate' && nextAffiliateStatus === 'approved') {
+      if (isCurrentAffiliateApplication && nextAffiliateStatus === 'approved') {
         const duplicateAffiliate = (db.contactSubmissions || []).find((entry) =>
           entry.id !== currentInquiry.id &&
-          entry.type === 'affiliate' &&
+          isAffiliateApplication(entry) &&
           getAffiliateApplicationStatus(entry) === 'approved' &&
           affiliateCodesMatch(getAffiliateOfficialCode(entry), officialAffiliateCode)
         );
@@ -4034,7 +4054,7 @@ const server = http.createServer(async (req, res) => {
       const updatedInquiry = {
         ...currentInquiry,
         status: effectiveStatus,
-        ...(currentInquiry.type === 'affiliate'
+        ...(isCurrentAffiliateApplication
           ? {
               affiliateStatus: nextAffiliateStatus,
               affiliateCode: officialAffiliateCode,
@@ -4064,7 +4084,7 @@ const server = http.createServer(async (req, res) => {
 
       db.contactSubmissions[index] = updatedInquiry;
       const reconciledAffiliateOrders =
-        currentInquiry.type === 'affiliate' && nextAffiliateStatus === 'approved'
+        isCurrentAffiliateApplication && nextAffiliateStatus === 'approved'
           ? reconcileAffiliateOrdersForAffiliate(db, updatedInquiry)
           : 0;
 
@@ -4097,7 +4117,7 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
-      if (currentInquiry.type === 'affiliate' && nextAffiliateStatus !== getAffiliateApplicationStatus(currentInquiry)) {
+      if (isCurrentAffiliateApplication && nextAffiliateStatus !== getAffiliateApplicationStatus(currentInquiry)) {
         createAuditLog(db, {
           event: `Affiliate application ${nextAffiliateStatus}: ${updatedInquiry.name}`,
           actor: user.name || user.email,

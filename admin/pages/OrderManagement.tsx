@@ -430,11 +430,18 @@ const OrderManagement: React.FC = () => {
                       </p>
                     </div>
                   ) : (
-                    <p className="text-sm font-bold text-gray-600">
-                      {selectedOrder.affiliateAttributionStatus === 'unmatched'
-                        ? 'Referral code was submitted but did not match an approved affiliate.'
-                        : 'No approved affiliate code was attached to this order.'}
-                    </p>
+                    <div className="space-y-2">
+                      <p className="text-sm font-bold text-gray-600">
+                        {selectedOrder.affiliateAttributionStatus === 'unmatched'
+                          ? selectedOrder.affiliateAttributionMessage || 'Referral code was submitted but did not match an approved affiliate.'
+                          : 'No approved affiliate code was attached to this order.'}
+                      </p>
+                      {selectedOrder.affiliateRequestedCode || selectedOrder.affiliateCode ? (
+                        <p className="text-xs font-black uppercase tracking-widest text-orange-600">
+                          Submitted code: {selectedOrder.affiliateRequestedCode || selectedOrder.affiliateCode}
+                        </p>
+                      ) : null}
+                    </div>
                   )}
                 </div>
               </div>

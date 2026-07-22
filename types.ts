@@ -128,10 +128,14 @@ export interface Order {
   promotionApplied?: boolean;
   promotionSubsidy?: number;
   affiliateCode?: string;
+  affiliateRequestedCode?: string;
   affiliateId?: string | null;
   affiliateName?: string;
   affiliateReferralSourcePath?: string;
   affiliateReferralCapturedAt?: string;
+  affiliateAttributionMessage?: string;
+  affiliateAttributionCheckedAt?: string | null;
+  affiliateAttributionReconciledAt?: string;
   affiliateAttributionStatus?: 'none' | 'matched' | 'unmatched';
   affiliateCommissionRate?: number;
   affiliateCommissionAmount?: number;

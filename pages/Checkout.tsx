@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   ShieldCheck,
   ChevronRight,
@@ -19,7 +19,10 @@ import {
   DeliveryPromotionPreview,
   promotionService
 } from '../services/promotionService';
-import { getStoredAffiliateReferral } from '../services/affiliateReferralService';
+import {
+  captureAffiliateReferralFromLocation,
+  getStoredAffiliateReferral
+} from '../services/affiliateReferralService';
 
 const DISTRICTS = [
   'Nyarugenge', 'Gasabo', 'Kicukiro', 
@@ -48,6 +51,7 @@ interface CheckoutProps {
 
 const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -140,7 +144,9 @@ const Checkout: React.FC<CheckoutProps> = ({ cartItems, subtotal, clearCart }) =
     let createdOrderId: string | null = null;
     try {
       const primaryMerchant = cartItems[0]?.product;
-      const affiliateReferral = getStoredAffiliateReferral();
+      const affiliateReferral =
+        captureAffiliateReferralFromLocation(location.search, location.pathname) ||
+        getStoredAffiliateReferral();
       const checkoutResult = await OrderService.createCheckoutOrder({
         customerId: user?.id || '',
         customerName: formData.fullName,

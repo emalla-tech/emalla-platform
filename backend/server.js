@@ -164,8 +164,27 @@ const getAllowedOrigins = () =>
       .filter(Boolean)
   );
 
+const CANONICAL_PUBLIC_APP_URL = 'https://www.emallarwanda.com';
+
+const normalizePublicAppUrl = (value = '') => {
+  const fallback = getRuntimeConfig().isProduction ? CANONICAL_PUBLIC_APP_URL : 'http://127.0.0.1:3000';
+  const trimmed = String(value || '').trim().replace(/\/#?$/, '');
+  if (!trimmed) return fallback;
+
+  try {
+    const url = new URL(trimmed);
+    const hostname = url.hostname.toLowerCase();
+    if (getRuntimeConfig().isProduction && (hostname === 'emallarwanda.com' || hostname.endsWith('.vercel.app'))) {
+      return CANONICAL_PUBLIC_APP_URL;
+    }
+    return trimmed;
+  } catch {
+    return fallback;
+  }
+};
+
 const buildPublicRoute = (path = '') => {
-  const base = String(getAppConfig().publicAppUrl || 'http://127.0.0.1:3000').replace(/\/#?$/, '');
+  const base = normalizePublicAppUrl(getAppConfig().publicAppUrl);
   const normalizedPath = String(path || '').replace(/^#?\/?/, '');
   return normalizedPath ? `${base}/${normalizedPath}` : base;
 };

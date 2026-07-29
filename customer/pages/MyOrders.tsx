@@ -13,6 +13,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useProducts } from '../../hooks/useProducts';
 import { html, printPdfDocument, renderTableRows } from '../../lib/documentExport';
 import { getCategoryFallbackImage, handleProductImageError } from '../../lib/productImages';
+import { DEFAULT_FULFILLMENT_HUB } from '../../lib/fulfillmentHub';
 
 const MyOrders: React.FC = () => {
   const { user } = useAuth();
@@ -98,8 +99,8 @@ const MyOrders: React.FC = () => {
     return [
       { label: 'Order Placed', done: true, time: new Date(order.createdAt).toLocaleString() },
       { label: order.paymentMethod === PaymentMethod.CASH_ON_DELIVERY ? 'Cash on Delivery Confirmed' : 'Payment Verified', done: isPaid, time: isPaid ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
-      { label: 'Seller Confirmed', done: isSellerConfirmed, time: isSellerConfirmed ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
-      { label: 'Seller Preparing Order', done: isPreparing, time: isPreparing ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
+      { label: 'E-Malla Hub Confirmed', done: isSellerConfirmed, time: isSellerConfirmed ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
+      { label: 'Hub Preparing Order', done: isPreparing, time: isPreparing ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
       { label: 'Ready for Dispatch', done: isReadyForDispatch, time: isReadyForDispatch ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
       { label: 'Rider Assigned', done: isRiderAssigned, time: isRiderAssigned ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
       { label: 'On the Way', done: isOnTheWay, time: isOnTheWay ? new Date(order.updatedAt).toLocaleString() : 'Pending' },
@@ -211,8 +212,8 @@ const MyOrders: React.FC = () => {
 
         <div class="grid">
           <div class="card">
-            <div class="card-label">Merchant</div>
-            <div class="card-value">${html.escape(order.merchantName)}</div>
+            <div class="card-label">Fulfillment Hub</div>
+            <div class="card-value">${html.escape(DEFAULT_FULFILLMENT_HUB.name)}</div>
           </div>
           <div class="card">
             <div class="card-label">Payment</div>

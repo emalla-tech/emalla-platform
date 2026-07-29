@@ -30,6 +30,7 @@ import {
   getProductDeliveryMessage,
   getProductFulfillmentLabel
 } from '../lib/productDelivery';
+import { DEFAULT_FULFILLMENT_HUB, getPublicFulfillmentHubLabel } from '../lib/fulfillmentHub';
 import QuoteRequestModal from '../components/products/QuoteRequestModal';
 
 const RECENTLY_VIEWED_KEY = 'emalla_recently_viewed_products';
@@ -104,7 +105,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
     if (!product) return;
 
     const title = `${product.name} | E-Malla Rwanda`;
-    const description = String(product.description || `Buy ${product.name} from a trusted seller on E-Malla Rwanda.`)
+    const description = String(product.description || `Buy ${product.name} through a trusted E-Malla Rwanda fulfillment hub.`)
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 160);
@@ -218,7 +219,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
 
     return [
       { label: 'Category', value: CATEGORIES.find((category) => category.id === product.category)?.name || 'General' },
-      { label: 'Seller', value: product.merchantName || 'E-Malla Merchant' },
+      { label: 'Fulfillment', value: DEFAULT_FULFILLMENT_HUB.name },
       { label: 'Price', value: product.pricingType === 'quote' ? 'Price on request' : `RWF ${product.price.toLocaleString()}` },
       { label: 'Availability', value: product.stock > 0 ? `${product.stock} units in stock` : 'Out of stock' },
       { label: 'Customer Rating', value: `${product.rating} / 5.0` },
@@ -445,8 +446,9 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
                 </p>
               </div>
               <div className="rounded-3xl border border-orange-100 bg-orange-50 p-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-orange-600">Seller Info</p>
-                <p className="mt-2 text-base font-black text-gray-900">{product.merchantName || 'E-Malla Merchant'}</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-orange-600">Fulfillment Hub</p>
+                <p className="mt-2 text-base font-black text-gray-900">{getPublicFulfillmentHubLabel()}</p>
+                <p className="mt-1 text-xs font-bold text-orange-700">{DEFAULT_FULFILLMENT_HUB.verificationLabel}</p>
               </div>
               <div className="rounded-3xl border border-blue-100 bg-blue-50 p-4">
                 <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Delivery Info</p>
@@ -623,8 +625,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
                 <Zap size={14} className="text-orange-500" />
                 <span className="text-xs font-bold text-orange-700">
                   {isQuoteProduct
-                    ? 'Your request goes directly to the verified seller without creating an unpaid order.'
-                    : 'Secure checkout with live pricing and seller stock validation.'}
+                    ? 'E-Malla routes your request to the verified fulfillment team without creating an unpaid order.'
+                    : 'Secure checkout with live pricing and fulfillment stock validation.'}
                 </span>
               </div>
             </div>
@@ -862,7 +864,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
                   </div>
                   <h4 className="text-lg font-bold text-gray-900">Hub Pickup</h4>
                   <p className="text-sm text-gray-600 leading-relaxed">
-                    Pickup timing is shared after checkout confirmation and depends on the assigned seller or hub.
+                    Pickup timing is shared after checkout confirmation and coordinated through the E-Malla fulfillment hub.
                   </p>
                 </div>
                 <div className="bg-emerald-50/50 p-8 rounded-3xl border border-emerald-100 flex flex-col space-y-4">
@@ -871,7 +873,9 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
                   </div>
                   <h4 className="text-lg font-bold text-gray-900">Order Fulfillment</h4>
                   <p className="text-sm text-gray-600 leading-relaxed">
-                    Seller: {product.merchantName || 'E-Malla Merchant'}<br />
+                    Fulfillment hub: {DEFAULT_FULFILLMENT_HUB.name}<br />
+                    Zone: {DEFAULT_FULFILLMENT_HUB.publicZone}<br />
+                    {DEFAULT_FULFILLMENT_HUB.dispatchNote}<br />
                     Stock status: {product.stock > 0 ? `${product.stock} units available` : 'Currently out of stock'}<br />
                     Payment options are confirmed during checkout.
                   </p>

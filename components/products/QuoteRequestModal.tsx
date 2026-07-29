@@ -3,6 +3,7 @@ import { CheckCircle2, Loader2, MessageSquareText, X } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { quoteRequestService } from '../../services/quoteRequestService';
 import { Product } from '../../types';
+import { getPublicFulfillmentHubLabel } from '../../lib/fulfillmentHub';
 
 interface QuoteRequestModalProps {
   product: Product;
@@ -126,7 +127,7 @@ const QuoteRequestModal = ({
             </span>
             <h3 className="mt-6 text-2xl font-black text-gray-950">Request sent successfully</h3>
             <p className="mx-auto mt-3 max-w-md text-sm font-medium leading-7 text-gray-500">
-              {product.merchantName || 'The seller'} has received your request and will contact you using the details you provided.
+              {getPublicFulfillmentHubLabel()} has received your request. The E-Malla team will coordinate the quotation using the details you provided.
             </p>
             <button
               type="button"
@@ -204,7 +205,7 @@ const QuoteRequestModal = ({
               <textarea
                 rows={3}
                 maxLength={800}
-                placeholder="Preferred specifications, color, deadline or questions for the seller..."
+                placeholder="Preferred specifications, color, deadline or questions for the E-Malla team..."
                 value={form.message}
                 onChange={(event) => setForm({ ...form, message: event.target.value })}
                 className="w-full resize-none rounded-2xl border-2 border-transparent bg-gray-50 px-5 py-4 font-bold text-gray-900 outline-none transition-colors focus:border-orange-500 focus:bg-white"
@@ -216,7 +217,7 @@ const QuoteRequestModal = ({
             )}
 
             <div className="rounded-2xl border border-blue-100 bg-blue-50 px-5 py-4 text-xs font-semibold leading-6 text-blue-800">
-              Your contact details are shared only with this seller so they can prepare and communicate the quotation.
+              Your contact details are used only to prepare and communicate this quotation through E-Malla Rwanda.
             </div>
 
             <button

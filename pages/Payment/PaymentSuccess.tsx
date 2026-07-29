@@ -5,6 +5,7 @@ import { Order, PaymentMethod } from '../../types';
 import { OrderService } from '../../services/orderService';
 import { html, printPdfDocument, renderTableRows } from '../../lib/documentExport';
 import { useAuth } from '../../auth/AuthContext';
+import { DEFAULT_FULFILLMENT_HUB, getPublicFulfillmentHubLabel } from '../../lib/fulfillmentHub';
 
 const PaymentSuccess: React.FC = () => {
   const { user } = useAuth();
@@ -60,8 +61,8 @@ const PaymentSuccess: React.FC = () => {
 
         <div class="grid">
           <div class="card">
-            <div class="card-label">Merchant</div>
-            <div class="card-value">${html.escape(order.merchantName)}</div>
+            <div class="card-label">Fulfillment Hub</div>
+            <div class="card-value">${html.escape(DEFAULT_FULFILLMENT_HUB.name)}</div>
           </div>
           <div class="card">
             <div class="card-label">Payment Method</div>
@@ -134,8 +135,8 @@ const PaymentSuccess: React.FC = () => {
             {mode === 'cod'
               ? <>Your order <span className="text-gray-900 font-black">{order?.orderNumber || '#Pending'}</span> is confirmed with <span className="text-orange-600 font-black">Cash on Delivery</span>. Please pay when it arrives.</>
               : isVerificationPending
-                ? <>Your GTBank payment details for order <span className="text-gray-900 font-black">{order?.orderNumber || '#Pending'}</span> were submitted. E-Malla Finance will verify them before the seller starts preparing your order.</>
-              : <>Payment confirmed. Your order <span className="text-gray-900 font-black">{order?.orderNumber || '#Pending'}</span> is being processed by <span className="text-orange-600 font-black">{order?.merchantName || 'E-Malla'}</span>.</>}
+                ? <>Your GTBank payment details for order <span className="text-gray-900 font-black">{order?.orderNumber || '#Pending'}</span> were submitted. E-Malla Finance will verify them before the fulfillment hub starts preparing your order.</>
+              : <>Payment confirmed. Your order <span className="text-gray-900 font-black">{order?.orderNumber || '#Pending'}</span> is being processed through <span className="text-orange-600 font-black">{getPublicFulfillmentHubLabel()}</span>.</>}
           </p>
         </div>
 

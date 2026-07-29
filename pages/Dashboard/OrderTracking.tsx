@@ -15,6 +15,7 @@ import {
 import { Order, OrderStatus, PaymentMethod } from '../../types';
 import { OrderService } from '../../services/orderService';
 import { RiderService } from '../../services/riderService';
+import { DEFAULT_FULFILLMENT_HUB, getPublicFulfillmentHubLabel } from '../../lib/fulfillmentHub';
 
 interface TrackingStep {
   key: OrderStatus;
@@ -41,7 +42,7 @@ const TRACKING_FLOW: Array<{ key: OrderStatus; label: string }> = [
 
 const formatStatus = (status?: string) => String(status || '').replaceAll('_', ' ');
 
-const getLocationLabel = (order: Order, status: OrderStatus) => {
+const getLocationLabel = (order: Order, status: OrderStatus, showInternalMerchant: boolean) => {
   switch (status) {
     case OrderStatus.PENDING_PAYMENT:
     case OrderStatus.PAID:
@@ -49,7 +50,7 @@ const getLocationLabel = (order: Order, status: OrderStatus) => {
       return 'E-Malla order desk';
     case OrderStatus.PREPARING:
     case OrderStatus.READY_FOR_PICKUP:
-      return `${order.merchantName} fulfilment center`;
+      return showInternalMerchant ? `${order.merchantName} fulfilment center` : DEFAULT_FULFILLMENT_HUB.publicZone;
     case OrderStatus.ASSIGNED:
     case OrderStatus.PICKED_UP:
     case OrderStatus.ON_THE_WAY:
@@ -72,14 +73,14 @@ const getEstimatedArrival = (order: Order) => {
   return 'Being processed';
 };
 
-const buildTrackingSteps = (order: Order): TrackingStep[] => {
+const buildTrackingSteps = (order: Order, showInternalMerchant: boolean): TrackingStep[] => {
   const currentIndex = TRACKING_FLOW.findIndex((step) => step.key === order.status);
   const safeIndex = currentIndex === -1 ? 0 : currentIndex;
 
   return TRACKING_FLOW.map((step, index) => ({
     key: step.key,
-    status: step.label,
-    location: getLocationLabel(order, step.key),
+    status: showInternalMerchant ? step.label : step.label.replace('Seller', 'Hub'),
+    location: getLocationLabel(order, step.key, showInternalMerchant),
     time: index <= safeIndex ? new Date(order.updatedAt || order.createdAt).toLocaleString() : 'Pending',
     completed: index < safeIndex || [OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(order.status) && index <= safeIndex,
     current: index === safeIndex && ![OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(order.status)
@@ -144,7 +145,9 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
     loadOrder();
   }, [id, guestAccess?.email, guestAccess?.phone]);
 
-  const trackingData = useMemo(() => (order ? buildTrackingSteps(order) : []), [order]);
+  const showInternalMerchant = isSellerView || isRiderView;
+  const fulfillmentLabel = showInternalMerchant ? order?.merchantName : getPublicFulfillmentHubLabel();
+  const trackingData = useMemo(() => (order ? buildTrackingSteps(order, showInternalMerchant) : []), [order, showInternalMerchant]);
   const currentStep = useMemo(() => trackingData.find((step) => step.current) || trackingData.find((step) => step.completed), [trackingData]);
   const totalItems = useMemo(() => (order?.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0), [order]);
   const nextRiderAction = order && isRiderView ? RIDER_NEXT_ACTIONS[order.status] : null;
@@ -333,8 +336,11 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
                 <div className="flex items-center space-x-3">
                   <Navigation className="text-gray-400" size={20} />
                   <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">Merchant</p>
-                    <p className="text-sm font-bold text-gray-900">{order.merchantName}</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase">{showInternalMerchant ? 'Merchant' : 'Fulfillment'}</p>
+                    <p className="text-sm font-bold text-gray-900">{fulfillmentLabel}</p>
+                    {!showInternalMerchant ? (
+                      <p className="mt-1 text-[11px] font-bold text-emerald-600">{DEFAULT_FULFILLMENT_HUB.verificationLabel}</p>
+                    ) : null}
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">

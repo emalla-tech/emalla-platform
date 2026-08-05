@@ -360,21 +360,18 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 max-w-7xl mx-auto px-4">
-        <div className="bg-yellow-400 rounded-[40px] p-12 md:p-20 relative overflow-hidden flex flex-col md:flex-row items-center justify-between shadow-2xl shadow-yellow-100">
+      <section className="py-16 max-w-7xl mx-auto px-4">
+        <div className="bg-yellow-400 rounded-[40px] p-10 md:p-14 relative overflow-hidden flex flex-col md:flex-row items-center justify-between shadow-2xl shadow-yellow-100">
           <div className="absolute inset-0 imigongo-bg opacity-10"></div>
           <div className="relative z-10 max-w-xl text-center md:text-left">
-            <h2 className="text-4xl md:text-5xl font-extrabold text-black mb-6 leading-tight">
-              {t.home.ctaTitleLine1} <br/><span className="text-white bg-black px-2">{t.home.ctaTitleLine2}</span>
-            </h2>
-            <p className="text-xl text-gray-800 mb-10 font-medium opacity-80">
+            <p className="text-xl text-gray-800 mb-8 font-medium opacity-80">
               {t.home.ctaDescription}
             </p>
             <Link to="/become-seller" className="bg-black text-white px-10 py-5 rounded-2xl font-black text-lg hover:bg-gray-800 transition-all shadow-2xl shadow-black/20 inline-block active:scale-95">
               {t.home.ctaButton}
             </Link>
           </div>
-          <div className="mt-12 md:mt-0 md:w-1/3 flex justify-center">
+          <div className="mt-10 md:mt-0 md:w-1/3 flex justify-center">
              <div className="w-64 h-64 bg-black/10 rounded-full flex items-center justify-center p-8 backdrop-blur-sm border border-black/5">
                 <Store size={120} className="text-black" />
              </div>

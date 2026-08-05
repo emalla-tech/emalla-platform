@@ -899,12 +899,18 @@ const sendPlatformEmailsInBackground = (emails = [], context = {}) => {
 };
 
 const formatOrderStatusLabel = (status = '') => String(status || '').replaceAll('_', ' ');
+const PUBLIC_FULFILLMENT_HUB = {
+  name: 'E-Malla Hub Kigali',
+  label: 'Fulfilled through E-Malla Hub Kigali',
+  verificationLabel: 'Verified by E-Malla Rwanda',
+  zone: 'Nyarugenge Zone'
+};
 
 const getOrderStatusNotification = (order, status) => {
   const messages = {
     preparing: {
-      title: 'Seller Started Preparing Your Order',
-      message: `${order.merchantName} is now preparing ${order.orderNumber}.`
+      title: 'Hub Started Preparing Your Order',
+      message: `${PUBLIC_FULFILLMENT_HUB.name} is now preparing ${order.orderNumber}.`
     },
     ready_for_pickup: {
       title: 'Order Ready for Rider Pickup',
@@ -912,7 +918,7 @@ const getOrderStatusNotification = (order, status) => {
     },
     picked_up: {
       title: 'Order Picked Up',
-      message: `${order.riderName || 'Your rider'} has collected ${order.orderNumber} from the seller.`
+      message: `${order.riderName || 'Your rider'} has collected ${order.orderNumber} from the E-Malla fulfillment hub.`
     },
     on_the_way: {
       title: 'Order Is On The Way',
@@ -1025,7 +1031,7 @@ const createLowStockNotifications = (db, products, items) => {
   return notifications;
 };
 
-const buildOrderStatusEmailMessage = ({ order, status, actorName }) => {
+const buildOrderStatusEmailMessage = ({ order, status }) => {
   const statusLabel = formatOrderStatusLabel(status);
   const trackingUrl = buildCustomerTrackingUrl(order);
 
@@ -1039,8 +1045,9 @@ const buildOrderStatusEmailMessage = ({ order, status, actorName }) => {
       sections: [
         { label: 'Order', value: order.orderNumber || 'Pending' },
         { label: 'New Status', value: statusLabel },
-        { label: 'Merchant', value: order.merchantName || 'E-Malla Rwanda' },
-        { label: 'Updated By', value: actorName || 'E-Malla Team' },
+        { label: 'Fulfillment Hub', value: PUBLIC_FULFILLMENT_HUB.label },
+        { label: 'Verification', value: PUBLIC_FULFILLMENT_HUB.verificationLabel },
+        { label: 'Hub Zone', value: PUBLIC_FULFILLMENT_HUB.zone },
         { label: 'Tracking', value: trackingUrl }
       ],
       closing: 'Komeza gukurikirana order yawe kuri tracking page kugira ngo ubone updates zose za nyuma.',
@@ -5237,7 +5244,7 @@ const server = http.createServer(async (req, res) => {
         new Date(entry.createdAt || 0).getTime() >= duplicateWindowStart
       );
       if (duplicateRequest) {
-        sendJson(res, 409, { error: 'Your request was already sent. Please allow the seller time to respond.' });
+        sendJson(res, 409, { error: 'Your request was already sent. Please allow the E-Malla team time to respond.' });
         return;
       }
 
@@ -5245,7 +5252,7 @@ const server = http.createServer(async (req, res) => {
         entry.id === product.merchantId && entry.role === 'MERCHANT'
       );
       if (!merchant) {
-        sendJson(res, 409, { error: 'Seller contact information is currently unavailable.' });
+        sendJson(res, 409, { error: 'E-Malla fulfillment contact information is currently unavailable.' });
         return;
       }
 
@@ -5291,7 +5298,7 @@ const server = http.createServer(async (req, res) => {
           userId: customerUser.id,
           role: 'CUSTOMER',
           title: 'Price Request Sent',
-          message: `Your request for ${product.name} was sent to ${quoteRequest.merchantName}.`,
+          message: `Your request for ${product.name} was sent to the E-Malla fulfillment team.`,
           type: 'success',
           metadata: {
             quoteRequestId: quoteRequest.id,
@@ -5340,17 +5347,18 @@ const server = http.createServer(async (req, res) => {
           to: email,
           subject: `We sent your price request for ${product.name}`,
           template: 'product_quote_request_customer',
-          body: `Your quotation request for ${product.name} was sent to ${quoteRequest.merchantName}.`,
+          body: `Your quotation request for ${product.name} was sent to the E-Malla fulfillment team.`,
           html: createEmailHtml({
             title: 'Price request received',
-            intro: `Muraho ${name}, your request has been delivered to ${quoteRequest.merchantName}.`,
+            intro: `Muraho ${name}, your request has been delivered to the E-Malla fulfillment team.`,
             sections: [
               { label: 'Product', value: product.name },
               { label: 'Quantity', value: String(quantity) },
               { label: 'Delivery Area', value: location },
-              { label: 'Status', value: 'Waiting for seller response' }
+              { label: 'Fulfillment Hub', value: PUBLIC_FULFILLMENT_HUB.label },
+              { label: 'Status', value: 'Waiting for E-Malla team response' }
             ],
-            closing: 'The seller will contact you using the email or phone number you provided.'
+            closing: 'The E-Malla team will contact you using the email or phone number you provided.'
           })
         }
       ], {
@@ -6312,7 +6320,6 @@ const server = http.createServer(async (req, res) => {
               address: order.address,
               phone: order.phone,
               txRef: order.tx_ref,
-              merchantName: order.merchantName,
               itemCount: (order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
               trackingUrl: buildCustomerTrackingUrl(order)
             })
@@ -7070,7 +7077,6 @@ const server = http.createServer(async (req, res) => {
               address: order.address,
               phone: order.phone,
               txRef: order.tx_ref,
-              merchantName: order.merchantName,
               itemCount: (order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
               trackingUrl: buildCustomerTrackingUrl(order)
             })

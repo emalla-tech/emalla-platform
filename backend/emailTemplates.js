@@ -13,6 +13,13 @@ const EMAIL_TEMPLATE_NAMES = [
 
 const formatMoney = (value) => `RWF ${Number(value || 0).toLocaleString()}`;
 
+const PUBLIC_FULFILLMENT_HUB = {
+  name: 'E-Malla Hub Kigali',
+  label: 'Fulfilled through E-Malla Hub Kigali',
+  verificationLabel: 'Verified by E-Malla Rwanda',
+  zone: 'Nyarugenge Zone'
+};
+
 const normalizePublicBaseUrl = (value = '') =>
   String(value || 'http://127.0.0.1:3000')
     .trim()
@@ -102,13 +109,15 @@ const renderWelcomeEmail = ({ name, email, role, username }) => {
   });
 };
 
-const renderOrderConfirmationEmail = ({ customerName, orderNumber, totalAmount, paymentMethod, address, phone, txRef, merchantName, itemCount, trackingUrl }) => {
+const renderOrderConfirmationEmail = ({ customerName, orderNumber, totalAmount, paymentMethod, address, phone, txRef, itemCount, trackingUrl }) => {
   const ordersUrl = trackingUrl || normalizePublicRoute('/buyer/orders');
   const sections = createSections([
     { label: 'Order', value: orderNumber || 'Pending' },
     { label: 'Payment Method', value: paymentMethod || 'Not specified' },
     { label: 'Items', value: itemCount ? `${itemCount} item(s)` : undefined },
-    { label: 'Merchant', value: merchantName || 'E-Malla Rwanda' },
+    { label: 'Fulfillment Hub', value: PUBLIC_FULFILLMENT_HUB.label },
+    { label: 'Verification', value: PUBLIC_FULFILLMENT_HUB.verificationLabel },
+    { label: 'Hub Zone', value: PUBLIC_FULFILLMENT_HUB.zone },
     { label: 'Delivery Address', value: address || 'To be confirmed' },
     { label: 'Phone', value: phone || undefined },
     { label: 'Reference', value: txRef || undefined },

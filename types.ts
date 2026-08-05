@@ -142,6 +142,9 @@ export interface Order {
   affiliateCommissionStatus?: 'not_applicable' | 'pending_review' | 'eligible' | 'paid';
   riderPayout?: number;
   riderPayoutStatus?: 'pending_assignment' | 'ready' | 'assigned' | 'released';
+  pickupLocation?: string;
+  pickupAddress?: string;
+  pickupZone?: string;
   deliveryConfirmationCode?: string;
   deliveryConfirmationRequired?: boolean;
   deliveryConfirmationGeneratedAt?: string;

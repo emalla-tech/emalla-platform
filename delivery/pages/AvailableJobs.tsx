@@ -9,6 +9,7 @@ import { OrderService } from '../../services/orderService';
 import { Order, OrderStatus } from '../../types';
 import { useAuth } from '../../auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { DEFAULT_FULFILLMENT_HUB } from '../../lib/fulfillmentHub';
 
 const AvailableJobs: React.FC = () => {
   const { user } = useAuth();
@@ -51,7 +52,7 @@ const AvailableJobs: React.FC = () => {
     setError(null);
     try {
       await OrderService.assignRider(orderId, riderId, riderName);
-      setMessage('Delivery accepted. The customer and seller have been notified.');
+      setMessage('Delivery accepted. The customer and E-Malla operations have been notified.');
       await loadPool();
       window.setTimeout(() => navigate(`/rider/orders/${orderId}/track`), 900);
     } catch (acceptError) {
@@ -68,6 +69,8 @@ const AvailableJobs: React.FC = () => {
   };
 
   const visibleJobs = jobs.filter((job) => !dismissedJobIds.includes(job.id));
+  const getPickupAddress = (order: Order) => order.pickupAddress || DEFAULT_FULFILLMENT_HUB.internalAddress;
+  const getPickupName = (order: Order) => order.pickupLocation || DEFAULT_FULFILLMENT_HUB.name;
 
   return (
     <div className="space-y-6 pb-24 animate-in fade-in duration-500">
@@ -108,7 +111,7 @@ const AvailableJobs: React.FC = () => {
                   <Package size={24} />
                 </div>
                 <div>
-                   <h4 className="font-black text-lg text-gray-900">Pickup: {job.merchantName}</h4>
+                   <h4 className="font-black text-lg text-gray-900">Pickup: {getPickupName(job)}</h4>
                    <p className="text-[10px] text-gray-400 font-bold uppercase flex items-center">
                      <Clock size={12} className="mr-1" /> Requested {new Date(job.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                    </p>
@@ -120,7 +123,7 @@ const AvailableJobs: React.FC = () => {
                    <div className="mt-1 w-2.5 h-2.5 rounded-full bg-orange-500 border-4 border-orange-100 shadow-sm"></div>
                    <div>
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Pick up items at:</p>
-                      <p className="text-sm font-bold text-gray-700">{job.merchantName} dispatch point</p>
+                      <p className="text-sm font-bold text-gray-700">{getPickupAddress(job)}</p>
                    </div>
                 </div>
                 <div className="flex items-start space-x-4">
@@ -167,7 +170,7 @@ const AvailableJobs: React.FC = () => {
           <div className="bg-white rounded-[40px] p-24 text-center border-2 border-dashed border-gray-100 shadow-sm">
             <Clock size={56} className="mx-auto text-gray-100 mb-8" />
             <h2 className="text-2xl font-black text-gray-900 mb-3">No pickup jobs available</h2>
-            <p className="text-gray-500 text-sm max-w-[260px] mx-auto font-medium">New pickup requests will appear here as soon as sellers prepare orders for collection.</p>
+            <p className="text-gray-500 text-sm max-w-[260px] mx-auto font-medium">New pickup requests will appear here as soon as E-Malla Hub marks orders ready for collection.</p>
             <button onClick={loadPool} className="mt-8 bg-gray-900 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest">Refresh Jobs</button>
           </div>
         )}
@@ -182,7 +185,7 @@ const AvailableJobs: React.FC = () => {
                </div>
                <div>
                   <h4 className="font-black text-lg leading-none mb-2">Delivery Standards</h4>
-                  <p className="text-xs text-gray-400 font-medium">Handle merchant packages carefully and confirm each handoff accurately.</p>
+                  <p className="text-xs text-gray-400 font-medium">Handle E-Malla Hub packages carefully and confirm each handoff accurately.</p>
                </div>
             </div>
             <ChevronRight size={24} className="text-gray-700" />

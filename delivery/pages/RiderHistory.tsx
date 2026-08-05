@@ -3,6 +3,7 @@ import { Calendar, CheckCircle2, Package, Search, Printer } from 'lucide-react';
 import { RiderService } from '../../services/riderService';
 import { Order, OrderStatus } from '../../types';
 import { html, printPdfDocument, renderTableRows } from '../../lib/documentExport';
+import { DEFAULT_FULFILLMENT_HUB } from '../../lib/fulfillmentHub';
 
 const COMPLETED_STATUSES = new Set<OrderStatus>([
   OrderStatus.DELIVERED,
@@ -34,9 +35,12 @@ const RiderHistory: React.FC = () => {
       (item) =>
         item.orderNumber.toLowerCase().includes(normalizedQuery) ||
         item.id.toLowerCase().includes(normalizedQuery) ||
-        item.merchantName.toLowerCase().includes(normalizedQuery)
+        (item.pickupLocation || DEFAULT_FULFILLMENT_HUB.name).toLowerCase().includes(normalizedQuery)
     );
   }, [history, query]);
+
+  const getPickupName = (order: Order) => order.pickupLocation || DEFAULT_FULFILLMENT_HUB.name;
+  const getPickupAddress = (order: Order) => order.pickupAddress || DEFAULT_FULFILLMENT_HUB.internalAddress;
 
   const handlePrintDeliveryNote = (order: Order) => {
     const bodyHtml = `
@@ -55,8 +59,8 @@ const RiderHistory: React.FC = () => {
 
         <div class="grid">
           <div class="card">
-            <div class="card-label">Merchant</div>
-            <div class="card-value">${html.escape(order.merchantName)}</div>
+            <div class="card-label">Pickup Hub</div>
+            <div class="card-value">${html.escape(getPickupName(order))}</div>
           </div>
           <div class="card">
             <div class="card-label">Delivery Fee</div>
@@ -73,7 +77,8 @@ const RiderHistory: React.FC = () => {
           <table>
             <tbody>
               ${renderTableRows([
-                ['Merchant', order.merchantName],
+                ['Pickup Hub', getPickupName(order)],
+                ['Pickup Address', getPickupAddress(order)],
                 ['Drop-off Address', order.address],
                 ['Customer Phone', order.phone],
                 ['Delivery Reference', order.tx_ref || order.id],
@@ -105,7 +110,7 @@ const RiderHistory: React.FC = () => {
           type="text"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search by order number or merchant..."
+          placeholder="Search by order number or pickup hub..."
           className="w-full pl-12 pr-4 py-4 bg-white border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-orange-50 font-bold text-sm shadow-sm transition-all"
         />
       </div>
@@ -124,7 +129,7 @@ const RiderHistory: React.FC = () => {
                 <h4 className="font-black text-gray-900">{item.orderNumber}</h4>
                 <div className="flex items-center text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">
                   <Calendar size={10} className="mr-1" />
-                  {new Date(item.updatedAt).toLocaleDateString()} | {item.merchantName}
+                  {new Date(item.updatedAt).toLocaleDateString()} | {getPickupName(item)}
                 </div>
               </div>
             </div>

@@ -42,7 +42,7 @@ const TRACKING_FLOW: Array<{ key: OrderStatus; label: string }> = [
 
 const formatStatus = (status?: string) => String(status || '').replaceAll('_', ' ');
 
-const getLocationLabel = (order: Order, status: OrderStatus, showInternalMerchant: boolean) => {
+const getLocationLabel = (order: Order, status: OrderStatus, showInternalMerchant: boolean, showHubPickupAddress: boolean) => {
   switch (status) {
     case OrderStatus.PENDING_PAYMENT:
     case OrderStatus.PAID:
@@ -50,7 +50,8 @@ const getLocationLabel = (order: Order, status: OrderStatus, showInternalMerchan
       return 'E-Malla order desk';
     case OrderStatus.PREPARING:
     case OrderStatus.READY_FOR_PICKUP:
-      return showInternalMerchant ? `${order.merchantName} fulfilment center` : DEFAULT_FULFILLMENT_HUB.publicZone;
+      if (showInternalMerchant) return `${order.merchantName} fulfilment center`;
+      return showHubPickupAddress ? (order.pickupAddress || DEFAULT_FULFILLMENT_HUB.internalAddress) : DEFAULT_FULFILLMENT_HUB.publicZone;
     case OrderStatus.ASSIGNED:
     case OrderStatus.PICKED_UP:
     case OrderStatus.ON_THE_WAY:
@@ -73,14 +74,14 @@ const getEstimatedArrival = (order: Order) => {
   return 'Being processed';
 };
 
-const buildTrackingSteps = (order: Order, showInternalMerchant: boolean): TrackingStep[] => {
+const buildTrackingSteps = (order: Order, showInternalMerchant: boolean, showHubPickupAddress: boolean): TrackingStep[] => {
   const currentIndex = TRACKING_FLOW.findIndex((step) => step.key === order.status);
   const safeIndex = currentIndex === -1 ? 0 : currentIndex;
 
   return TRACKING_FLOW.map((step, index) => ({
     key: step.key,
     status: showInternalMerchant ? step.label : step.label.replace('Seller', 'Hub'),
-    location: getLocationLabel(order, step.key, showInternalMerchant),
+    location: getLocationLabel(order, step.key, showInternalMerchant, showHubPickupAddress),
     time: index <= safeIndex ? new Date(order.updatedAt || order.createdAt).toLocaleString() : 'Pending',
     completed: index < safeIndex || [OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(order.status) && index <= safeIndex,
     current: index === safeIndex && ![OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(order.status)
@@ -145,9 +146,10 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
     loadOrder();
   }, [id, guestAccess?.email, guestAccess?.phone]);
 
-  const showInternalMerchant = isSellerView || isRiderView;
+  const showInternalMerchant = isSellerView;
+  const showHubPickupAddress = isRiderView;
   const fulfillmentLabel = showInternalMerchant ? order?.merchantName : getPublicFulfillmentHubLabel();
-  const trackingData = useMemo(() => (order ? buildTrackingSteps(order, showInternalMerchant) : []), [order, showInternalMerchant]);
+  const trackingData = useMemo(() => (order ? buildTrackingSteps(order, showInternalMerchant, showHubPickupAddress) : []), [order, showInternalMerchant, showHubPickupAddress]);
   const currentStep = useMemo(() => trackingData.find((step) => step.current) || trackingData.find((step) => step.completed), [trackingData]);
   const totalItems = useMemo(() => (order?.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0), [order]);
   const nextRiderAction = order && isRiderView ? RIDER_NEXT_ACTIONS[order.status] : null;
@@ -338,7 +340,11 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
                   <div>
                     <p className="text-[10px] font-bold text-gray-400 uppercase">{showInternalMerchant ? 'Merchant' : 'Fulfillment'}</p>
                     <p className="text-sm font-bold text-gray-900">{fulfillmentLabel}</p>
-                    {!showInternalMerchant ? (
+                    {isRiderView ? (
+                      <p className="mt-1 text-[11px] font-bold text-emerald-600">
+                        Pickup: {order.pickupAddress || DEFAULT_FULFILLMENT_HUB.internalAddress}
+                      </p>
+                    ) : !showInternalMerchant ? (
                       <p className="mt-1 text-[11px] font-bold text-emerald-600">{DEFAULT_FULFILLMENT_HUB.verificationLabel}</p>
                     ) : null}
                   </div>
@@ -405,6 +411,8 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
             <p className="text-sm font-medium leading-relaxed opacity-80">
               {isSellerView
                 ? 'Keep the package sealed and ready for a smooth hand-off when the rider arrives.'
+                : isRiderView
+                  ? `Pickup: ${order.pickupAddress || DEFAULT_FULFILLMENT_HUB.internalAddress}. Drop-off: ${order.address}.`
                 : `Delivery destination: ${order.address}. Keep ${order.phone} reachable for hand-off updates.`}
             </p>
           </div>
@@ -433,7 +441,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ guestAccess }) => {
             <div className="bg-white rounded-[40px] p-8 border border-gray-100 shadow-sm">
               <h4 className="font-bold text-gray-900 mb-2">Rider Delivery Actions</h4>
               <p className="text-xs text-gray-500 mb-5">
-                Update the live delivery stage so the customer, seller, and admin all see the same progress instantly.
+                Update the live delivery stage so the customer, E-Malla operations, and admin all see the same progress instantly.
               </p>
               {statusMessage ? <p className="mb-4 text-sm font-bold text-emerald-600">{statusMessage}</p> : null}
               {statusError ? <p className="mb-4 text-sm font-bold text-red-600">{statusError}</p> : null}

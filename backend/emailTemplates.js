@@ -181,12 +181,14 @@ const renderSellerOrderNotificationEmail = ({ merchantName, orderNumber, totalAm
   });
 };
 
-const renderRiderDeliveryAssignmentEmail = ({ riderName, orderNumber, customerName, address, phone }) => {
+const renderRiderDeliveryAssignmentEmail = ({ riderName, orderNumber, customerName, address, phone, pickupLocation, pickupAddress }) => {
   const riderHubUrl = normalizePublicRoute('/rider');
   const sections = createSections([
     { label: 'Order', value: orderNumber || 'Pending' },
+    { label: 'Pickup Hub', value: pickupLocation || PUBLIC_FULFILLMENT_HUB.name },
+    { label: 'Pickup Address', value: pickupAddress || 'Kigali-Nyarugenge Road KN 84 St' },
     { label: 'Customer', value: customerName || 'Buyer' },
-    { label: 'Address', value: address || 'To be confirmed' },
+    { label: 'Drop-off Address', value: address || 'To be confirmed' },
     { label: 'Phone', value: phone || 'Not provided' },
     { label: 'Rider Hub', value: riderHubUrl }
   ]);
@@ -202,8 +204,10 @@ const renderRiderDeliveryAssignmentEmail = ({ riderName, orderNumber, customerNa
     bodyLines: [
       `Hello ${riderName || 'Rider'},`,
       `You have been assigned delivery ${orderNumber || ''}.`,
+      `Pickup hub: ${pickupLocation || PUBLIC_FULFILLMENT_HUB.name}`,
+      `Pickup address: ${pickupAddress || 'Kigali-Nyarugenge Road KN 84 St'}`,
       `Customer: ${customerName || 'Buyer'}`,
-      `Address: ${address || 'To be confirmed'}`,
+      `Drop-off address: ${address || 'To be confirmed'}`,
       `Phone: ${phone || 'Not provided'}`,
       `Rider Hub: ${riderHubUrl}`
     ]

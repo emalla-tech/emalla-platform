@@ -784,11 +784,25 @@ const canViewDeliveryConfirmationCode = (order = {}, user = null, options = {}) 
 
 const presentOrderForUser = (order = {}, user = null, options = {}) => {
   const presented = withRiderPayout(order);
+  const hideMerchantIdentity =
+    options.guestMatches ||
+    ['CUSTOMER', 'DELIVERY'].includes(String(user?.role || '').toUpperCase());
+  const privacySafeOrder = hideMerchantIdentity
+    ? {
+        ...presented,
+        merchantId: undefined,
+        merchantName: PUBLIC_FULFILLMENT_HUB.name,
+        pickupLocation: PUBLIC_FULFILLMENT_HUB.name,
+        pickupAddress: 'Kigali-Nyarugenge Road KN 84 St',
+        pickupZone: PUBLIC_FULFILLMENT_HUB.zone
+      }
+    : presented;
+
   if (canViewDeliveryConfirmationCode(order, user, options)) {
-    return presented;
+    return privacySafeOrder;
   }
 
-  const { deliveryConfirmationCode, ...safeOrder } = presented;
+  const { deliveryConfirmationCode, ...safeOrder } = privacySafeOrder;
   return {
     ...safeOrder,
     deliveryConfirmationRequired: Boolean(order.deliveryConfirmationCode),
@@ -6554,7 +6568,7 @@ const server = http.createServer(async (req, res) => {
           userId: 'broadcast_DELIVERY',
           role: 'DELIVERY',
           title: 'New Pickup Job Available',
-          message: `${current.orderNumber} is ready for pickup from ${current.merchantName}.`,
+          message: `${current.orderNumber} is ready for pickup from ${PUBLIC_FULFILLMENT_HUB.name}.`,
           type: 'success',
           metadata: { orderId: current.id }
         });
@@ -6859,6 +6873,8 @@ const server = http.createServer(async (req, res) => {
         ...buildPlatformEmail('rider_delivery_assignment', {
           riderName: assignedOrder.riderName || riderRecipient?.name,
           orderNumber: assignedOrder.orderNumber,
+          pickupLocation: PUBLIC_FULFILLMENT_HUB.name,
+          pickupAddress: 'Kigali-Nyarugenge Road KN 84 St',
           customerName: assignedOrder.customerName,
           address: assignedOrder.address,
           phone: assignedOrder.phone

@@ -15,6 +15,7 @@ import { RiderService } from '../../services/riderService';
 import { authService } from '../../services/authService';
 import { useAuth } from '../../auth/AuthContext';
 import { Order, OrderStatus, Rider } from '../../types';
+import { DEFAULT_FULFILLMENT_HUB } from '../../lib/fulfillmentHub';
 
 const ACTIVE_DELIVERY_STATUSES = new Set<OrderStatus>([
   OrderStatus.ASSIGNED,
@@ -186,6 +187,9 @@ const RiderDashboard: React.FC = () => {
     }
   };
 
+  const getPickupAddress = (order?: Order | null) => order?.pickupAddress || DEFAULT_FULFILLMENT_HUB.internalAddress;
+  const getPickupName = (order?: Order | null) => order?.pickupLocation || DEFAULT_FULFILLMENT_HUB.name;
+
   if (loading) {
     return (
       <div className="min-h-[40vh] flex items-center justify-center">
@@ -255,7 +259,7 @@ const RiderDashboard: React.FC = () => {
                   <div>
                     <h4 className="font-bold text-gray-900">{activeTask.orderNumber}</h4>
                     <p className="text-[10px] text-gray-400 font-bold uppercase">
-                      Pickup from: {activeTask.merchantName}
+                      Pickup from: {getPickupName(activeTask)}
                     </p>
                   </div>
                 </div>
@@ -270,7 +274,7 @@ const RiderDashboard: React.FC = () => {
               <div className="space-y-4 mb-6">
                 <div className="flex items-start space-x-3">
                   <div className="mt-1 w-2 h-2 rounded-full bg-orange-500"></div>
-                  <p className="text-xs font-medium text-gray-600">{activeTask.merchantName} dispatch point</p>
+                  <p className="text-xs font-medium text-gray-600">{getPickupAddress(activeTask)}</p>
                 </div>
                 <div className="flex items-start space-x-3">
                   <div className="mt-1 w-2 h-2 rounded-full bg-emerald-500"></div>

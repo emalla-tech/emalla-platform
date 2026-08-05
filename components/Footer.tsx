@@ -3,6 +3,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Facebook, Twitter, Instagram, Linkedin, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
+import BrandLogo from './BrandLogo';
 
 const Footer: React.FC = () => {
   const location = useLocation();
@@ -35,9 +36,8 @@ const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
           {/* Brand Info */}
           <div className="col-span-1">
-            <Link to="/" className="flex items-center space-x-2 mb-8 group">
-              <div className="w-8 h-8 bg-orange-500 rounded-lg group-hover:rotate-12 transition-transform shadow-lg shadow-orange-500/20"></div>
-              <span className="text-2xl font-black text-white">E-Malla <span className="font-light opacity-70">Rwanda</span></span>
+            <Link to="/" className="mb-8 inline-flex group">
+              <BrandLogo inverse revealCountry showTagline />
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed mb-8 max-w-xs">
               {t.footer.tagline}

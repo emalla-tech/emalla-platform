@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CATEGORIES } from '../constants';
 import { ShoppingBag, ArrowRight, ShieldCheck, Truck, Zap, Store, Check, Star, MessageSquare } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
 import { getProductPrimaryImage, handleProductImageError } from '../lib/productImages';
 import { useLanguage } from '../i18n/LanguageContext';
+import { Product } from '../types';
 
 interface HomeProps {
   onAddToCart: (item: { productId: string; quantity: number }) => void;
@@ -28,12 +29,46 @@ const TRUSTED_BRANDS = [
   { name: 'Lightwave', logo: '/brands/lightwave.svg', wordmark: true },
 ];
 
+const getProductTimestamp = (product: Product) => {
+  const datedProduct = product as Product & { createdAt?: string; updatedAt?: string };
+  const value = datedProduct.updatedAt || datedProduct.createdAt || '';
+  const timestamp = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
 const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
   const navigate = useNavigate();
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
   const products = useProducts();
   const { t } = useLanguage();
-  const featuredProducts = [...products].sort((left, right) => Number(Boolean(right.featured)) - Number(Boolean(left.featured))).slice(0, 8);
+  const featuredProducts = useMemo(
+    () => [...products].sort((left, right) => Number(Boolean(right.featured)) - Number(Boolean(left.featured))).slice(0, 8),
+    [products]
+  );
+  const newArrivalProducts = useMemo(
+    () => [...products].sort((left, right) => getProductTimestamp(right) - getProductTimestamp(left)).slice(0, 4),
+    [products]
+  );
+  const todaysPicks = useMemo(
+    () =>
+      [...products]
+        .filter((product) => product.stock > 0 || product.pricingType === 'quote')
+        .sort((left, right) => {
+          const leftScore = Number(Boolean(left.featured)) * 4 + Number(left.rating || 0) + Math.min(Number(left.stock || 0), 10) / 10;
+          const rightScore = Number(Boolean(right.featured)) * 4 + Number(right.rating || 0) + Math.min(Number(right.stock || 0), 10) / 10;
+          return rightScore - leftScore;
+        })
+        .slice(0, 4),
+    [products]
+  );
+  const popularInKigali = useMemo(
+    () =>
+      [...products]
+        .filter((product) => product.stock > 0 && product.fulfillmentType !== 'imported_on_demand')
+        .sort((left, right) => Number(right.rating || 0) - Number(left.rating || 0))
+        .slice(0, 4),
+    [products]
+  );
 
   const handleAddToCart = (e: React.MouseEvent, productId: string, stock: number) => {
     e.stopPropagation();
@@ -46,6 +81,106 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
       return next;
     }), 2000);
   };
+
+  const renderProductCard = (product: Product, badge: string, eyebrow = t.home.featured) => (
+    <div
+      key={product.id}
+      onClick={() => navigate(`/product/${product.id}`)}
+      className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all group border border-gray-100 cursor-pointer flex flex-col"
+    >
+      <div className="h-64 relative overflow-hidden bg-gray-50">
+        <img
+          src={getProductPrimaryImage(product)}
+          alt={product.name}
+          onError={(event) => handleProductImageError(event, product.category)}
+          loading="lazy"
+          decoding="async"
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+        />
+        <div className="absolute top-4 right-4 bg-orange-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-lg">
+          {badge}
+        </div>
+      </div>
+      <div className="p-6 flex-grow flex flex-col">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-gray-400 text-[10px] font-black uppercase tracking-[2px]">{eyebrow}</p>
+          <div className="flex items-center text-yellow-400">
+             <Star size={10} fill="currentColor" />
+             <span className="text-[10px] font-black text-gray-900 ml-1">{product.rating}</span>
+          </div>
+        </div>
+        <h3 className="font-bold text-gray-900 mb-6 truncate text-lg">{product.name}</h3>
+        <div className="mt-auto space-y-4">
+          <div className="flex justify-between items-center">
+            <span className="text-orange-600 font-black text-xl">
+              {product.pricingType === 'quote' ? 'Price on Request' : `RWF ${product.price.toLocaleString()}`}
+            </span>
+          </div>
+          <button
+            onClick={(e) => {
+              if (product.pricingType === 'quote') {
+                e.stopPropagation();
+                navigate(`/product/${product.id}`);
+                return;
+              }
+              handleAddToCart(e, product.id, product.stock);
+            }}
+            disabled={product.pricingType !== 'quote' && product.stock <= 0}
+            className={`w-full py-3 rounded-xl text-xs font-black transition-all flex items-center justify-center shadow-lg active:scale-[0.98] ${
+              product.pricingType !== 'quote' && product.stock <= 0
+              ? 'cursor-not-allowed bg-gray-200 text-gray-500 shadow-none'
+              : addedItems.has(product.id)
+              ? 'bg-emerald-500 text-white shadow-emerald-200'
+              : 'bg-black text-white hover:bg-orange-600 shadow-black/10'
+            }`}
+          >
+            {product.pricingType === 'quote' ? (
+              <><MessageSquare size={14} className="mr-2" /> Request a Quote</>
+            ) : product.stock <= 0 ? (
+              <>Out of Stock</>
+            ) : addedItems.has(product.id) ? (
+              <><Check size={14} className="mr-2" /> {t.home.added}</>
+            ) : (
+              <><ShoppingBag size={14} className="mr-2" /> {t.home.addToCart}</>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const marketplaceShelves = [
+    {
+      eyebrow: 'Just landed',
+      title: 'New Arrivals',
+      subtitle: 'Freshly approved products added to the E-Malla marketplace.',
+      cta: 'View new arrivals',
+      href: '/shop?sort=newest',
+      badge: t.home.newArrival,
+      cardEyebrow: 'New Arrival',
+      products: newArrivalProducts
+    },
+    {
+      eyebrow: 'Curated today',
+      title: "Today's Picks",
+      subtitle: 'A rotating selection of useful products worth checking today.',
+      cta: "Explore today's picks",
+      href: '/shop?search=today',
+      badge: 'Today',
+      cardEyebrow: "Today's Pick",
+      products: todaysPicks
+    },
+    {
+      eyebrow: 'E-Malla Hub Kigali',
+      title: 'Popular in Kigali',
+      subtitle: 'Ready-stock items that fit fast local fulfillment through our Kigali hub.',
+      cta: 'Shop Kigali-ready items',
+      href: '/shop?search=Kigali',
+      badge: 'Kigali',
+      cardEyebrow: 'Hub Ready',
+      products: popularInKigali
+    }
+  ];
 
   return (
     <div className="overflow-hidden">
@@ -188,73 +323,39 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
             <p className="text-gray-500">{t.home.featuredSubtitle}</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {featuredProducts.map((product) => (
-              <div 
-                key={product.id} 
-                onClick={() => navigate(`/product/${product.id}`)}
-                className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all group border border-gray-100 cursor-pointer flex flex-col"
-              >
-                <div className="h-64 relative overflow-hidden bg-gray-50">
-                  <img 
-                    src={getProductPrimaryImage(product)} 
-                    alt={product.name} 
-                    onError={(event) => handleProductImageError(event, product.category)}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  <div className="absolute top-4 right-4 bg-orange-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-lg">
-                    {product.featured ? t.home.featured : t.home.newArrival}
+            {featuredProducts.map((product) => renderProductCard(product, product.featured ? t.home.featured : t.home.newArrival))}
+          </div>
+        </div>
+      </section>
+
+      {/* Marketplace Shelves */}
+      <section className="bg-white py-20">
+        <div className="mx-auto max-w-7xl space-y-16 px-4">
+          {marketplaceShelves.map((shelf, index) => (
+            shelf.products.length > 0 ? (
+              <div key={shelf.title} className={`rounded-[40px] border border-gray-100 p-6 md:p-10 ${index === 1 ? 'bg-gray-950 text-white shadow-2xl shadow-gray-200' : 'bg-gray-50'}`}>
+                <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <p className={`mb-2 text-[10px] font-black uppercase tracking-[0.28em] ${index === 1 ? 'text-orange-300' : 'text-orange-500'}`}>{shelf.eyebrow}</p>
+                    <h2 className={`text-3xl font-black md:text-4xl ${index === 1 ? 'text-white' : 'text-gray-900'}`}>{shelf.title}</h2>
+                    <p className={`mt-3 max-w-xl text-sm font-medium leading-6 ${index === 1 ? 'text-gray-300' : 'text-gray-500'}`}>{shelf.subtitle}</p>
                   </div>
+                  <Link
+                    to={shelf.href}
+                    className={`inline-flex items-center rounded-2xl px-5 py-3 text-xs font-black uppercase tracking-widest transition-all active:scale-95 ${
+                      index === 1 ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-black text-white hover:bg-orange-500'
+                    }`}
+                  >
+                    {shelf.cta}
+                    <ArrowRight size={16} className="ml-2" />
+                  </Link>
                 </div>
-                <div className="p-6 flex-grow flex flex-col">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-gray-400 text-[10px] font-black uppercase tracking-[2px]">{t.home.featured}</p>
-                    <div className="flex items-center text-yellow-400">
-                       <Star size={10} fill="currentColor" />
-                       <span className="text-[10px] font-black text-gray-900 ml-1">{product.rating}</span>
-                    </div>
-                  </div>
-                  <h3 className="font-bold text-gray-900 mb-6 truncate text-lg">{product.name}</h3>
-                  <div className="mt-auto space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-orange-600 font-black text-xl">
-                        {product.pricingType === 'quote' ? 'Price on Request' : `RWF ${product.price.toLocaleString()}`}
-                      </span>
-                    </div>
-                    <button 
-                      onClick={(e) => {
-                        if (product.pricingType === 'quote') {
-                          e.stopPropagation();
-                          navigate(`/product/${product.id}`);
-                          return;
-                        }
-                        handleAddToCart(e, product.id, product.stock);
-                      }}
-                      disabled={product.pricingType !== 'quote' && product.stock <= 0}
-                      className={`w-full py-3 rounded-xl text-xs font-black transition-all flex items-center justify-center shadow-lg active:scale-[0.98] ${
-                        product.pricingType !== 'quote' && product.stock <= 0
-                        ? 'cursor-not-allowed bg-gray-200 text-gray-500 shadow-none'
-                        : addedItems.has(product.id)
-                        ? 'bg-emerald-500 text-white shadow-emerald-200' 
-                        : 'bg-black text-white hover:bg-orange-600 shadow-black/10'
-                      }`}
-                    >
-                      {product.pricingType === 'quote' ? (
-                        <><MessageSquare size={14} className="mr-2" /> Request a Quote</>
-                      ) : product.stock <= 0 ? (
-                        <>Out of Stock</>
-                      ) : addedItems.has(product.id) ? (
-                        <><Check size={14} className="mr-2" /> {t.home.added}</>
-                      ) : (
-                        <><ShoppingBag size={14} className="mr-2" /> {t.home.addToCart}</>
-                      )}
-                    </button>
-                  </div>
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                  {shelf.products.map((product) => renderProductCard(product, shelf.badge, shelf.cardEyebrow))}
                 </div>
               </div>
-            ))}
-          </div>
+            ) : null
+          ))}
         </div>
       </section>
 

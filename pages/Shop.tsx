@@ -8,6 +8,7 @@ import { useAuth } from '../auth/AuthContext';
 import { CustomerService } from '../services/customerService';
 import { getProductPrimaryImage, handleProductImageError } from '../lib/productImages';
 import { useLanguage } from '../i18n/LanguageContext';
+import { Product } from '../types';
 
 interface ShopProps {
   onAddToCart?: (item: { productId: string; quantity: number }) => void;
@@ -21,6 +22,68 @@ interface Particle {
 
 const RECENT_SEARCHES_KEY = 'emalla_recent_searches';
 
+const TRUSTED_BRANDS = [
+  'HP',
+  'Dell',
+  'Lenovo',
+  'Apple',
+  'Epson',
+  'Samsung',
+  'Cisco',
+  'TP-Link',
+  'Canon',
+  'Hikvision',
+  'D-Link',
+  'OfficePoint',
+  'Brother',
+  'Lightwave'
+];
+
+const PRICE_RANGES = [
+  { id: 'under-50000', label: 'Under RWF 50k', min: 0, max: 50000 },
+  { id: '50000-150000', label: 'RWF 50k - 150k', min: 50000, max: 150000 },
+  { id: '150000-500000', label: 'RWF 150k - 500k', min: 150000, max: 500000 },
+  { id: 'above-500000', label: 'Above RWF 500k', min: 500000, max: Infinity }
+];
+
+const AVAILABILITY_FILTERS = [
+  { id: 'in-stock', label: 'In Stock' },
+  { id: 'quote', label: 'Price on Request' },
+  { id: 'hub-ready', label: 'Hub Ready' },
+  { id: 'on-demand', label: 'Imported / Preorder' }
+];
+
+const normalizeFilterValue = (value: string) => value.trim().toLowerCase();
+
+const getProductSearchBlob = (product: Product) => [
+  product.name,
+  product.description,
+  product.specifications,
+  product.merchantName,
+  ...(product.tags || [])
+].filter(Boolean).join(' ').toLowerCase();
+
+const productMatchesBrand = (product: Product, brand: string) => {
+  const normalizedBrand = normalizeFilterValue(brand);
+  if (!normalizedBrand) return true;
+  return getProductSearchBlob(product).includes(normalizedBrand);
+};
+
+const productMatchesPriceRange = (product: Product, rangeId: string) => {
+  const selectedPriceRange = PRICE_RANGES.find((range) => range.id === rangeId);
+  if (!selectedPriceRange) return true;
+  return product.pricingType !== 'quote' && product.price >= selectedPriceRange.min && product.price <= selectedPriceRange.max;
+};
+
+const productMatchesAvailability = (product: Product, availabilityId: string) => {
+  if (availabilityId === 'all') return true;
+  if (availabilityId === 'in-stock') return product.stock > 0;
+  if (availabilityId === 'quote') return product.pricingType === 'quote';
+  if (availabilityId === 'hub-ready') return product.stock > 0 && product.fulfillmentType !== 'imported_on_demand';
+  if (availabilityId === 'on-demand') return ['imported_on_demand', 'preorder'].includes(String(product.fulfillmentType));
+  return true;
+};
+
 const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -30,6 +93,11 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
   const [searchParams, setSearchParamsSetter] = useSearchParams();
   const currentCategory = searchParams.get('category') || 'all';
   const urlSearch = searchParams.get('search') || '';
+  const currentBrand = searchParams.get('brand') || 'all';
+  const currentPriceRange = searchParams.get('price') || 'all';
+  const currentAvailability = searchParams.get('availability') || 'all';
+  const currentSize = searchParams.get('size') || 'all';
+  const currentColor = searchParams.get('color') || 'all';
   
   const [searchTerm, setSearchTerm] = useState(urlSearch);
   const deferredSearchTerm = useDeferredValue(searchTerm);
@@ -79,13 +147,88 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
       const searchableText = [
         product.name,
         product.description,
+        product.specifications,
+        product.merchantName,
         CATEGORIES.find((category) => category.id === product.category)?.name,
         ...(product.tags || [])
       ].join(' ').toLowerCase();
       const matchesSearch = searchableText.includes(deferredSearchTerm.toLowerCase());
-      return matchesCategory && matchesSearch;
+
+      const matchesBrand = currentBrand === 'all' || productMatchesBrand(product, currentBrand);
+      const matchesPrice = productMatchesPriceRange(product, currentPriceRange);
+      const matchesAvailability = productMatchesAvailability(product, currentAvailability);
+      const matchesSize = currentSize === 'all' || (product.variants?.sizes || []).some((size) => normalizeFilterValue(size) === normalizeFilterValue(currentSize));
+      const matchesColor = currentColor === 'all' || (product.variants?.colors || []).some((color) => normalizeFilterValue(color.name) === normalizeFilterValue(currentColor));
+
+      return matchesCategory && matchesSearch && matchesBrand && matchesPrice && matchesAvailability && matchesSize && matchesColor;
     });
-  }, [currentCategory, products, deferredSearchTerm]);
+  }, [currentAvailability, currentBrand, currentCategory, currentColor, currentPriceRange, currentSize, products, deferredSearchTerm]);
+
+  const availableBrands = useMemo(() => {
+    return TRUSTED_BRANDS.filter((brand) => products.some((product) => productMatchesBrand(product, brand)));
+  }, [products]);
+
+  const availableSizes = useMemo(() => {
+    return Array.from(new Set(products.flatMap((product) => product.variants?.sizes || []))).sort();
+  }, [products]);
+
+  const availableColors = useMemo(() => {
+    return Array.from(new Set(products.flatMap((product) => (product.variants?.colors || []).map((color) => color.name)))).sort();
+  }, [products]);
+
+  const activeFilterCount = [
+    currentCategory !== 'all',
+    Boolean(urlSearch),
+    currentBrand !== 'all',
+    currentPriceRange !== 'all',
+    currentAvailability !== 'all',
+    currentSize !== 'all',
+    currentColor !== 'all'
+  ].filter(Boolean).length;
+
+  const selectedCategoryLabel = currentCategory === 'all'
+    ? ''
+    : CATEGORIES.find((category) => category.id === currentCategory)?.name || currentCategory;
+  const selectedPriceLabel = PRICE_RANGES.find((range) => range.id === currentPriceRange)?.label || '';
+  const selectedAvailabilityLabel = AVAILABILITY_FILTERS.find((filter) => filter.id === currentAvailability)?.label || '';
+
+  const categoryFilterOptions = useMemo(() => [
+    { id: 'all', label: t.shop.allProducts, count: products.length, icon: null },
+    ...CATEGORIES.map((category) => ({
+      id: category.id,
+      label: category.name,
+      count: products.filter((product) => product.category === category.id).length,
+      icon: category.icon
+    }))
+  ], [products, t.shop.allProducts]);
+
+  const brandFilterOptions = useMemo(() => availableBrands.map((brand) => ({
+    id: brand,
+    label: brand,
+    count: products.filter((product) => productMatchesBrand(product, brand)).length
+  })), [availableBrands, products]);
+
+  const priceFilterOptions = useMemo(() => PRICE_RANGES.map((range) => ({
+    ...range,
+    count: products.filter((product) => productMatchesPriceRange(product, range.id)).length
+  })), [products]);
+
+  const availabilityFilterOptions = useMemo(() => AVAILABILITY_FILTERS.map((filter) => ({
+    ...filter,
+    count: products.filter((product) => productMatchesAvailability(product, filter.id)).length
+  })), [products]);
+
+  const sizeFilterOptions = useMemo(() => availableSizes.map((size) => ({
+    id: size,
+    label: size,
+    count: products.filter((product) => (product.variants?.sizes || []).some((productSize) => normalizeFilterValue(productSize) === normalizeFilterValue(size))).length
+  })), [availableSizes, products]);
+
+  const colorFilterOptions = useMemo(() => availableColors.map((color) => ({
+    id: color,
+    label: color,
+    count: products.filter((product) => (product.variants?.colors || []).some((productColor) => normalizeFilterValue(productColor.name) === normalizeFilterValue(color))).length
+  })), [availableColors, products]);
 
   const searchSuggestions = useMemo(() => {
     if (!deferredSearchTerm.trim()) return [];
@@ -136,6 +279,21 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
     setSearchParamsSetter(newParams);
   };
 
+  const handleFilterClick = (key: 'brand' | 'price' | 'availability' | 'size' | 'color', value: string) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (value === 'all') {
+      newParams.delete(key);
+    } else {
+      newParams.set(key, value);
+    }
+    setSearchParamsSetter(newParams);
+  };
+
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setSearchParamsSetter(new URLSearchParams());
+  };
+
   const clearRecentSearches = (e: React.MouseEvent) => {
     e.stopPropagation();
     setRecentSearches([]);
@@ -176,6 +334,52 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
       return next;
     });
   };
+
+  const renderFilterOption = (
+    option: { id: string; label: string; count: number; icon?: React.ReactNode },
+    active: boolean,
+    onClick: () => void,
+    mode: 'radio' | 'checkbox' = 'radio'
+  ) => (
+    <button
+      type="button"
+      key={option.id}
+      onClick={onClick}
+      disabled={option.count === 0 && !active}
+      className={`group flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-2.5 text-left transition-all ${
+        active
+          ? 'bg-orange-50 text-orange-700 ring-1 ring-orange-100'
+          : option.count === 0
+          ? 'cursor-not-allowed text-gray-300'
+          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-950'
+      }`}
+    >
+      <span className="flex min-w-0 items-center gap-3">
+        <span
+          className={`flex h-4 w-4 shrink-0 items-center justify-center border transition-colors ${
+            mode === 'checkbox' ? 'rounded-[5px]' : 'rounded-full'
+          } ${active ? 'border-orange-500 bg-orange-500 text-white' : 'border-gray-300 bg-white group-hover:border-orange-300'}`}
+        >
+          {active && (mode === 'checkbox' ? <Check size={11} strokeWidth={4} /> : <span className="h-1.5 w-1.5 rounded-full bg-white" />)}
+        </span>
+        {option.icon && <span className="scale-75 opacity-70">{option.icon}</span>}
+        <span className="truncate text-sm font-semibold">{option.label}</span>
+      </span>
+      <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${active ? 'bg-white text-orange-600' : 'bg-gray-100 text-gray-400'}`}>
+        {option.count}
+      </span>
+    </button>
+  );
+
+  const renderFilterSection = (title: string, children: React.ReactNode, subtitle?: string) => (
+    <section className="border-t border-gray-100 pt-5 first:border-t-0 first:pt-0">
+      <div className="mb-3">
+        <h4 className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-900">{title}</h4>
+        {subtitle && <p className="mt-1 text-xs font-medium leading-5 text-gray-400">{subtitle}</p>}
+      </div>
+      {children}
+    </section>
+  );
 
   return (
     <div className="bg-gray-50 min-h-screen pb-28 md:pb-20">
@@ -339,31 +543,140 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
         <div className="flex flex-col lg:flex-row gap-10">
           {/* Sidebar */}
           <aside className="lg:w-64 flex-shrink-0">
-            <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 sticky top-44">
-              <div className="flex items-center space-x-2 mb-6">
-                <Filter size={18} className="text-orange-500" />
-                <h3 className="font-black text-gray-900 text-sm uppercase tracking-wider">{t.shop.categories}</h3>
-              </div>
-              <div className="space-y-2">
-                <button 
-                  onClick={() => handleCategoryClick('all')}
-                  className={`w-full text-left px-4 py-3 rounded-2xl text-sm font-bold transition-all ${currentCategory === 'all' ? 'bg-orange-500 text-white shadow-xl shadow-orange-200' : 'text-gray-600 hover:bg-orange-50 hover:text-orange-500'}`}
-                >
-                  {t.shop.allProducts}
-                </button>
-                {CATEGORIES.map(cat => (
-                  <button 
-                    key={cat.id}
-                    onClick={() => handleCategoryClick(cat.id)}
-                    className={`w-full text-left px-4 py-3 rounded-2xl text-sm font-bold transition-all flex items-center justify-between ${currentCategory === cat.id ? 'bg-orange-500 text-white shadow-xl shadow-orange-200' : 'text-gray-600 hover:bg-orange-50 hover:text-orange-500'}`}
+            <div className="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm lg:sticky lg:top-44">
+              <div className="border-b border-gray-100 bg-gray-950 px-5 py-5 text-white">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-300">Refine Results</p>
+                    <h3 className="mt-1 text-xl font-black tracking-tight">Shop smarter</h3>
+                    <p className="mt-1 text-xs font-semibold text-white/55">{filteredProducts.length} matching products</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/10 p-3">
+                    <Filter size={18} />
+                  </div>
+                </div>
+                {activeFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-gray-950 transition-all hover:bg-orange-100"
                   >
-                    <span className="flex items-center">
-                      <span className="mr-3 scale-75 opacity-70">{cat.icon}</span>
-                      {cat.name}
-                    </span>
-                    {currentCategory !== cat.id && <ChevronRight size={14} className="opacity-30" />}
+                    Clear all filters
                   </button>
-                ))}
+                )}
+              </div>
+
+              <div className="max-h-none space-y-6 p-5 lg:max-h-[calc(100vh-14rem)] lg:overflow-y-auto">
+                {renderFilterSection(
+                  t.shop.categories,
+                  <div className="space-y-1.5">
+                    {categoryFilterOptions.map((option) =>
+                      renderFilterOption(
+                        option,
+                        currentCategory === option.id,
+                        () => handleCategoryClick(option.id)
+                      )
+                    )}
+                  </div>,
+                  'Browse by department'
+                )}
+
+                {brandFilterOptions.length > 0 && renderFilterSection(
+                  'Brand',
+                  <div className="space-y-1.5">
+                    {renderFilterOption(
+                      { id: 'all', label: 'All brands', count: products.length },
+                      currentBrand === 'all',
+                      () => handleFilterClick('brand', 'all')
+                    )}
+                    {brandFilterOptions.map((option) =>
+                      renderFilterOption(
+                        option,
+                        currentBrand === option.id,
+                        () => handleFilterClick('brand', option.id),
+                        'checkbox'
+                      )
+                    )}
+                  </div>,
+                  'Trusted names and product makers'
+                )}
+
+                {renderFilterSection(
+                  'Price',
+                  <div className="space-y-1.5">
+                    {renderFilterOption(
+                      { id: 'all', label: 'Any price', count: products.length },
+                      currentPriceRange === 'all',
+                      () => handleFilterClick('price', 'all')
+                    )}
+                    {priceFilterOptions.map((option) =>
+                      renderFilterOption(
+                        option,
+                        currentPriceRange === option.id,
+                        () => handleFilterClick('price', option.id)
+                      )
+                    )}
+                  </div>,
+                  'Filter fixed-price products'
+                )}
+
+                {renderFilterSection(
+                  'Availability',
+                  <div className="space-y-1.5">
+                    {renderFilterOption(
+                      { id: 'all', label: 'All availability', count: products.length },
+                      currentAvailability === 'all',
+                      () => handleFilterClick('availability', 'all')
+                    )}
+                    {availabilityFilterOptions.map((option) =>
+                      renderFilterOption(
+                        option,
+                        currentAvailability === option.id,
+                        () => handleFilterClick('availability', option.id),
+                        'checkbox'
+                      )
+                    )}
+                  </div>,
+                  'Stock, quotes, and fulfillment'
+                )}
+
+                {sizeFilterOptions.length > 0 && renderFilterSection(
+                  'Size',
+                  <div className="space-y-1.5">
+                    {renderFilterOption(
+                      { id: 'all', label: 'All sizes', count: products.length },
+                      currentSize === 'all',
+                      () => handleFilterClick('size', 'all')
+                    )}
+                    {sizeFilterOptions.map((option) =>
+                      renderFilterOption(
+                        option,
+                        currentSize === option.id,
+                        () => handleFilterClick('size', option.id),
+                        'checkbox'
+                      )
+                    )}
+                  </div>
+                )}
+
+                {colorFilterOptions.length > 0 && renderFilterSection(
+                  'Color',
+                  <div className="space-y-1.5">
+                    {renderFilterOption(
+                      { id: 'all', label: 'All colors', count: products.length },
+                      currentColor === 'all',
+                      () => handleFilterClick('color', 'all')
+                    )}
+                    {colorFilterOptions.map((option) =>
+                      renderFilterOption(
+                        option,
+                        currentColor === option.id,
+                        () => handleFilterClick('color', option.id),
+                        'checkbox'
+                      )
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </aside>
@@ -382,6 +695,40 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                         <X size={10} />
                       </button>
                     </span>
+                  </div>
+                )}
+                {activeFilterCount > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedCategoryLabel && (
+                      <button onClick={() => handleCategoryClick('all')} className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-gray-600 shadow-sm ring-1 ring-gray-100 transition-colors hover:text-orange-600">
+                        Category: {selectedCategoryLabel} <X size={10} className="ml-1 inline" />
+                      </button>
+                    )}
+                    {currentBrand !== 'all' && (
+                      <button onClick={() => handleFilterClick('brand', 'all')} className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-gray-600 shadow-sm ring-1 ring-gray-100 transition-colors hover:text-orange-600">
+                        Brand: {currentBrand} <X size={10} className="ml-1 inline" />
+                      </button>
+                    )}
+                    {selectedPriceLabel && (
+                      <button onClick={() => handleFilterClick('price', 'all')} className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-gray-600 shadow-sm ring-1 ring-gray-100 transition-colors hover:text-orange-600">
+                        Price: {selectedPriceLabel} <X size={10} className="ml-1 inline" />
+                      </button>
+                    )}
+                    {selectedAvailabilityLabel && (
+                      <button onClick={() => handleFilterClick('availability', 'all')} className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-gray-600 shadow-sm ring-1 ring-gray-100 transition-colors hover:text-orange-600">
+                        {selectedAvailabilityLabel} <X size={10} className="ml-1 inline" />
+                      </button>
+                    )}
+                    {currentSize !== 'all' && (
+                      <button onClick={() => handleFilterClick('size', 'all')} className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-gray-600 shadow-sm ring-1 ring-gray-100 transition-colors hover:text-orange-600">
+                        Size: {currentSize} <X size={10} className="ml-1 inline" />
+                      </button>
+                    )}
+                    {currentColor !== 'all' && (
+                      <button onClick={() => handleFilterClick('color', 'all')} className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-gray-600 shadow-sm ring-1 ring-gray-100 transition-colors hover:text-orange-600">
+                        Color: {currentColor} <X size={10} className="ml-1 inline" />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -485,7 +832,7 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                 </div>
                 <h2 className="text-3xl font-black text-gray-900 mb-3">No matches found</h2>
                 <p className="text-gray-500 max-w-sm mx-auto font-medium">Try different keywords or check our popular categories to find what you're looking for.</p>
-                <button onClick={() => { handleSearchSubmit(''); handleCategoryClick('all'); }} className="mt-10 bg-black text-white px-10 py-4 rounded-2xl font-black shadow-xl hover:bg-orange-600 transition-all">Clear All Filters</button>
+                <button onClick={clearAllFilters} className="mt-10 bg-black text-white px-10 py-4 rounded-2xl font-black shadow-xl hover:bg-orange-600 transition-all">Clear All Filters</button>
               </div>
             )}
           </div>

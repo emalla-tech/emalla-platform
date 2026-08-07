@@ -1469,7 +1469,27 @@ const getCategoryFallbackImage = (categoryId) => {
     '4': '/catalog/groceries.svg',
     '5': '/catalog/beauty.svg',
     '6': '/catalog/books.svg',
-    '7': '/catalog/books.svg'
+    '7': '/catalog/books.svg',
+    '8': '/catalog/electronics.svg',
+    '9': '/catalog/electronics.svg',
+    '10': '/catalog/home.svg',
+    '11': '/catalog/fashion.svg',
+    '12': '/catalog/beauty.svg',
+    '13': '/catalog/fashion.svg',
+    '14': '/catalog/fashion.svg',
+    '15': '/catalog/electronics.svg',
+    '16': '/catalog/home.svg',
+    '17': '/catalog/home.svg',
+    '18': '/catalog/groceries.svg',
+    '19': '/catalog/electronics.svg',
+    '20': '/catalog/electronics.svg',
+    '21': '/catalog/electronics.svg',
+    '22': '/catalog/groceries.svg',
+    '23': '/catalog/home.svg',
+    '24': '/catalog/electronics.svg',
+    '25': '/catalog/fashion.svg',
+    '26': '/catalog/books.svg',
+    '27': '/catalog/home.svg'
   };
   return map[String(categoryId || '1')] || map['1'];
 };
@@ -1799,13 +1819,33 @@ const buildAffiliatePartnerDashboard = (db, affiliate) => {
 };
 
 const CATEGORY_LABELS = {
-  '1': 'Electronics',
-  '2': 'Fashion',
+  '1': 'Electronics & Gadgets',
+  '2': 'Fashion & Clothing',
   '3': 'Home & Living',
-  '4': 'Groceries',
-  '5': 'Beauty',
-  '6': 'Books',
-  '7': 'Stationery & Office Supplies'
+  '4': 'Groceries & Household Essentials',
+  '5': 'Beauty & Personal Care',
+  '6': 'Books & Learning Materials',
+  '7': 'Stationery & Office Supplies',
+  '8': 'Computers & Accessories',
+  '9': 'Phones & Tablets',
+  '10': 'Home Appliances',
+  '11': 'Shoes & Bags',
+  '12': 'Health & Wellness',
+  '13': 'Baby & Kids',
+  '14': 'Sports & Fitness',
+  '15': 'Automotive & Motorcycle',
+  '16': 'Tools & Hardware',
+  '17': 'Construction & Building Materials',
+  '18': 'Food & Beverages',
+  '19': 'Security & CCTV',
+  '20': 'Networking & Internet Equipment',
+  '21': 'Gaming & Entertainment',
+  '22': 'Agriculture & Farming',
+  '23': 'Industrial & Business Supplies',
+  '24': 'Services',
+  '25': 'Deals & Promotions',
+  '26': 'Printers & Office Machines',
+  '27': 'Furniture'
 };
 
 const FINANCE_REPORT_METRICS = {

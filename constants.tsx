@@ -14,13 +14,32 @@ import {
   Settings,
   Heart,
   ShoppingCart,
+  Baby,
+  BadgePercent,
+  BriefcaseBusiness,
+  Car,
+  Dumbbell,
+  Gamepad2,
+  HardHat,
+  HeartPulse,
+  Laptop,
+  Monitor,
+  Printer,
+  ShieldCheck,
   Smartphone,
   Shirt,
   Home as HomeIcon,
   Apple,
   Sparkles,
   Book,
-  ClipboardList
+  ClipboardList,
+  Sofa,
+  Sprout,
+  TabletSmartphone,
+  Tv,
+  Utensils,
+  Wifi,
+  Wrench
 } from 'lucide-react';
 import { UserRole } from './types';
 
@@ -33,13 +52,33 @@ export const COLORS = {
 };
 
 export const CATEGORIES = [
-  { id: '1', name: 'Electronics', icon: <Smartphone size={32} /> },
-  { id: '2', name: 'Fashion', icon: <Shirt size={32} /> },
+  { id: '1', name: 'Electronics & Gadgets', icon: <Smartphone size={32} /> },
+  { id: '2', name: 'Fashion & Clothing', icon: <Shirt size={32} /> },
   { id: '3', name: 'Home & Living', icon: <HomeIcon size={32} /> },
-  { id: '4', name: 'Groceries', icon: <Apple size={32} /> },
-  { id: '5', name: 'Beauty', icon: <Sparkles size={32} /> },
-  { id: '6', name: 'Books', icon: <Book size={32} /> },
-  { id: '7', name: 'Stationery & Office Supplies', icon: <ClipboardList size={32} /> }
+  { id: '4', name: 'Groceries & Household Essentials', icon: <Apple size={32} /> },
+  { id: '5', name: 'Beauty & Personal Care', icon: <Sparkles size={32} /> },
+  { id: '6', name: 'Books & Learning Materials', icon: <Book size={32} /> },
+  { id: '7', name: 'Stationery & Office Supplies', icon: <ClipboardList size={32} /> },
+  { id: '8', name: 'Computers & Accessories', icon: <Laptop size={32} /> },
+  { id: '9', name: 'Phones & Tablets', icon: <TabletSmartphone size={32} /> },
+  { id: '10', name: 'Home Appliances', icon: <Tv size={32} /> },
+  { id: '11', name: 'Shoes & Bags', icon: <ShoppingBag size={32} /> },
+  { id: '12', name: 'Health & Wellness', icon: <HeartPulse size={32} /> },
+  { id: '13', name: 'Baby & Kids', icon: <Baby size={32} /> },
+  { id: '14', name: 'Sports & Fitness', icon: <Dumbbell size={32} /> },
+  { id: '15', name: 'Automotive & Motorcycle', icon: <Car size={32} /> },
+  { id: '16', name: 'Tools & Hardware', icon: <Wrench size={32} /> },
+  { id: '17', name: 'Construction & Building Materials', icon: <HardHat size={32} /> },
+  { id: '18', name: 'Food & Beverages', icon: <Utensils size={32} /> },
+  { id: '19', name: 'Security & CCTV', icon: <ShieldCheck size={32} /> },
+  { id: '20', name: 'Networking & Internet Equipment', icon: <Wifi size={32} /> },
+  { id: '21', name: 'Gaming & Entertainment', icon: <Gamepad2 size={32} /> },
+  { id: '22', name: 'Agriculture & Farming', icon: <Sprout size={32} /> },
+  { id: '23', name: 'Industrial & Business Supplies', icon: <BriefcaseBusiness size={32} /> },
+  { id: '24', name: 'Services', icon: <Monitor size={32} /> },
+  { id: '25', name: 'Deals & Promotions', icon: <BadgePercent size={32} /> },
+  { id: '26', name: 'Printers & Office Machines', icon: <Printer size={32} /> },
+  { id: '27', name: 'Furniture', icon: <Sofa size={32} /> }
 ];
 
 export const NAV_LINKS = [

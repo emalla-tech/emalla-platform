@@ -9,7 +9,7 @@ import { MerchantService } from '../../services/merchantService';
 import { geminiService } from '../../services/geminiService';
 import { uploadService } from '../../services/uploadService';
 import { Product } from '../../types';
-import { CATEGORIES } from '../../constants';
+import { CATEGORIES, PRODUCT_SUBCATEGORIES } from '../../constants';
 import { getProductPrimaryImage, handleProductImageError } from '../../lib/productImages';
 import { PRODUCT_FULFILLMENT_OPTIONS } from '../../lib/productDelivery';
 
@@ -30,6 +30,12 @@ const normalizeProductTags = (value: string | undefined) =>
         .map((tag) => tag.slice(0, 40))
     )
   ).slice(0, 12);
+
+const normalizeSubcategory = (value: string | undefined, categoryId: string | undefined) => {
+  const normalized = String(value || '').trim();
+  const options = PRODUCT_SUBCATEGORIES[String(categoryId || '')] || [];
+  return options.includes(normalized) ? normalized : '';
+};
 
 const mergeProductIntoInventory = (items: Product[], product: Product) => {
   const existingIndex = items.findIndex((entry) => entry.id === product.id);
@@ -71,6 +77,7 @@ const Inventory: React.FC = () => {
     price: 0,
     pricingType: 'fixed',
     category: '1',
+    subcategory: '',
     description: '',
     specifications: '',
     tags: [],
@@ -196,11 +203,13 @@ const Inventory: React.FC = () => {
       const description = String(newProduct.description || '').trim();
       const specifications = normalizeMultilineText(specificationsText);
       const tags = normalizeProductTags(productTags);
+      const subcategory = normalizeSubcategory(newProduct.subcategory, newProduct.category);
       const productPayload = {
         ...newProduct,
         price: newProduct.pricingType === 'quote' ? 0 : Number(newProduct.price || 0),
         description,
         specifications,
+        subcategory,
         tags
       };
 
@@ -223,6 +232,7 @@ const Inventory: React.FC = () => {
         price: 0,
         pricingType: 'fixed',
         category: '1',
+        subcategory: '',
         description: '',
         specifications: '',
         tags: [],
@@ -279,6 +289,7 @@ const Inventory: React.FC = () => {
         price: 0,
         pricingType: 'fixed',
         category: '1',
+        subcategory: '',
         description: '',
         specifications: '',
         tags: [],
@@ -299,6 +310,7 @@ const Inventory: React.FC = () => {
   const visibleProducts = products.filter((product) => {
     const matchesSearch =
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(product.subcategory || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (CATEGORIES.find((category) => category.id === product.category)?.name || '')
         .toLowerCase()
         .includes(searchTerm.toLowerCase());
@@ -307,6 +319,8 @@ const Inventory: React.FC = () => {
     if (showLowStockOnly && product.stock >= 5) return false;
     return true;
   });
+
+  const currentSubcategories = PRODUCT_SUBCATEGORIES[String(newProduct.category || '')] || [];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -404,7 +418,12 @@ const Inventory: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-8 py-6 text-sm font-medium text-gray-500">
-                    {CATEGORIES.find(c => c.id === p.category)?.name || 'General'}
+                    <div className="space-y-1">
+                      <p>{CATEGORIES.find(c => c.id === p.category)?.name || 'General'}</p>
+                      {p.subcategory && (
+                        <p className="text-[10px] font-black uppercase tracking-widest text-orange-500">{p.subcategory}</p>
+                      )}
+                    </div>
                   </td>
                   <td className="px-8 py-6 font-black text-gray-900 text-sm">
                     {p.pricingType === 'quote' ? (
@@ -583,7 +602,11 @@ const Inventory: React.FC = () => {
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Category</label>
                   <select 
                     value={newProduct.category}
-                    onChange={e => setNewProduct({...newProduct, category: e.target.value})}
+                    onChange={e => setNewProduct({
+                      ...newProduct,
+                      category: e.target.value,
+                      subcategory: ''
+                    })}
                     className="w-full px-6 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 rounded-2xl outline-none font-bold text-gray-900 appearance-none"
                   >
                     {CATEGORIES.map(cat => (
@@ -592,6 +615,25 @@ const Inventory: React.FC = () => {
                   </select>
                 </div>
               </div>
+
+              {currentSubcategories.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Subcategory</label>
+                  <select
+                    value={newProduct.subcategory || ''}
+                    onChange={(e) => setNewProduct({ ...newProduct, subcategory: e.target.value })}
+                    className="w-full px-6 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 rounded-2xl outline-none font-bold text-gray-900 appearance-none"
+                  >
+                    <option value="">Select the closest product type</option>
+                    {currentSubcategories.map((subcategory) => (
+                      <option key={subcategory} value={subcategory}>{subcategory}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-gray-400 font-medium italic">
+                    Optional, but recommended. It helps customers find products faster and improves product SEO context.
+                  </p>
+                </div>
+              )}
 
               <div className="rounded-3xl border border-gray-100 bg-gray-50/70 p-5">
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Pricing Method</p>

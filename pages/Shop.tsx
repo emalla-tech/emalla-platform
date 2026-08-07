@@ -59,6 +59,7 @@ const getProductSearchBlob = (product: Product) => [
   product.name,
   product.description,
   product.specifications,
+  product.subcategory,
   product.merchantName,
   ...(product.tags || [])
 ].filter(Boolean).join(' ').toLowerCase();
@@ -148,6 +149,7 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
         product.name,
         product.description,
         product.specifications,
+        product.subcategory,
         product.merchantName,
         CATEGORIES.find((category) => category.id === product.category)?.name,
         ...(product.tags || [])

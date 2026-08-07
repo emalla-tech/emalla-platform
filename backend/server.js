@@ -1528,6 +1528,9 @@ const normalizeProductTags = (value) => {
   ).slice(0, 12);
 };
 
+const normalizeProductSubcategory = (value) =>
+  String(value || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+
 const normalizeProductPricingType = (value, fallback = 'fixed') => {
   const pricingType = String(value ?? fallback).trim().toLowerCase();
   if (!PRODUCT_PRICING_TYPES.has(pricingType)) {
@@ -5649,12 +5652,14 @@ const server = http.createServer(async (req, res) => {
       const canControlApproval = user.role === 'ADMIN';
       const deliverySettings = normalizeProductDeliverySettings(body);
       const tags = normalizeProductTags(body.tags);
+      const subcategory = normalizeProductSubcategory(body.subcategory);
       const product = normalizeProductMedia({
         id: `p${Date.now()}`,
         name: productName,
         price,
         pricingType,
         category: body.category || '1',
+        subcategory,
         image: body.image || '/catalog/electronics.svg',
         images: body.images || [],
         stock,
@@ -5753,6 +5758,9 @@ const server = http.createServer(async (req, res) => {
       }
       if (body.tags !== undefined) {
         body.tags = normalizeProductTags(body.tags);
+      }
+      if (body.subcategory !== undefined) {
+        body.subcategory = normalizeProductSubcategory(body.subcategory);
       }
 
       const previousMediaUrls = getProductMediaUrls(existing);

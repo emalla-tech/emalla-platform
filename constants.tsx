@@ -81,6 +81,36 @@ export const CATEGORIES = [
   { id: '27', name: 'Furniture', icon: <Sofa size={32} /> }
 ];
 
+export const PRODUCT_SUBCATEGORIES: Record<string, string[]> = {
+  '1': ['Smart Devices', 'Audio', 'Cameras', 'Accessories', 'Power & Charging'],
+  '2': ["Men's Clothing", "Women's Clothing", 'Kids Fashion', 'Traditional Wear', 'Fashion Accessories'],
+  '3': ['Kitchenware', 'Home Decor', 'Bedding', 'Storage & Organization', 'Cleaning Essentials'],
+  '4': ['Groceries', 'Household Cleaning', 'Beverages', 'Pantry Essentials', 'Daily Consumables'],
+  '5': ['Skincare', 'Hair Care', 'Fragrance', 'Cosmetics', 'Grooming'],
+  '6': ['Textbooks', 'Revision Guides', 'Literature', "Children's Books", 'Learning Resources'],
+  '7': ['Pens & Writing', 'Paper & Notebooks', 'School Supplies', 'Office Files', 'Office Consumables'],
+  '8': ['Laptops', 'Desktops', 'Monitors', 'Keyboards & Mice', 'Storage', 'Computer Parts'],
+  '9': ['Smartphones', 'Tablets', 'Chargers', 'Cases & Screen Protectors', 'Mobile Accessories'],
+  '10': ['TVs', 'Kitchen Appliances', 'Laundry Appliances', 'Cooling & Fans', 'Small Appliances'],
+  '11': ['Shoes', 'Handbags', 'Backpacks', 'Travel Bags', 'Wallets & Accessories'],
+  '12': ['Wellness Essentials', 'Personal Care Tools', 'First Aid', 'Fitness Care', 'Hygiene Products'],
+  '13': ['Baby Care', 'Kids Clothing', 'Toys', 'School Items', 'Family Essentials'],
+  '14': ['Gym Equipment', 'Sports Gear', 'Activewear', 'Outdoor Gear', 'Team Sports'],
+  '15': ['Car Accessories', 'Motorcycle Parts', 'Maintenance Tools', 'Oils & Fluids', 'Vehicle Electronics'],
+  '16': ['Hand Tools', 'Power Tools', 'Electrical Supplies', 'Plumbing Supplies', 'Repair Hardware'],
+  '17': ['Building Supplies', 'Finishing Materials', 'Safety Gear', 'Paint & Coatings', 'Construction Tools'],
+  '18': ['Packaged Foods', 'Drinks', 'Snacks', 'Tea & Coffee', 'Local Food Products'],
+  '19': ['CCTV Cameras', 'Access Control', 'Alarm Systems', 'Smart Locks', 'Security Accessories'],
+  '20': ['Routers', 'Switches', 'Access Points', 'Network Cables', 'Internet Accessories'],
+  '21': ['Consoles', 'Gaming Accessories', 'Audio Entertainment', 'Media Devices', 'Toys & Games'],
+  '22': ['Farming Tools', 'Seeds', 'Irrigation', 'Agri Inputs', 'Farm Equipment'],
+  '23': ['Bulk Supplies', 'Professional Equipment', 'Business Tools', 'Industrial Essentials', 'Packaging'],
+  '24': ['Repairs', 'Installation', 'Business Support', 'Delivery Services', 'Professional Services'],
+  '25': ['Discounts', 'Bundles', 'Seasonal Offers', 'Clearance', 'Featured Deals'],
+  '26': ['Printers', 'Scanners', 'Copiers', 'Toners & Cartridges', 'Shredders'],
+  '27': ['Office Desks', 'Office Chairs', 'Shelves', 'Home Furniture', 'Interior Essentials']
+};
+
 export const NAV_LINKS = [
   { name: 'Home', path: '/' },
   { name: 'Shop', path: '/shop' },

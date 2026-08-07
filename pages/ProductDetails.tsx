@@ -219,6 +219,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
 
     return [
       { label: 'Category', value: CATEGORIES.find((category) => category.id === product.category)?.name || 'General' },
+      product.subcategory ? { label: 'Product Type', value: product.subcategory } : null,
       { label: 'Fulfillment', value: DEFAULT_FULFILLMENT_HUB.name },
       { label: 'Price', value: product.pricingType === 'quote' ? 'Price on request' : `RWF ${product.price.toLocaleString()}` },
       { label: 'Availability', value: product.stock > 0 ? `${product.stock} units in stock` : 'Out of stock' },

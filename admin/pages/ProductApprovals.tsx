@@ -223,9 +223,14 @@ const ProductApprovals: React.FC = () => {
                 </div>
                 <div className="rounded-3xl border border-gray-100 bg-gray-50 px-5 py-4">
                   <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Category</p>
-                  <div className="flex items-center gap-2 text-sm font-bold text-gray-900">
-                    <Tag size={16} className="text-orange-500" />
-                    {CATEGORIES.find((category) => category.id === selectedProduct.category)?.name || 'General'}
+                  <div className="flex items-start gap-2 text-sm font-bold text-gray-900">
+                    <Tag size={16} className="mt-0.5 flex-shrink-0 text-orange-500" />
+                    <div>
+                      <p>{CATEGORIES.find((category) => category.id === selectedProduct.category)?.name || 'General'}</p>
+                      {selectedProduct.subcategory && (
+                        <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-orange-500">{selectedProduct.subcategory}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="rounded-3xl border border-gray-100 bg-gray-50 px-5 py-4">

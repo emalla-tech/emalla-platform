@@ -199,6 +199,7 @@ export interface Product {
   price: number;
   pricingType?: 'fixed' | 'quote';
   category: string;
+  subcategory?: string;
   image: string;
   images?: string[];
   stock: number;

@@ -402,7 +402,7 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
 
       {/* Header / Search Area */}
       <div className="bg-white border-b sticky top-20 z-40 py-4 md:py-6 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="max-w-[1560px] mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
           <h1 className="text-2xl font-black text-gray-900">{t.shop.title}</h1>
           
           <div className="relative w-full md:w-[500px]" ref={searchContainerRef}>
@@ -539,8 +539,8 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
-        <div className="flex flex-col lg:flex-row gap-10">
+      <div className="max-w-[1560px] mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+        <div className="flex flex-col lg:flex-row gap-6 xl:gap-8">
           {/* Sidebar */}
           <aside className="lg:w-64 flex-shrink-0">
             <div className="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm lg:sticky lg:top-44">
@@ -741,11 +741,11 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
             </div>
 
             {filteredProducts.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {filteredProducts.map((product) => (
-                  <article key={product.id} className="bg-white rounded-[40px] overflow-hidden shadow-sm hover:shadow-2xl transition-all group border border-gray-100 flex flex-col">
-                    <div className="h-72 relative overflow-hidden bg-gray-50 p-4">
-                      <Link to={`/product/${product.id}`} aria-label={`View ${product.name}`} className="block w-full h-full rounded-[32px] overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500">
+                  <article key={product.id} className="bg-white rounded-[28px] overflow-hidden shadow-sm hover:shadow-xl transition-all group border border-gray-100 flex flex-col">
+                    <div className="h-44 sm:h-52 relative overflow-hidden bg-gray-50 p-3">
+                      <Link to={`/product/${product.id}`} aria-label={`View ${product.name}`} className="block w-full h-full rounded-[22px] overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500">
                         <img
                           src={getProductPrimaryImage(product)}
                           alt={product.name}
@@ -755,40 +755,40 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                         />
                       </Link>
-                      <div className="absolute top-8 left-8 flex flex-col space-y-3">
+                      <div className="absolute top-5 left-5 flex flex-col space-y-3">
                          <button 
                            onClick={(e) => handleToggleWishlist(e, product.id)}
                            aria-label={wishlistIds.has(product.id) ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
-                           className={`p-3 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl transition-all hover:scale-110 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 ${
+                           className={`p-2.5 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl transition-all hover:scale-110 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 ${
                              wishlistIds.has(product.id) ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
                            }`}
                          >
                            <Heart size={18} className={wishlistIds.has(product.id) ? 'fill-red-500' : ''} />
                          </button>
                       </div>
-                      <div className="absolute bottom-8 right-8 p-3 bg-orange-500 text-white rounded-2xl shadow-xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
-                        <ShoppingBag size={20} />
+                      <div className="absolute bottom-5 right-5 p-2.5 bg-orange-500 text-white rounded-2xl shadow-xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
+                        <ShoppingBag size={18} />
                       </div>
                     </div>
                     
-                    <div className="p-8 flex-grow flex flex-col">
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="text-orange-500 text-[10px] font-black uppercase tracking-widest bg-orange-50 px-3 py-1 rounded-full">
+                    <div className="p-4 sm:p-5 flex-grow flex flex-col">
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <span className="truncate text-orange-500 text-[9px] font-black uppercase tracking-widest bg-orange-50 px-2.5 py-1 rounded-full">
                           {CATEGORIES.find(c => c.id === product.category)?.name}
                         </span>
-                        <div className="flex items-center text-yellow-400 text-xs bg-yellow-50 px-2 py-1 rounded-lg">
+                        <div className="flex shrink-0 items-center text-yellow-400 text-[11px] bg-yellow-50 px-2 py-1 rounded-lg">
                           <Star size={12} fill="currentColor" />
                           <span className="ml-1 text-gray-900 font-black">{product.rating}</span>
                         </div>
                       </div>
-                      <h3 className="mb-6 h-14 text-lg font-bold leading-tight text-gray-900 transition-colors group-hover:text-orange-600">
+                      <h3 className="mb-4 min-h-12 text-sm sm:text-[15px] font-bold leading-tight text-gray-900 transition-colors group-hover:text-orange-600">
                         <Link to={`/product/${product.id}`} className="line-clamp-2 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500">
                           {product.name}
                         </Link>
                       </h3>
                       <div className="mt-auto">
-                        <div className="flex items-baseline space-x-2 mb-6">
-                          <span className="text-2xl font-black text-gray-900">
+                        <div className="flex items-baseline space-x-2 mb-4">
+                          <span className="text-base sm:text-lg font-black text-gray-900">
                             {product.pricingType === 'quote' ? 'Price on Request' : `RWF ${product.price.toLocaleString()}`}
                           </span>
                         </div>
@@ -802,7 +802,7 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                             handleAddToCart(e, product.id, product.stock);
                           }}
                           disabled={product.pricingType !== 'quote' && product.stock <= 0}
-                          className={`w-full py-4 rounded-2xl text-sm font-black transition-all flex items-center justify-center shadow-lg active:scale-[0.98] ${
+                          className={`w-full py-3 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center justify-center shadow-lg active:scale-[0.98] ${
                             product.pricingType !== 'quote' && product.stock <= 0
                             ? 'cursor-not-allowed bg-gray-200 text-gray-500 shadow-none'
                             : addedItems.has(product.id)

@@ -46,6 +46,14 @@ export const DEFAULT_CATEGORY_SEEDS = [
     description: 'Educational books, literature, stationery, and study materials.',
     iconKey: 'book',
     sortOrder: 6
+  },
+  {
+    id: '7',
+    name: 'Stationery & Office Supplies',
+    slug: 'stationery-office-supplies',
+    description: 'School, office, and paperwork essentials for students, businesses, and teams.',
+    iconKey: 'clipboard-list',
+    sortOrder: 7
   }
 ];
 

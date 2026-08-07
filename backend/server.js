@@ -1468,7 +1468,8 @@ const getCategoryFallbackImage = (categoryId) => {
     '3': '/catalog/home.svg',
     '4': '/catalog/groceries.svg',
     '5': '/catalog/beauty.svg',
-    '6': '/catalog/books.svg'
+    '6': '/catalog/books.svg',
+    '7': '/catalog/books.svg'
   };
   return map[String(categoryId || '1')] || map['1'];
 };
@@ -1803,7 +1804,8 @@ const CATEGORY_LABELS = {
   '3': 'Home & Living',
   '4': 'Groceries',
   '5': 'Beauty',
-  '6': 'Books'
+  '6': 'Books',
+  '7': 'Stationery & Office Supplies'
 };
 
 const FINANCE_REPORT_METRICS = {

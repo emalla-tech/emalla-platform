@@ -299,12 +299,15 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
             {t.home.viewAll} <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={18} />
           </Link>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-          {CATEGORIES.map((cat) => (
+        <div className="home-categories-marquee" aria-label="Browse product categories">
+          <div className="home-categories-track">
+          {[...CATEGORIES, ...CATEGORIES].map((cat, index) => (
             <Link 
-              key={cat.id} 
+              key={`${cat.id}-${index}`}
               to={`/shop?category=${cat.id}`} 
-              className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center hover:shadow-xl transition-all hover:border-orange-200 group"
+              className="home-category-card group"
+              aria-hidden={index >= CATEGORIES.length}
+              tabIndex={index >= CATEGORIES.length ? -1 : 0}
             >
               <div className="text-orange-500 mb-4 group-hover:scale-125 transition-transform duration-300">
                 {cat.icon}
@@ -312,6 +315,7 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
               <span className="font-bold text-gray-700 text-sm text-center">{cat.name}</span>
             </Link>
           ))}
+          </div>
         </div>
       </section>
 

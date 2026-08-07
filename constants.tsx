@@ -19,7 +19,8 @@ import {
   Home as HomeIcon,
   Apple,
   Sparkles,
-  Book
+  Book,
+  ClipboardList
 } from 'lucide-react';
 import { UserRole } from './types';
 
@@ -37,7 +38,8 @@ export const CATEGORIES = [
   { id: '3', name: 'Home & Living', icon: <HomeIcon size={32} /> },
   { id: '4', name: 'Groceries', icon: <Apple size={32} /> },
   { id: '5', name: 'Beauty', icon: <Sparkles size={32} /> },
-  { id: '6', name: 'Books', icon: <Book size={32} /> }
+  { id: '6', name: 'Books', icon: <Book size={32} /> },
+  { id: '7', name: 'Stationery & Office Supplies', icon: <ClipboardList size={32} /> }
 ];
 
 export const NAV_LINKS = [

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { MerchantService } from '../services/merchantService';
 import { uploadService } from '../services/uploadService';
+import { CATEGORIES } from '../constants';
 
 const BecomeSeller: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,7 +48,7 @@ const BecomeSeller: React.FC = () => {
   }>(null);
   const [formData, setFormData] = useState({
     businessName: '',
-    category: 'Fashion',
+    category: CATEGORIES[0]?.name || 'Electronics & Gadgets',
     email: '',
     phone: '',
     logoUrl: '',
@@ -95,7 +96,7 @@ const BecomeSeller: React.FC = () => {
       setIsSubmitted(true);
       setFormData({
         businessName: '',
-        category: 'Fashion',
+        category: CATEGORIES[0]?.name || 'Electronics & Gadgets',
         email: '',
         phone: '',
         logoUrl: '',
@@ -285,11 +286,9 @@ const BecomeSeller: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     className="w-full bg-gray-50 border-2 border-transparent focus:border-orange-500 focus:bg-white rounded-2xl p-4 outline-none transition-all text-black font-bold appearance-none cursor-pointer"
                   >
-                    <option>Fashion</option>
-                    <option>Electronics</option>
-                    <option>Agriculture</option>
-                    <option>Crafts</option>
-                    <option>Health & Beauty</option>
+                    {CATEGORIES.map((category) => (
+                      <option key={category.id} value={category.name}>{category.name}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

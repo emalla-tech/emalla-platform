@@ -24,6 +24,7 @@ import { UserRole } from '../../types';
 import { MerchantService } from '../../services/merchantService';
 import { RiderService } from '../../services/riderService';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { CATEGORIES } from '../../constants';
 
 type SubmissionNotice = {
   role: UserRole;
@@ -55,7 +56,7 @@ const Register: React.FC = () => {
   });
   const [sellerForm, setSellerForm] = useState({
     businessName: '',
-    category: 'Fashion',
+    category: CATEGORIES[0]?.name || 'Electronics & Gadgets',
     email: '',
     phone: ''
   });
@@ -141,7 +142,7 @@ const Register: React.FC = () => {
       });
       setSellerForm({
         businessName: '',
-        category: 'Fashion',
+        category: CATEGORIES[0]?.name || 'Electronics & Gadgets',
         email: '',
         phone: ''
       });
@@ -316,11 +317,9 @@ const Register: React.FC = () => {
           onChange={(e) => setSellerForm({ ...sellerForm, category: e.target.value })}
           className="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl outline-none font-bold text-gray-900 focus:border-orange-500 transition-all"
         >
-          <option>Fashion</option>
-          <option>Electronics</option>
-          <option>Agriculture</option>
-          <option>Crafts</option>
-          <option>Health & Beauty</option>
+          {CATEGORIES.map((category) => (
+            <option key={category.id} value={category.name}>{category.name}</option>
+          ))}
         </select>
       </div>
 

@@ -454,6 +454,26 @@ button {
   .cookie-consent-open .whatsapp-support {
     display: none;
   }
+
+  .shop-page-active .floating-cart {
+    bottom: calc(6.4rem + env(safe-area-inset-bottom, 0px));
+    right: 0.85rem;
+    height: 3.1rem;
+    width: 3.1rem;
+  }
+
+  .shop-page-active .whatsapp-support {
+    bottom: calc(6.4rem + env(safe-area-inset-bottom, 0px));
+    left: 0.85rem;
+    transform: scale(0.9);
+    transform-origin: bottom left;
+  }
+
+  .shop-filters-open .floating-cart,
+  .shop-filters-open .mobile-bottom-nav,
+  .shop-filters-open .whatsapp-support {
+    display: none !important;
+  }
 }
 
 @keyframes mobile-navigation-in {

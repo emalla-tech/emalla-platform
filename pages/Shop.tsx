@@ -107,8 +107,10 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [particles, setParticles] = useState<Particle[]>([]);
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
 
   useEffect(() => {
+    document.body.classList.add('shop-page-active');
     const saved = localStorage.getItem(RECENT_SEARCHES_KEY);
     if (saved) {
       setRecentSearches(JSON.parse(saved));
@@ -120,8 +122,16 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.body.classList.remove('shop-page-active');
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle('shop-filters-open', isMobileFiltersOpen);
+    return () => document.body.classList.remove('shop-filters-open');
+  }, [isMobileFiltersOpen]);
 
   useEffect(() => {
     const loadWishlist = async () => {
@@ -383,6 +393,168 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
     </section>
   );
 
+  const renderFilterPanel = (variant: 'desktop' | 'mobile') => (
+    <div className="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm lg:sticky lg:top-44">
+      <div className="border-b border-gray-100 bg-gray-950 px-5 py-5 text-white">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-300">Refine Results</p>
+            <h3 className="mt-1 text-xl font-black tracking-tight">Shop smarter</h3>
+            <p className="mt-1 text-xs font-semibold text-white/55">{filteredProducts.length} matching products</p>
+          </div>
+          {variant === 'mobile' ? (
+            <button
+              type="button"
+              onClick={() => setIsMobileFiltersOpen(false)}
+              className="rounded-2xl bg-white/10 p-3 transition-colors hover:bg-white/15"
+              aria-label="Close filters"
+            >
+              <X size={18} />
+            </button>
+          ) : (
+            <div className="rounded-2xl bg-white/10 p-3">
+              <Filter size={18} />
+            </div>
+          )}
+        </div>
+        {activeFilterCount > 0 && (
+          <button
+            type="button"
+            onClick={clearAllFilters}
+            className="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-gray-950 transition-all hover:bg-orange-100"
+          >
+            Clear all filters
+          </button>
+        )}
+      </div>
+
+      <div className={`${variant === 'mobile' ? 'max-h-[64vh]' : 'max-h-none lg:max-h-[calc(100vh-14rem)]'} space-y-6 overflow-y-auto p-5`}>
+        {renderFilterSection(
+          t.shop.categories,
+          <div className="space-y-1.5">
+            {categoryFilterOptions.map((option) =>
+              renderFilterOption(
+                option,
+                currentCategory === option.id,
+                () => handleCategoryClick(option.id)
+              )
+            )}
+          </div>,
+          'Browse by department'
+        )}
+
+        {brandFilterOptions.length > 0 && renderFilterSection(
+          'Brand',
+          <div className="space-y-1.5">
+            {renderFilterOption(
+              { id: 'all', label: 'All brands', count: products.length },
+              currentBrand === 'all',
+              () => handleFilterClick('brand', 'all')
+            )}
+            {brandFilterOptions.map((option) =>
+              renderFilterOption(
+                option,
+                currentBrand === option.id,
+                () => handleFilterClick('brand', option.id),
+                'checkbox'
+              )
+            )}
+          </div>,
+          'Trusted names and product makers'
+        )}
+
+        {renderFilterSection(
+          'Price',
+          <div className="space-y-1.5">
+            {renderFilterOption(
+              { id: 'all', label: 'Any price', count: products.length },
+              currentPriceRange === 'all',
+              () => handleFilterClick('price', 'all')
+            )}
+            {priceFilterOptions.map((option) =>
+              renderFilterOption(
+                option,
+                currentPriceRange === option.id,
+                () => handleFilterClick('price', option.id)
+              )
+            )}
+          </div>,
+          'Filter fixed-price products'
+        )}
+
+        {renderFilterSection(
+          'Availability',
+          <div className="space-y-1.5">
+            {renderFilterOption(
+              { id: 'all', label: 'All availability', count: products.length },
+              currentAvailability === 'all',
+              () => handleFilterClick('availability', 'all')
+            )}
+            {availabilityFilterOptions.map((option) =>
+              renderFilterOption(
+                option,
+                currentAvailability === option.id,
+                () => handleFilterClick('availability', option.id),
+                'checkbox'
+              )
+            )}
+          </div>,
+          'Stock, quotes, and fulfillment'
+        )}
+
+        {sizeFilterOptions.length > 0 && renderFilterSection(
+          'Size',
+          <div className="space-y-1.5">
+            {renderFilterOption(
+              { id: 'all', label: 'All sizes', count: products.length },
+              currentSize === 'all',
+              () => handleFilterClick('size', 'all')
+            )}
+            {sizeFilterOptions.map((option) =>
+              renderFilterOption(
+                option,
+                currentSize === option.id,
+                () => handleFilterClick('size', option.id),
+                'checkbox'
+              )
+            )}
+          </div>
+        )}
+
+        {colorFilterOptions.length > 0 && renderFilterSection(
+          'Color',
+          <div className="space-y-1.5">
+            {renderFilterOption(
+              { id: 'all', label: 'All colors', count: products.length },
+              currentColor === 'all',
+              () => handleFilterClick('color', 'all')
+            )}
+            {colorFilterOptions.map((option) =>
+              renderFilterOption(
+                option,
+                currentColor === option.id,
+                () => handleFilterClick('color', option.id),
+                'checkbox'
+              )
+            )}
+          </div>
+        )}
+      </div>
+
+      {variant === 'mobile' && (
+        <div className="border-t border-gray-100 bg-white p-4">
+          <button
+            type="button"
+            onClick={() => setIsMobileFiltersOpen(false)}
+            className="w-full rounded-2xl bg-orange-500 px-5 py-4 text-sm font-black text-white shadow-lg shadow-orange-200 active:scale-[0.98]"
+          >
+            Show {filteredProducts.length} products
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="bg-gray-50 min-h-screen pb-28 md:pb-20">
       <style>{`
@@ -412,7 +584,7 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
               <Search className={`absolute left-4 transition-colors duration-300 ${isSearchFocused ? 'text-orange-500' : 'text-gray-400'}`} size={20} />
               <input 
                 type="text" 
-                placeholder="Search products, shops, categories..."
+                placeholder="Search products..."
                 value={searchTerm}
                 onFocus={() => setIsSearchFocused(true)}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -541,151 +713,39 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
         </div>
       </div>
 
-      <div className="max-w-[1560px] mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+      <div className="max-w-[1560px] mx-auto px-4 sm:px-6 lg:px-8 mt-4 md:mt-10">
         <div className="flex flex-col lg:flex-row gap-6 xl:gap-8">
           {/* Sidebar */}
-          <aside className="lg:w-64 flex-shrink-0">
-            <div className="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm lg:sticky lg:top-44">
-              <div className="border-b border-gray-100 bg-gray-950 px-5 py-5 text-white">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-300">Refine Results</p>
-                    <h3 className="mt-1 text-xl font-black tracking-tight">Shop smarter</h3>
-                    <p className="mt-1 text-xs font-semibold text-white/55">{filteredProducts.length} matching products</p>
-                  </div>
-                  <div className="rounded-2xl bg-white/10 p-3">
-                    <Filter size={18} />
-                  </div>
-                </div>
-                {activeFilterCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={clearAllFilters}
-                    className="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-gray-950 transition-all hover:bg-orange-100"
-                  >
-                    Clear all filters
-                  </button>
-                )}
-              </div>
-
-              <div className="max-h-none space-y-6 p-5 lg:max-h-[calc(100vh-14rem)] lg:overflow-y-auto">
-                {renderFilterSection(
-                  t.shop.categories,
-                  <div className="space-y-1.5">
-                    {categoryFilterOptions.map((option) =>
-                      renderFilterOption(
-                        option,
-                        currentCategory === option.id,
-                        () => handleCategoryClick(option.id)
-                      )
-                    )}
-                  </div>,
-                  'Browse by department'
-                )}
-
-                {brandFilterOptions.length > 0 && renderFilterSection(
-                  'Brand',
-                  <div className="space-y-1.5">
-                    {renderFilterOption(
-                      { id: 'all', label: 'All brands', count: products.length },
-                      currentBrand === 'all',
-                      () => handleFilterClick('brand', 'all')
-                    )}
-                    {brandFilterOptions.map((option) =>
-                      renderFilterOption(
-                        option,
-                        currentBrand === option.id,
-                        () => handleFilterClick('brand', option.id),
-                        'checkbox'
-                      )
-                    )}
-                  </div>,
-                  'Trusted names and product makers'
-                )}
-
-                {renderFilterSection(
-                  'Price',
-                  <div className="space-y-1.5">
-                    {renderFilterOption(
-                      { id: 'all', label: 'Any price', count: products.length },
-                      currentPriceRange === 'all',
-                      () => handleFilterClick('price', 'all')
-                    )}
-                    {priceFilterOptions.map((option) =>
-                      renderFilterOption(
-                        option,
-                        currentPriceRange === option.id,
-                        () => handleFilterClick('price', option.id)
-                      )
-                    )}
-                  </div>,
-                  'Filter fixed-price products'
-                )}
-
-                {renderFilterSection(
-                  'Availability',
-                  <div className="space-y-1.5">
-                    {renderFilterOption(
-                      { id: 'all', label: 'All availability', count: products.length },
-                      currentAvailability === 'all',
-                      () => handleFilterClick('availability', 'all')
-                    )}
-                    {availabilityFilterOptions.map((option) =>
-                      renderFilterOption(
-                        option,
-                        currentAvailability === option.id,
-                        () => handleFilterClick('availability', option.id),
-                        'checkbox'
-                      )
-                    )}
-                  </div>,
-                  'Stock, quotes, and fulfillment'
-                )}
-
-                {sizeFilterOptions.length > 0 && renderFilterSection(
-                  'Size',
-                  <div className="space-y-1.5">
-                    {renderFilterOption(
-                      { id: 'all', label: 'All sizes', count: products.length },
-                      currentSize === 'all',
-                      () => handleFilterClick('size', 'all')
-                    )}
-                    {sizeFilterOptions.map((option) =>
-                      renderFilterOption(
-                        option,
-                        currentSize === option.id,
-                        () => handleFilterClick('size', option.id),
-                        'checkbox'
-                      )
-                    )}
-                  </div>
-                )}
-
-                {colorFilterOptions.length > 0 && renderFilterSection(
-                  'Color',
-                  <div className="space-y-1.5">
-                    {renderFilterOption(
-                      { id: 'all', label: 'All colors', count: products.length },
-                      currentColor === 'all',
-                      () => handleFilterClick('color', 'all')
-                    )}
-                    {colorFilterOptions.map((option) =>
-                      renderFilterOption(
-                        option,
-                        currentColor === option.id,
-                        () => handleFilterClick('color', option.id),
-                        'checkbox'
-                      )
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+          <aside className="hidden lg:block lg:w-64 flex-shrink-0">
+            {renderFilterPanel('desktop')}
           </aside>
 
           {/* Product Grid */}
           <div className="flex-grow">
-            <div className="flex justify-between items-center mb-10">
+            <div className="mb-4 flex items-center gap-3 lg:hidden">
+              <button
+                type="button"
+                onClick={() => setIsMobileFiltersOpen(true)}
+                className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gray-950 px-4 py-3.5 text-sm font-black text-white shadow-lg shadow-gray-200 active:scale-[0.98]"
+              >
+                <Filter size={17} />
+                Filters
+                {activeFilterCount > 0 && (
+                  <span className="rounded-full bg-orange-500 px-2 py-0.5 text-[10px] text-white">{activeFilterCount}</span>
+                )}
+              </button>
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="rounded-2xl bg-white px-4 py-3.5 text-xs font-black text-orange-600 shadow-sm ring-1 ring-gray-100"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            <div className="flex justify-between items-center mb-5 md:mb-10">
               <div className="flex flex-col gap-1">
                 <p className="text-gray-500 font-medium">{t.shop.found} <span className="font-black text-gray-900">{filteredProducts.length}</span> {t.shop.results}</p>
                 {urlSearch && (
@@ -840,6 +900,20 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
           </div>
         </div>
       </div>
+
+      {isMobileFiltersOpen && (
+        <div className="fixed inset-0 z-[120] lg:hidden" role="dialog" aria-modal="true" aria-label="Shop filters">
+          <button
+            type="button"
+            className="absolute inset-0 bg-gray-950/55 backdrop-blur-sm"
+            onClick={() => setIsMobileFiltersOpen(false)}
+            aria-label="Close filters"
+          />
+          <div className="absolute inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] animate-in slide-in-from-bottom-6 fade-in duration-200">
+            {renderFilterPanel('mobile')}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -888,13 +888,53 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                 ))}
               </div>
             ) : (
-              <div className="bg-white rounded-[40px] p-24 text-center border-2 border-dashed border-gray-100 shadow-sm mt-10">
-                <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-8 text-gray-300">
-                  <Search size={48} />
-                </div>
-                <h2 className="text-3xl font-black text-gray-900 mb-3">No matches found</h2>
-                <p className="text-gray-500 max-w-sm mx-auto font-medium">Try different keywords or check our popular categories to find what you're looking for.</p>
-                <button onClick={clearAllFilters} className="mt-10 bg-black text-white px-10 py-4 rounded-2xl font-black shadow-xl hover:bg-orange-600 transition-all">Clear All Filters</button>
+              <div className="mt-6 overflow-hidden rounded-[36px] border border-orange-100 bg-white shadow-xl shadow-orange-100/40 md:rounded-[44px]">
+                {products.length === 0 ? (
+                  <div className="relative px-6 py-10 text-center sm:px-10 md:px-16 md:py-16">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.14),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(17,24,39,0.08),transparent_32%)]" />
+                    <div className="relative mx-auto max-w-3xl">
+                      <div className="mx-auto mb-7 flex h-20 w-20 items-center justify-center rounded-[28px] bg-gray-950 text-orange-400 shadow-2xl shadow-gray-200">
+                        <ShoppingBag size={34} />
+                      </div>
+                      <p className="mb-3 text-[10px] font-black uppercase tracking-[0.28em] text-orange-500">Marketplace launch preparation</p>
+                      <h2 className="text-3xl font-black leading-tight text-gray-950 sm:text-4xl md:text-5xl">
+                        Products are being verified for launch.
+                      </h2>
+                      <p className="mx-auto mt-5 max-w-2xl text-sm font-semibold leading-7 text-gray-500 sm:text-base">
+                        E-Malla Rwanda is preparing a trusted product catalog before opening the marketplace fully. Approved products will appear here as soon as the launch setup is complete.
+                      </p>
+                      <div className="mt-8 grid gap-3 text-left sm:grid-cols-3">
+                        {[
+                          'Seller listings under review',
+                          'Cloudinary media kept secure',
+                          'Checkout will open when verified'
+                        ].map((item) => (
+                          <div key={item} className="rounded-2xl border border-gray-100 bg-white/80 px-4 py-3 text-xs font-black text-gray-600 shadow-sm">
+                            <Check size={15} className="mb-2 text-orange-500" />
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
+                        <Link to="/contact" className="rounded-2xl bg-orange-500 px-7 py-4 text-sm font-black text-white shadow-xl shadow-orange-200 transition-all hover:bg-orange-600 active:scale-[0.98]">
+                          Contact E-Malla
+                        </Link>
+                        <Link to="/become-seller" className="rounded-2xl bg-gray-950 px-7 py-4 text-sm font-black text-white shadow-xl shadow-gray-200 transition-all hover:bg-gray-800 active:scale-[0.98]">
+                          Become a Seller
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="px-6 py-12 text-center sm:px-10 md:px-16">
+                    <div className="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-gray-50 text-gray-300">
+                      <Search size={48} />
+                    </div>
+                    <h2 className="mb-3 text-3xl font-black text-gray-900">No matches found</h2>
+                    <p className="mx-auto max-w-sm font-medium text-gray-500">Try different keywords or clear the filters to browse all available products.</p>
+                    <button onClick={clearAllFilters} className="mt-10 rounded-2xl bg-black px-10 py-4 font-black text-white shadow-xl transition-all hover:bg-orange-600">Clear All Filters</button>
+                  </div>
+                )}
               </div>
             )}
           </div>

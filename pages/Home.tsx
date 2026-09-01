@@ -69,6 +69,7 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
         .slice(0, 4),
     [products]
   );
+  const hasMarketplaceProducts = products.length > 0;
 
   const handleAddToCart = (e: React.MouseEvent, productId: string, stock: number) => {
     e.stopPropagation();
@@ -326,14 +327,51 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
             <h2 className="text-3xl font-bold mb-4">{t.home.featuredTitle}</h2>
             <p className="text-gray-500">{t.home.featuredSubtitle}</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {featuredProducts.map((product) => renderProductCard(product, product.featured ? t.home.featured : t.home.newArrival))}
-          </div>
+          {featuredProducts.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              {featuredProducts.map((product) => renderProductCard(product, product.featured ? t.home.featured : t.home.newArrival))}
+            </div>
+          ) : (
+            <div className="mx-auto max-w-5xl overflow-hidden rounded-[40px] border border-orange-100 bg-white text-left shadow-xl shadow-orange-100/50">
+              <div className="grid gap-8 p-7 md:grid-cols-[1.2fr_0.8fr] md:p-10">
+                <div>
+                  <p className="mb-3 text-[10px] font-black uppercase tracking-[0.28em] text-orange-500">Marketplace launch preparation</p>
+                  <h3 className="text-3xl font-black leading-tight text-gray-950 md:text-4xl">
+                    A trusted catalog is being prepared for launch.
+                  </h3>
+                  <p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-gray-500">
+                    E-Malla Rwanda is finalizing seller verification, product media, and marketplace readiness so customers see reliable listings when shopping opens fully.
+                  </p>
+                  <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                    <Link to="/contact" className="rounded-2xl bg-orange-500 px-6 py-4 text-center text-sm font-black text-white shadow-xl shadow-orange-200 transition-all hover:bg-orange-600 active:scale-[0.98]">
+                      Contact E-Malla
+                    </Link>
+                    <Link to="/become-seller" className="rounded-2xl bg-gray-950 px-6 py-4 text-center text-sm font-black text-white shadow-xl shadow-gray-200 transition-all hover:bg-gray-800 active:scale-[0.98]">
+                      List Your Products
+                    </Link>
+                  </div>
+                </div>
+                <div className="rounded-[32px] bg-gray-950 p-6 text-white">
+                  <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-3xl bg-orange-500/15 text-orange-300">
+                    <ShoppingBag size={30} />
+                  </div>
+                  <div className="space-y-4">
+                    {['Verified sellers', 'Secure product media', 'Reliable delivery readiness'].map((item) => (
+                      <div key={item} className="flex items-center gap-3 rounded-2xl bg-white/8 px-4 py-3 text-sm font-black">
+                        <Check size={16} className="text-orange-300" />
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
       {/* Marketplace Shelves */}
-      <section className="bg-white py-20">
+      {hasMarketplaceProducts && <section className="bg-white py-20">
         <div className="mx-auto max-w-7xl space-y-16 px-4">
           {marketplaceShelves.map((shelf, index) => (
             shelf.products.length > 0 ? (
@@ -361,7 +399,7 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
             ) : null
           ))}
         </div>
-      </section>
+      </section>}
 
       {/* CTA Section */}
       <section className="py-16 max-w-7xl mx-auto px-4">

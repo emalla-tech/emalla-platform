@@ -1,5 +1,6 @@
 import { Product } from '../types';
 import { apiUrl } from './apiConfig';
+import { monitoringService } from './monitoringService';
 
 const PRODUCTS_UPDATED_EVENT = 'emalla_products_updated';
 let cachedProducts: Product[] | null = null;
@@ -21,9 +22,27 @@ const request = async (path = '', init: RequestInit = {}) => {
     headers
   });
 
-  const data = await response.json().catch(() => ({}));
+  const data = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(data.error || 'Product request failed');
+    const message = data?.error || 'Product request failed';
+    if (response.status >= 500) {
+      monitoringService.reportApiError({
+        path: `/products${path}`,
+        statusCode: response.status,
+        message,
+        requestId: data?.requestId || response.headers.get('x-request-id') || undefined
+      });
+    }
+    throw new Error(message);
+  }
+
+  if (!data || !Array.isArray(data.products)) {
+    monitoringService.reportApiError({
+      path: `/products${path}`,
+      statusCode: response.status,
+      message: 'Products API returned an invalid response'
+    });
+    throw new Error('Products API returned an invalid response');
   }
 
   return data;
@@ -80,6 +99,10 @@ export const ProductService = {
         const response = await request();
         cachedProducts = response.products;
       } catch (error) {
+        monitoringService.reportApiError({
+          path: '/products',
+          message: error instanceof Error ? error.message : 'Unable to load products'
+        });
         cachedProducts = shouldUseCatalogFallback(options) ? await loadCatalogFallback() : [];
       } finally {
         inflightProductsRequest = null;

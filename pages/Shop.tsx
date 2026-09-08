@@ -896,18 +896,18 @@ const Shop: React.FC<ShopProps> = ({ onAddToCart }) => {
                       <div className="mx-auto mb-7 flex h-20 w-20 items-center justify-center rounded-[28px] bg-gray-950 text-orange-400 shadow-2xl shadow-gray-200">
                         <ShoppingBag size={34} />
                       </div>
-                      <p className="mb-3 text-[10px] font-black uppercase tracking-[0.28em] text-orange-500">Marketplace launch preparation</p>
+                      <p className="mb-3 text-[10px] font-black uppercase tracking-[0.28em] text-orange-500">Marketplace catalog</p>
                       <h2 className="text-3xl font-black leading-tight text-gray-950 sm:text-4xl md:text-5xl">
-                        Products are being verified for launch.
+                        No products are available right now.
                       </h2>
                       <p className="mx-auto mt-5 max-w-2xl text-sm font-semibold leading-7 text-gray-500 sm:text-base">
-                        E-Malla Rwanda is preparing a trusted product catalog before opening the marketplace fully. Approved products will appear here as soon as the launch setup is complete.
+                        Please refresh the page or check back shortly. If you need help finding an item, our team can assist you directly.
                       </p>
                       <div className="mt-8 grid gap-3 text-left sm:grid-cols-3">
                         {[
-                          'Seller listings under review',
-                          'Cloudinary media kept secure',
-                          'Checkout will open when verified'
+                          'Verified sellers',
+                          'Secure product media',
+                          'Fast local support'
                         ].map((item) => (
                           <div key={item} className="rounded-2xl border border-gray-100 bg-white/80 px-4 py-3 text-xs font-black text-gray-600 shadow-sm">
                             <Check size={15} className="mb-2 text-orange-500" />

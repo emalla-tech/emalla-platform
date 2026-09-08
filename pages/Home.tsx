@@ -335,19 +335,19 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
             <div className="mx-auto max-w-5xl overflow-hidden rounded-[40px] border border-orange-100 bg-white text-left shadow-xl shadow-orange-100/50">
               <div className="grid gap-8 p-7 md:grid-cols-[1.2fr_0.8fr] md:p-10">
                 <div>
-                  <p className="mb-3 text-[10px] font-black uppercase tracking-[0.28em] text-orange-500">Marketplace launch preparation</p>
+                  <p className="mb-3 text-[10px] font-black uppercase tracking-[0.28em] text-orange-500">Featured products</p>
                   <h3 className="text-3xl font-black leading-tight text-gray-950 md:text-4xl">
-                    A trusted catalog is being prepared for launch.
+                    Featured products are not available right now.
                   </h3>
                   <p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-gray-500">
-                    E-Malla Rwanda is finalizing seller verification, product media, and marketplace readiness so customers see reliable listings when shopping opens fully.
+                    Browse the shop to see the latest available listings, or contact E-Malla Rwanda if you need help finding a specific item.
                   </p>
                   <div className="mt-7 flex flex-col gap-3 sm:flex-row">
                     <Link to="/contact" className="rounded-2xl bg-orange-500 px-6 py-4 text-center text-sm font-black text-white shadow-xl shadow-orange-200 transition-all hover:bg-orange-600 active:scale-[0.98]">
                       Contact E-Malla
                     </Link>
-                    <Link to="/become-seller" className="rounded-2xl bg-gray-950 px-6 py-4 text-center text-sm font-black text-white shadow-xl shadow-gray-200 transition-all hover:bg-gray-800 active:scale-[0.98]">
-                      List Your Products
+                    <Link to="/shop" className="rounded-2xl bg-gray-950 px-6 py-4 text-center text-sm font-black text-white shadow-xl shadow-gray-200 transition-all hover:bg-gray-800 active:scale-[0.98]">
+                      Browse Shop
                     </Link>
                   </div>
                 </div>

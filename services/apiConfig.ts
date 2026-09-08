@@ -1,6 +1,6 @@
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 const CANONICAL_PUBLIC_APP_URL = 'https://www.emallarwanda.com';
-const DEFAULT_PRODUCTION_API_URL = 'https://emalla-platform.onrender.com/api';
+const DEFAULT_PRODUCTION_API_URL = 'https://emalla-api.emallarwanda.workers.dev/api';
 const DEFAULT_LOCAL_API_URL = '/api';
 
 const normalizePublicAppUrl = (value: string) => {

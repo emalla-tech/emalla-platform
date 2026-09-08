@@ -35,7 +35,6 @@ import ProtectedRoute from './auth/ProtectedRoute';
 import RoleRoute from './auth/RoleRoute';
 import { useAuth } from './auth/AuthContext';
 import { getRoleHome } from './auth/roleRouting';
-import { captureAffiliateReferralFromLocation } from './services/affiliateReferralService';
 
 const Home = lazy(() => import('./pages/Home'));
 const BecomeSeller = lazy(() => import('./pages/BecomeSeller'));
@@ -47,8 +46,6 @@ const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const ReturnsPolicy = lazy(() => import('./pages/ReturnsPolicy'));
 const SellerAgreement = lazy(() => import('./pages/SellerAgreement'));
-const AffiliateProgram = lazy(() => import('./pages/AffiliateProgram'));
-const AffiliateDashboard = lazy(() => import('./pages/AffiliateDashboard'));
 const Contact = lazy(() => import('./pages/Contact'));
 const HowItWorks = lazy(() => import('./pages/HowItWorks'));
 const Cart = lazy(() => import('./pages/Cart'));
@@ -202,14 +199,6 @@ const buildSeoConfig = (pathname: string) => {
       title: 'Seller Agreement | E-Malla Rwanda',
       description: 'Review the standards and responsibilities for sellers operating on E-Malla Rwanda.',
     },
-    '/affiliate-program': {
-      title: 'Affiliate Program | E-Malla Rwanda',
-      description: 'Join the E-Malla Rwanda affiliate program and earn by helping buyers discover trusted marketplace products.',
-    },
-    '/affiliate': {
-      title: 'Affiliate Dashboard | E-Malla Rwanda',
-      description: 'Track E-Malla Rwanda affiliate referral links, attributed orders and commission performance.',
-    },
     '/contact': {
       title: 'Contact Us | E-Malla Rwanda',
       description: 'Contact E-Malla Rwanda for support, partnership opportunities and customer assistance.',
@@ -293,16 +282,6 @@ const SeoMetaUpdater = () => {
   return null;
 };
 
-const AffiliateReferralTracker = () => {
-  const { pathname, search } = useLocation();
-
-  useEffect(() => {
-    captureAffiliateReferralFromLocation(search, pathname);
-  }, [pathname, search]);
-
-  return null;
-};
-
 const BackToTop = () => {
   const [isVisible, setIsVisible] = React.useState(false);
 
@@ -345,7 +324,6 @@ const App: React.FC = () => {
         <LegacyHashRedirect />
         <ScrollToTop />
         <SeoMetaUpdater />
-        <AffiliateReferralTracker />
         <BackToTop />
         <CookieConsent />
         <div className="min-h-screen flex flex-col app-shell">
@@ -372,9 +350,6 @@ const App: React.FC = () => {
             <Route path="/privacy" element={withSuspense(<PrivacyPolicy />)} />
             <Route path="/returns" element={withSuspense(<ReturnsPolicy />)} />
             <Route path="/seller-agreement" element={withSuspense(<SellerAgreement />)} />
-            <Route path="/affiliate-program" element={withSuspense(<AffiliateProgram />)} />
-            <Route path="/affiliate" element={withSuspense(<AffiliateDashboard />)} />
-            <Route path="/company-information" element={<Navigate to="/affiliate-program" replace />} />
             <Route path="/contact" element={withSuspense(<Contact />)} />
             <Route path="/how-it-works" element={withSuspense(<HowItWorks />)} />
             <Route path="/become-seller" element={withSuspense(<BecomeSeller />)} />

@@ -69,10 +69,12 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
         .slice(0, 4),
     [products]
   );
-  const heroCampaigns = useMemo(() => {
+  const heroFeaturedProduct = useMemo(() => {
     const availableProducts = products.filter((product) => product.stock > 0 || product.pricingType === 'quote');
-    const pickProductByTerms = (terms: string[], fallbackIndex: number) => {
-      const matchedProduct = availableProducts.find((product) => {
+    const priorityTerms = ['printer', 'office', 'school', 'laptop', 'router', 'hub', 'business'];
+
+    return (
+      availableProducts.find((product) => {
         const searchable = [
           product.name,
           product.description,
@@ -80,39 +82,13 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
           ...(product.tags || [])
         ].join(' ').toLowerCase();
 
-        return terms.some((term) => searchable.includes(term));
-      });
-
-      return matchedProduct || availableProducts[fallbackIndex % Math.max(availableProducts.length, 1)] || products[fallbackIndex % Math.max(products.length, 1)];
-    };
-
-    return [
-      {
-        eyebrow: 'Seasonal campaign',
-        title: 'Back-to-school and office essentials',
-        description: 'Printers, stationery, accessories and reliable work tools for students, offices and businesses.',
-        href: '/shop?search=school office printer',
-        product: pickProductByTerms(['school', 'office', 'printer', 'stationery', 'supplies'], 0),
-        accent: 'from-orange-500 to-amber-400'
-      },
-      {
-        eyebrow: 'Brand spotlight',
-        title: 'Business tech ready for Kigali',
-        description: 'Promote trusted electronics, network gear and professional devices already listed on E-Malla.',
-        href: '/shop?category=1',
-        product: pickProductByTerms(['laptop', 'router', 'hub', 'hp', 'tp-link', 'usb'], 1),
-        accent: 'from-gray-950 to-slate-700'
-      },
-      {
-        eyebrow: 'Partner marketing',
-        title: 'Premium slots for brands and industries',
-        description: 'A curated space for institutions, suppliers and brands that want visibility on E-Malla Rwanda.',
-        href: '/contact',
-        product: pickProductByTerms(['money', 'counter', 'business', 'machine', 'cash'], 2),
-        accent: 'from-emerald-500 to-teal-400'
-      }
-    ];
-  }, [products]);
+        return priorityTerms.some((term) => searchable.includes(term));
+      }) ||
+      featuredProducts[0] ||
+      availableProducts[0] ||
+      products[0]
+    );
+  }, [featuredProducts, products]);
   const hasMarketplaceProducts = products.length > 0;
 
   const handleAddToCart = (e: React.MouseEvent, productId: string, stock: number) => {
@@ -230,140 +206,115 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
   return (
     <div className="overflow-hidden">
       {/* Hero Section */}
-      <section className="relative flex min-h-[calc(100svh-5rem)] items-center overflow-hidden bg-gray-950 py-10 pb-28 text-white md:min-h-[780px] md:py-16 md:pb-16">
-        <div className="absolute inset-0 z-0">
-          <img
-            src="https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&q=80&w=1920"
-            alt="E-Malla Rwanda marketplace marketing"
-            loading="eager"
-            fetchPriority="high"
-            decoding="async"
-            className="h-full w-full object-cover opacity-35"
-          />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.35),transparent_34%),linear-gradient(110deg,rgba(3,7,18,0.98),rgba(3,7,18,0.86)_45%,rgba(3,7,18,0.58))]" />
-          <div className="absolute -bottom-32 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-orange-500/20 blur-3xl" />
-        </div>
-        
-        <div className="relative z-10 mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8">
-          <div className="grid items-center gap-10 lg:grid-cols-[0.92fr_1.08fr]">
-            <div className="max-w-2xl">
-              <span className="mb-6 inline-flex items-center rounded-full border border-white/10 bg-white/10 px-4 py-2 text-[10px] font-black uppercase leading-relaxed tracking-[2px] text-orange-100 shadow-lg backdrop-blur-md md:mb-8 md:px-5 md:py-2">
-                <Zap className="mr-2 text-orange-300" size={14} />
-                E-Malla Campaign Hub
-              </span>
-              <h1 className="mb-6 text-[3rem] font-black leading-[1.02] tracking-tight sm:text-6xl md:mb-8 md:text-7xl md:leading-[1.05]">
-                Market products, brands and growth stories from one powerful space.
-              </h1>
-              <p className="mb-8 max-w-xl text-base font-semibold leading-7 text-gray-200 sm:text-lg md:mb-10 md:text-xl md:leading-relaxed">
-                A professional hero section for featured products, sponsored campaigns, seasonal offers and institutional visibility across E-Malla Rwanda.
-              </p>
+      <section className="relative overflow-hidden bg-[#f6f1e8] text-gray-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(249,115,22,0.18),transparent_28%),radial-gradient(circle_at_82%_20%,rgba(15,23,42,0.10),transparent_30%)]" />
+        <div className="relative mx-auto grid min-h-[680px] max-w-7xl items-center gap-12 px-5 py-12 sm:px-6 lg:grid-cols-[0.94fr_1.06fr] lg:px-8 lg:py-20">
+          <div className="max-w-2xl">
+            <span className="mb-6 inline-flex items-center rounded-full border border-orange-200 bg-white/80 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-orange-600 shadow-sm">
+              Trusted marketplace Rwanda
+            </span>
+            <h1 className="text-5xl font-black leading-[0.98] tracking-tight text-gray-950 sm:text-6xl lg:text-7xl">
+              Shop verified products for work, school and home.
+            </h1>
+            <p className="mt-6 max-w-xl text-base font-semibold leading-8 text-gray-600 sm:text-lg">
+              E-Malla Rwanda connects customers with approved sellers, reliable delivery and carefully presented product collections.
+            </p>
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
-                <Link 
-                  to="/shop" 
-                  className="group flex items-center justify-center rounded-2xl bg-orange-500 px-7 py-4 text-base font-black text-white shadow-2xl shadow-orange-500/20 transition-all hover:bg-orange-600 active:scale-95 sm:px-10 sm:py-5 sm:text-lg"
-                >
-                  <span>{t.home.exploreShop}</span>
-                  <ShoppingBag className="ml-3 transition-transform group-hover:rotate-12" size={22} />
-                </Link>
-                <Link 
-                  to="/contact" 
-                  className="flex items-center justify-center rounded-2xl bg-white px-7 py-4 text-base font-black text-black shadow-2xl shadow-white/10 transition-all hover:bg-gray-100 active:scale-95 sm:px-10 sm:py-5 sm:text-lg"
-                >
-                  Advertise with E-Malla
-                </Link>
-              </div>
-
-              <div className="mt-9 grid grid-cols-3 gap-3 max-w-xl">
-                {[
-                  ['43+', 'Live products'],
-                  ['3', 'Campaign slots'],
-                  ['RW', 'Local reach']
-                ].map(([value, label]) => (
-                  <div key={label} className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-md">
-                    <p className="text-2xl font-black text-white">{value}</p>
-                    <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-gray-300">{label}</p>
-                  </div>
-                ))}
-              </div>
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+              <Link
+                to="/shop"
+                className="group flex items-center justify-center rounded-2xl bg-gray-950 px-8 py-4 text-sm font-black text-white shadow-2xl shadow-gray-300 transition-all hover:bg-orange-600 active:scale-95"
+              >
+                Shop marketplace
+                <ShoppingBag className="ml-3 transition-transform group-hover:rotate-12" size={20} />
+              </Link>
+              <Link
+                to="/contact"
+                className="flex items-center justify-center rounded-2xl border border-gray-200 bg-white px-8 py-4 text-sm font-black text-gray-950 shadow-xl shadow-gray-200/60 transition-all hover:border-orange-200 hover:text-orange-600 active:scale-95"
+              >
+                Book a brand placement
+              </Link>
             </div>
 
-            <div className="relative">
-              <div className="absolute -inset-4 rounded-[48px] bg-orange-500/20 blur-3xl" />
-              <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-white/10 p-3 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-4 lg:rounded-[48px]">
-                <div className="grid gap-3 lg:grid-cols-[1.08fr_0.92fr]">
-                  <Link
-                    to={heroCampaigns[0].href}
-                    className="group relative min-h-[420px] overflow-hidden rounded-[30px] bg-white text-gray-950 shadow-2xl lg:rounded-[38px]"
-                  >
-                    {heroCampaigns[0].product ? (
-                      <img
-                        src={getProductPrimaryImage(heroCampaigns[0].product)}
-                        alt={heroCampaigns[0].product.name}
-                        onError={(event) => handleProductImageError(event, heroCampaigns[0].product?.category)}
-                        loading="eager"
-                        decoding="async"
-                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className={`absolute inset-0 bg-gradient-to-br ${heroCampaigns[0].accent}`} />
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/55 to-transparent" />
-                    <div className="absolute left-5 right-5 top-5 flex items-center justify-between">
-                      <span className="rounded-full bg-white/90 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-orange-600">
-                        {heroCampaigns[0].eyebrow}
-                      </span>
-                      <span className="rounded-full bg-gray-950/80 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white">
-                        Featured
-                      </span>
-                    </div>
-                    <div className="absolute inset-x-0 bottom-0 p-6 text-white sm:p-7">
-                      <h2 className="max-w-sm text-3xl font-black leading-tight sm:text-4xl">
-                        {heroCampaigns[0].title}
-                      </h2>
-                      <p className="mt-3 max-w-sm text-sm font-semibold leading-6 text-gray-200">
-                        {heroCampaigns[0].description}
-                      </p>
-                      <div className="mt-6 inline-flex items-center rounded-2xl bg-orange-500 px-5 py-3 text-sm font-black text-white shadow-xl transition-all group-hover:bg-orange-600">
-                        Explore campaign
-                        <ArrowRight size={17} className="ml-2 transition-transform group-hover:translate-x-1" />
-                      </div>
-                    </div>
-                  </Link>
+            <div className="mt-10 grid max-w-2xl gap-3 sm:grid-cols-3">
+              {[
+                ['Featured products', 'Curated catalog visibility'],
+                ['Sponsored stories', 'For brands and institutions'],
+                ['Seasonal campaigns', 'School, office and lifestyle']
+              ].map(([title, description]) => (
+                <div key={title} className="rounded-3xl border border-white bg-white/75 p-4 shadow-sm">
+                  <p className="text-sm font-black text-gray-950">{title}</p>
+                  <p className="mt-2 text-xs font-semibold leading-5 text-gray-500">{description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
 
-                  <div className="grid gap-3">
-                    {heroCampaigns.slice(1).map((campaign) => (
-                      <Link
-                        key={campaign.title}
-                        to={campaign.href}
-                        className="group grid min-h-[204px] grid-cols-[0.92fr_1.08fr] overflow-hidden rounded-[30px] bg-white text-gray-950 shadow-xl transition-transform hover:-translate-y-1"
-                      >
-                        <div className={`relative bg-gradient-to-br ${campaign.accent}`}>
-                          {campaign.product ? (
-                            <img
-                              src={getProductPrimaryImage(campaign.product)}
-                              alt={campaign.product.name}
-                              onError={(event) => handleProductImageError(event, campaign.product?.category)}
-                              loading="lazy"
-                              decoding="async"
-                              className="h-full w-full object-cover mix-blend-luminosity opacity-90 transition-transform duration-500 group-hover:scale-110"
-                            />
-                          ) : null}
-                          <div className="absolute inset-0 bg-gray-950/15" />
-                        </div>
-                        <div className="flex flex-col justify-center p-5">
-                          <p className="mb-2 text-[9px] font-black uppercase tracking-[0.24em] text-orange-500">{campaign.eyebrow}</p>
-                          <h3 className="text-xl font-black leading-tight text-gray-950">{campaign.title}</h3>
-                          <p className="mt-3 line-clamp-3 text-xs font-semibold leading-5 text-gray-500">{campaign.description}</p>
-                          <span className="mt-4 inline-flex items-center text-xs font-black uppercase tracking-widest text-gray-950">
-                            View
-                            <ArrowRight size={14} className="ml-2 transition-transform group-hover:translate-x-1" />
-                          </span>
-                        </div>
-                      </Link>
-                    ))}
+          <div className="relative">
+            <div className="absolute -inset-5 rounded-[46px] bg-orange-300/25 blur-3xl" />
+            <div className="relative overflow-hidden rounded-[38px] bg-gray-950 p-4 shadow-2xl shadow-gray-300 md:p-5">
+              <div className="grid gap-4 rounded-[30px] bg-white p-4 md:grid-cols-[1fr_0.82fr] md:p-5">
+                <Link
+                  to={heroFeaturedProduct ? `/product/${heroFeaturedProduct.id}` : '/shop?search=office'}
+                  className="group relative min-h-[380px] overflow-hidden rounded-[28px] bg-gray-100"
+                >
+                  <img
+                    src={heroFeaturedProduct ? getProductPrimaryImage(heroFeaturedProduct) : 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=1000'}
+                    alt={heroFeaturedProduct?.name || 'Featured E-Malla product'}
+                    onError={(event) => handleProductImageError(event, heroFeaturedProduct?.category)}
+                    loading="eager"
+                    fetchPriority="high"
+                    decoding="async"
+                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                  <div className="absolute left-4 top-4 rounded-full bg-white/95 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-orange-600 shadow-lg">
+                    Featured campaign
+                  </div>
+                </Link>
+
+                <div className="flex flex-col justify-between rounded-[28px] bg-[#f6f1e8] p-6">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-orange-600">Now promoting</p>
+                    <h2 className="mt-4 text-3xl font-black leading-tight text-gray-950">
+                      Back-to-school and office essentials
+                    </h2>
+                    <p className="mt-4 text-sm font-semibold leading-6 text-gray-600">
+                      Printers, accessories, stationery and practical tools for students, offices and growing businesses.
+                    </p>
+                  </div>
+
+                  <div className="mt-8 space-y-4">
+                    {heroFeaturedProduct ? (
+                      <div className="rounded-3xl bg-white p-4 shadow-sm">
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">Highlighted item</p>
+                        <p className="mt-2 line-clamp-2 text-base font-black text-gray-950">{heroFeaturedProduct.name}</p>
+                        <p className="mt-2 text-sm font-black text-orange-600">
+                          {heroFeaturedProduct.pricingType === 'quote' ? 'Price on Request' : `RWF ${heroFeaturedProduct.price.toLocaleString()}`}
+                        </p>
+                      </div>
+                    ) : null}
+                    <Link
+                      to="/shop?search=school office printer"
+                      className="group inline-flex w-full items-center justify-center rounded-2xl bg-orange-500 px-5 py-4 text-sm font-black text-white shadow-xl shadow-orange-200 transition-all hover:bg-orange-600 active:scale-95"
+                    >
+                      Explore collection
+                      <ArrowRight size={17} className="ml-2 transition-transform group-hover:translate-x-1" />
+                    </Link>
                   </div>
                 </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 text-white sm:grid-cols-3">
+                {[
+                  ['Verified sellers', 'Approved marketplace listings'],
+                  ['Cloudinary media', 'Clean product presentation'],
+                  ['Business visibility', 'Premium placements available']
+                ].map(([title, description]) => (
+                  <div key={title} className="rounded-3xl border border-white/10 bg-white/8 p-4">
+                    <p className="text-sm font-black">{title}</p>
+                    <p className="mt-2 text-xs font-semibold leading-5 text-gray-300">{description}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

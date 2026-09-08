@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CATEGORIES } from '../constants';
 import { ShoppingBag, ArrowRight, ShieldCheck, Truck, Zap, Store, Check, Star, MessageSquare } from 'lucide-react';
@@ -39,6 +39,7 @@ const getProductTimestamp = (product: Product) => {
 const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
   const navigate = useNavigate();
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
+  const [activeHeroSlideIndex, setActiveHeroSlideIndex] = useState(0);
   const products = useProducts();
   const { t } = useLanguage();
   const featuredProducts = useMemo(
@@ -69,12 +70,24 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
         .slice(0, 4),
     [products]
   );
-  const heroFeaturedProduct = useMemo(() => {
+  const heroSlides = useMemo(() => {
     const availableProducts = products.filter((product) => product.stock > 0 || product.pricingType === 'quote');
-    const priorityTerms = ['printer', 'office', 'school', 'laptop', 'router', 'hub', 'business'];
+    const pickMixedProducts = () => {
+      const seenGroups = new Set<string>();
+      const selectedProducts: Product[] = [];
 
-    return (
-      availableProducts.find((product) => {
+      for (const product of availableProducts) {
+        const groupKey = `${product.category}-${product.subcategory || product.name.split(' ')[0]}`.toLowerCase();
+        if (seenGroups.has(groupKey)) continue;
+        seenGroups.add(groupKey);
+        selectedProducts.push(product);
+        if (selectedProducts.length === 6) break;
+      }
+
+      return selectedProducts.length >= 4 ? selectedProducts : availableProducts.slice(0, 6);
+    };
+    const pickProductByTerms = (terms: string[], fallbackIndex: number) => {
+      const matchedProduct = availableProducts.find((product) => {
         const searchable = [
           product.name,
           product.description,
@@ -82,14 +95,66 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
           ...(product.tags || [])
         ].join(' ').toLowerCase();
 
-        return priorityTerms.some((term) => searchable.includes(term));
-      }) ||
-      featuredProducts[0] ||
-      availableProducts[0] ||
-      products[0]
-    );
+        return terms.some((term) => searchable.includes(term));
+      });
+
+      return matchedProduct || featuredProducts[fallbackIndex] || availableProducts[fallbackIndex] || products[fallbackIndex];
+    };
+
+    return [
+      {
+        eyebrow: 'School season',
+        title: 'School essentials',
+        highlight: 'Ready',
+        description: 'Printers, stationery and study tools.',
+        href: '/shop?search=school office printer',
+        cta: 'Shop now',
+        product: pickProductByTerms(['school', 'office', 'printer', 'stationery', 'supplies'], 0),
+        palette: 'from-orange-500 via-amber-400 to-yellow-300'
+      },
+      {
+        eyebrow: 'Business tech',
+        title: 'Office tech',
+        highlight: 'Work',
+        description: 'Devices and accessories for teams.',
+        href: '/shop?category=1',
+        cta: 'Explore',
+        product: pickProductByTerms(['laptop', 'router', 'hub', 'usb', 'hp', 'tp-link'], 1),
+        palette: 'from-slate-950 via-slate-700 to-slate-500'
+      },
+      {
+        eyebrow: 'Brand placement',
+        title: 'Promote your brand',
+        highlight: 'Visible',
+        description: 'Premium space for serious brands.',
+        href: '/contact',
+        cta: 'Book slot',
+        product: pickProductByTerms(['money', 'counter', 'business', 'machine', 'cash'], 2),
+        palette: 'from-emerald-600 via-teal-500 to-cyan-400'
+      },
+      {
+        eyebrow: 'Marketplace mix',
+        title: 'Many products, one place',
+        highlight: 'Discover',
+        description: 'A fast look at what is live now.',
+        href: '/shop',
+        cta: 'View shop',
+        product: pickProductByTerms(['printer', 'hub', 'router', 'laptop', 'watch'], 3),
+        products: pickMixedProducts(),
+        palette: 'from-orange-500 via-slate-700 to-gray-950'
+      }
+    ];
   }, [featuredProducts, products]);
+  const activeHeroSlide = heroSlides[activeHeroSlideIndex % heroSlides.length];
   const hasMarketplaceProducts = products.length > 0;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setActiveHeroSlideIndex((current) => (current + 1) % heroSlides.length);
+    }, 5500);
+
+    return () => window.clearInterval(timer);
+  }, [heroSlides.length]);
 
   const handleAddToCart = (e: React.MouseEvent, productId: string, stock: number) => {
     e.stopPropagation();
@@ -206,115 +271,115 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
   return (
     <div className="overflow-hidden">
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-[#f6f1e8] text-gray-950">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(249,115,22,0.18),transparent_28%),radial-gradient(circle_at_82%_20%,rgba(15,23,42,0.10),transparent_30%)]" />
-        <div className="relative mx-auto grid min-h-[680px] max-w-7xl items-center gap-12 px-5 py-12 sm:px-6 lg:grid-cols-[0.94fr_1.06fr] lg:px-8 lg:py-20">
-          <div className="max-w-2xl">
-            <span className="mb-6 inline-flex items-center rounded-full border border-orange-200 bg-white/80 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-orange-600 shadow-sm">
-              Trusted marketplace Rwanda
-            </span>
-            <h1 className="text-5xl font-black leading-[0.98] tracking-tight text-gray-950 sm:text-6xl lg:text-7xl">
-              Shop verified products for work, school and home.
-            </h1>
-            <p className="mt-6 max-w-xl text-base font-semibold leading-8 text-gray-600 sm:text-lg">
-              E-Malla Rwanda connects customers with approved sellers, reliable delivery and carefully presented product collections.
-            </p>
+      <section className="bg-[#f5efe4] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="relative overflow-hidden rounded-[32px] border border-slate-800/10 bg-slate-900 text-white shadow-2xl shadow-orange-100/70">
+            <div className={`absolute inset-0 bg-gradient-to-br ${activeHeroSlide.palette} opacity-24 transition-all duration-700`} />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_12%,rgba(255,255,255,0.20),transparent_27%),linear-gradient(90deg,rgba(15,23,42,0.94),rgba(15,23,42,0.76)_48%,rgba(15,23,42,0.38))]" />
 
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Link
-                to="/shop"
-                className="group flex items-center justify-center rounded-2xl bg-gray-950 px-8 py-4 text-sm font-black text-white shadow-2xl shadow-gray-300 transition-all hover:bg-orange-600 active:scale-95"
-              >
-                Shop marketplace
-                <ShoppingBag className="ml-3 transition-transform group-hover:rotate-12" size={20} />
-              </Link>
-              <Link
-                to="/contact"
-                className="flex items-center justify-center rounded-2xl border border-gray-200 bg-white px-8 py-4 text-sm font-black text-gray-950 shadow-xl shadow-gray-200/60 transition-all hover:border-orange-200 hover:text-orange-600 active:scale-95"
-              >
-                Book a brand placement
-              </Link>
-            </div>
+            <div
+              key={activeHeroSlide.title}
+              className="home-hero-slide relative grid min-h-[520px] items-center gap-6 px-5 py-7 sm:px-8 md:min-h-[430px] md:grid-cols-[0.88fr_1.12fr] md:px-10 lg:min-h-[470px] lg:px-12"
+            >
+              <div className="relative z-10 max-w-xl">
+                <p className="mb-4 inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.24em] text-orange-100 backdrop-blur-md">
+                  {activeHeroSlide.eyebrow}
+                </p>
+                <h1 className="max-w-2xl text-3xl font-black leading-[1.02] tracking-tight sm:text-5xl lg:text-6xl">
+                  <span className="home-hero-word text-orange-300">{activeHeroSlide.highlight}</span>
+                  <br />
+                  {activeHeroSlide.title}
+                </h1>
+                <p className="mt-4 max-w-md text-sm font-semibold leading-6 text-gray-200 sm:mt-5 sm:text-base">
+                  {activeHeroSlide.description}
+                </p>
 
-            <div className="mt-10 grid max-w-2xl gap-3 sm:grid-cols-3">
-              {[
-                ['Featured products', 'Curated catalog visibility'],
-                ['Sponsored stories', 'For brands and institutions'],
-                ['Seasonal campaigns', 'School, office and lifestyle']
-              ].map(([title, description]) => (
-                <div key={title} className="rounded-3xl border border-white bg-white/75 p-4 shadow-sm">
-                  <p className="text-sm font-black text-gray-950">{title}</p>
-                  <p className="mt-2 text-xs font-semibold leading-5 text-gray-500">{description}</p>
+                <div className="mt-6 flex flex-col gap-3 sm:mt-7 sm:flex-row">
+                  <Link
+                    to={activeHeroSlide.href}
+                    className="group inline-flex items-center justify-center rounded-2xl bg-orange-500 px-6 py-4 text-sm font-black text-white shadow-xl shadow-orange-950/20 transition-all hover:bg-orange-600 active:scale-95"
+                  >
+                    {activeHeroSlide.cta}
+                    <ArrowRight size={17} className="ml-2 transition-transform group-hover:translate-x-1" />
+                  </Link>
+                  <Link
+                    to="/shop"
+                    className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-6 py-4 text-sm font-black text-white backdrop-blur-md transition-all hover:bg-white hover:text-gray-950 active:scale-95"
+                  >
+                    All products
+                  </Link>
                 </div>
-              ))}
-            </div>
-          </div>
 
-          <div className="relative">
-            <div className="absolute -inset-5 rounded-[46px] bg-orange-300/25 blur-3xl" />
-            <div className="relative overflow-hidden rounded-[38px] bg-gray-950 p-4 shadow-2xl shadow-gray-300 md:p-5">
-              <div className="grid gap-4 rounded-[30px] bg-white p-4 md:grid-cols-[1fr_0.82fr] md:p-5">
-                <Link
-                  to={heroFeaturedProduct ? `/product/${heroFeaturedProduct.id}` : '/shop?search=office'}
-                  className="group relative min-h-[380px] overflow-hidden rounded-[28px] bg-gray-100"
-                >
-                  <img
-                    src={heroFeaturedProduct ? getProductPrimaryImage(heroFeaturedProduct) : 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=1000'}
-                    alt={heroFeaturedProduct?.name || 'Featured E-Malla product'}
-                    onError={(event) => handleProductImageError(event, heroFeaturedProduct?.category)}
-                    loading="eager"
-                    fetchPriority="high"
-                    decoding="async"
-                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                  <div className="absolute left-4 top-4 rounded-full bg-white/95 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-orange-600 shadow-lg">
-                    Featured campaign
-                  </div>
-                </Link>
-
-                <div className="flex flex-col justify-between rounded-[28px] bg-[#f6f1e8] p-6">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-orange-600">Now promoting</p>
-                    <h2 className="mt-4 text-3xl font-black leading-tight text-gray-950">
-                      Back-to-school and office essentials
-                    </h2>
-                    <p className="mt-4 text-sm font-semibold leading-6 text-gray-600">
-                      Printers, accessories, stationery and practical tools for students, offices and growing businesses.
-                    </p>
-                  </div>
-
-                  <div className="mt-8 space-y-4">
-                    {heroFeaturedProduct ? (
-                      <div className="rounded-3xl bg-white p-4 shadow-sm">
-                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">Highlighted item</p>
-                        <p className="mt-2 line-clamp-2 text-base font-black text-gray-950">{heroFeaturedProduct.name}</p>
-                        <p className="mt-2 text-sm font-black text-orange-600">
-                          {heroFeaturedProduct.pricingType === 'quote' ? 'Price on Request' : `RWF ${heroFeaturedProduct.price.toLocaleString()}`}
-                        </p>
-                      </div>
-                    ) : null}
-                    <Link
-                      to="/shop?search=school office printer"
-                      className="group inline-flex w-full items-center justify-center rounded-2xl bg-orange-500 px-5 py-4 text-sm font-black text-white shadow-xl shadow-orange-200 transition-all hover:bg-orange-600 active:scale-95"
-                    >
-                      Explore collection
-                      <ArrowRight size={17} className="ml-2 transition-transform group-hover:translate-x-1" />
-                    </Link>
-                  </div>
+                <div className="mt-6 flex items-center gap-3 sm:mt-8">
+                  {heroSlides.map((slide, index) => (
+                    <button
+                      key={slide.title}
+                      type="button"
+                      onClick={() => setActiveHeroSlideIndex(index)}
+                      className={`h-2.5 rounded-full transition-all ${
+                        index === activeHeroSlideIndex ? 'w-10 bg-orange-400' : 'w-2.5 bg-white/35 hover:bg-white/60'
+                      }`}
+                      aria-label={`Show ${slide.eyebrow} promotion`}
+                    />
+                  ))}
                 </div>
               </div>
 
-              <div className="mt-4 grid gap-3 text-white sm:grid-cols-3">
-                {[
-                  ['Verified sellers', 'Approved marketplace listings'],
-                  ['Cloudinary media', 'Clean product presentation'],
-                  ['Business visibility', 'Premium placements available']
-                ].map(([title, description]) => (
-                  <div key={title} className="rounded-3xl border border-white/10 bg-white/8 p-4">
-                    <p className="text-sm font-black">{title}</p>
-                    <p className="mt-2 text-xs font-semibold leading-5 text-gray-300">{description}</p>
-                  </div>
-                ))}
+              <div className="relative z-10 mx-auto flex w-full max-w-xl items-center justify-center md:justify-end">
+                <div className="relative h-[220px] w-full max-w-[520px] sm:h-[300px] lg:h-[340px]">
+                  <div className="absolute inset-x-8 bottom-1 h-16 rounded-full bg-black/45 blur-2xl" />
+                  {activeHeroSlide.products?.length ? (
+                    <div className="absolute inset-0">
+                      {activeHeroSlide.products.map((product, index) => (
+                        <Link
+                          key={product.id}
+                          to={`/product/${product.id}`}
+                          className={`home-hero-blast-card home-hero-blast-card-${index + 1} absolute overflow-hidden rounded-[22px] border border-white/15 bg-white/12 shadow-2xl shadow-black/25 backdrop-blur-sm`}
+                        >
+                          <img
+                            src={getProductPrimaryImage(product)}
+                            alt={product.name}
+                            onError={(event) => handleProductImageError(event, product.category)}
+                            loading="lazy"
+                            decoding="async"
+                            className="h-full w-full object-cover"
+                          />
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <Link
+                        to={activeHeroSlide.product ? `/product/${activeHeroSlide.product.id}` : activeHeroSlide.href}
+                        className="home-hero-product group absolute inset-y-0 right-0 w-[78%] overflow-hidden rounded-[30px] border border-white/15 bg-white/10 shadow-2xl shadow-black/30 backdrop-blur-sm"
+                      >
+                        <img
+                          src={activeHeroSlide.product ? getProductPrimaryImage(activeHeroSlide.product) : 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=1000'}
+                          alt={activeHeroSlide.product?.name || activeHeroSlide.title}
+                          onError={(event) => handleProductImageError(event, activeHeroSlide.product?.category)}
+                          loading="eager"
+                          fetchPriority="high"
+                          decoding="async"
+                          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                      </Link>
+
+                      <div className="absolute bottom-5 left-0 hidden w-[38%] rounded-[20px] border border-white/20 bg-white/95 p-3 text-gray-950 shadow-xl shadow-black/20 backdrop-blur-md sm:block">
+                        <p className="text-[8px] font-black uppercase tracking-[0.22em] text-orange-600">Featured</p>
+                        <p className="mt-2 line-clamp-2 text-sm font-black leading-tight">
+                          {activeHeroSlide.product?.name || activeHeroSlide.title}
+                        </p>
+                        <p className="mt-2 text-xs font-black text-orange-600">
+                          {activeHeroSlide.product
+                            ? activeHeroSlide.product.pricingType === 'quote'
+                              ? 'Price on Request'
+                              : `RWF ${activeHeroSlide.product.price.toLocaleString()}`
+                            : 'E-Malla feature'}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>

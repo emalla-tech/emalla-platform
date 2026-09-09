@@ -135,7 +135,7 @@ const PaymentSuccess: React.FC = () => {
             {mode === 'cod'
               ? <>Your order <span className="text-gray-900 font-black">{order?.orderNumber || '#Pending'}</span> is confirmed with <span className="text-orange-600 font-black">Cash on Delivery</span>. Please pay when it arrives.</>
               : isVerificationPending
-                ? <>Your GTBank payment details for order <span className="text-gray-900 font-black">{order?.orderNumber || '#Pending'}</span> were submitted. E-Malla Finance will verify them before the fulfillment hub starts preparing your order.</>
+                ? <>Your Bank of Kigali payment details for order <span className="text-gray-900 font-black">{order?.orderNumber || '#Pending'}</span> were submitted. E-Malla Finance will verify them before the fulfillment hub starts preparing your order.</>
               : <>Payment confirmed. Your order <span className="text-gray-900 font-black">{order?.orderNumber || '#Pending'}</span> is being processed through <span className="text-orange-600 font-black">{getPublicFulfillmentHubLabel()}</span>.</>}
           </p>
         </div>

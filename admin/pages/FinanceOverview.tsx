@@ -233,11 +233,11 @@ const FinanceOverview: React.FC = () => {
       const updated = await AdminService.reviewPaymentClaim(paymentId, status);
       setPaymentClaims((current) => current.map((entry) => (entry.id === paymentId ? updated : entry)));
       setMessageTone(status === 'approved' ? 'success' : 'info');
-      setMessage(status === 'approved' ? 'GTBank payment approved.' : 'GTBank payment rejected.');
+      setMessage(status === 'approved' ? 'Bank payment approved.' : 'Bank payment rejected.');
       window.setTimeout(() => setMessage(null), 3000);
     } catch (error) {
       setMessageTone('error');
-      setMessage(error instanceof Error ? error.message : 'Unable to review GTBank payment.');
+      setMessage(error instanceof Error ? error.message : 'Unable to review bank payment.');
       window.setTimeout(() => setMessage(null), 3000);
     } finally {
       setBusyClaimId(null);
@@ -887,12 +887,12 @@ const FinanceOverview: React.FC = () => {
 
           <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-8 py-6 border-b border-gray-100">
-              <h2 className="text-xl font-black text-gray-900">GTBank Payment Verification Queue</h2>
+              <h2 className="text-xl font-black text-gray-900">Bank Payment Verification Queue</h2>
               <p className="text-sm text-gray-500 mt-1">Confirm the bank reference and amount before releasing an order to the seller.</p>
             </div>
             <div className="divide-y divide-gray-100">
               {paymentClaims.length === 0 ? (
-                <div className="px-8 py-10 text-sm text-gray-500">No GTBank payments are waiting for verification.</div>
+                <div className="px-8 py-10 text-sm text-gray-500">No bank payments are waiting for verification.</div>
               ) : paymentClaims.map((claim) => (
                 <div key={claim.id} className="px-8 py-5 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
                   <div>

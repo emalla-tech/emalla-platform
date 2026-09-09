@@ -136,8 +136,9 @@ export const getStorageConfig = () => ({
 });
 
 export const getPaymentConfig = () => ({
-  gtbankMerchantCode: String(process.env.GTBANK_MERCHANT_CODE || '551000093').trim(),
-  gtbankRecipientName: String(process.env.GTBANK_RECIPIENT_NAME || 'Perfect Technologies Ltd').trim()
+  bankName: String(process.env.BK_BANK_NAME || 'Bank of Kigali').trim(),
+  bkAccountNumber: String(process.env.BK_ACCOUNT_NUMBER || '100149281929').trim(),
+  bkRecipientName: String(process.env.BK_RECIPIENT_NAME || 'Perfect Technologies Ltd').trim()
 });
 
 export const getDatabaseConfig = () => {

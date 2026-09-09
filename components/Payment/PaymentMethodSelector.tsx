@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Building2, CheckCircle2, Banknote } from 'lucide-react';
+import { Building2, CheckCircle2, Banknote, Smartphone } from 'lucide-react';
 import { PaymentMethod } from '../../types';
 
 interface PaymentMethodSelectorProps {
@@ -11,13 +11,22 @@ interface PaymentMethodSelectorProps {
 const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({ selected, onSelect }) => {
   const methods = [
     {
-      id: PaymentMethod.GTBANK_MOMO_PAY,
-      name: 'GTBank MoMo Pay',
-      desc: 'Pay free by dialing a secure USSD code',
-      icon: <Building2 className="text-red-600" />,
-      color: 'border-red-100 bg-red-50/30',
-      activeColor: 'border-red-500 bg-red-50 ring-red-100',
+      id: PaymentMethod.BK_EKASH,
+      name: 'BK eKash',
+      desc: 'Dial USSD and pay from your phone',
+      icon: <Smartphone className="text-blue-700" />,
+      color: 'border-blue-100 bg-blue-50/30',
+      activeColor: 'border-blue-500 bg-blue-50 ring-blue-100',
       badge: 'Recommended'
+    },
+    {
+      id: PaymentMethod.BK_BANK_TRANSFER,
+      name: 'BK Bank Transfer',
+      desc: 'Transfer directly to the E-Malla BK account',
+      icon: <Building2 className="text-sky-700" />,
+      color: 'border-sky-100 bg-sky-50/30',
+      activeColor: 'border-sky-500 bg-sky-50 ring-sky-100',
+      badge: 'Bank'
     },
     {
       id: PaymentMethod.CASH_ON_DELIVERY,

@@ -51,6 +51,22 @@ const getJsonAdapter = () => {
       const snapshot = await jsonDb.readDb();
       return snapshot.products || [];
     },
+    updateProductRecord: async ({ product, expectedUpdatedAt, auditLog }) => {
+      const snapshot = await jsonDb.readDb();
+      const index = (snapshot.products || []).findIndex((entry) => entry.id === product.id);
+      if (index < 0 || snapshot.products[index].updatedAt !== expectedUpdatedAt) {
+        const error = new Error('Product changed while you were editing it. Refresh and try again.');
+        error.statusCode = 409;
+        throw error;
+      }
+      snapshot.products[index] = product;
+      if (auditLog) {
+        snapshot.auditLogs = snapshot.auditLogs || [];
+        snapshot.auditLogs.unshift(auditLog);
+      }
+      await jsonDb.writeDb(snapshot);
+      return product;
+    },
     readOrders: async () => {
       const snapshot = await jsonDb.readDb();
       return snapshot.orders || [];
@@ -64,6 +80,18 @@ const getJsonAdapter = () => {
       return {
         ...snapshot,
         orders: (snapshot.orders || []).filter((entry) => entry.id === options.orderId)
+      };
+    },
+    readManualPaymentData: async ({ orderId, txRef, bankReference }) => {
+      const snapshot = await jsonDb.readDb();
+      return {
+        orders: (snapshot.orders || []).filter((entry) => entry.id === orderId),
+        payments: (snapshot.payments || []).filter((entry) =>
+          (entry.orderId === orderId && entry.tx_ref === txRef) ||
+          (bankReference && String(entry.bankReference || '').toLowerCase() === bankReference.toLowerCase())
+        ),
+        notifications: [],
+        auditLogs: []
       };
     },
     readPublicInsightsData: async () => {
@@ -378,8 +406,10 @@ const createActiveAdapter = () => {
       ensureDb: () => callWithFallback('ensureDb'),
       readDb: () => callWithFallback('readDb'),
       readProducts: () => callWithFallback('readProducts'),
+      updateProductRecord: (payload) => callWithFallback('updateProductRecord', payload),
       readOrders: () => callWithFallback('readOrders'),
       readCheckoutData: (options) => callWithFallback('readCheckoutData', options),
+      readManualPaymentData: (options) => callWithFallback('readManualPaymentData', options),
       readPublicInsightsData: () => callWithFallback('readPublicInsightsData'),
       readAdminStatsData: () => callWithFallback('readAdminStatsData'),
       readAdminRidersData: () => callWithFallback('readAdminRidersData'),
@@ -471,6 +501,9 @@ export const readCheckoutData = async (options = {}) => {
 
   return adapter.readDb();
 };
+
+export const readManualPaymentData = (options) => getAdapter().readManualPaymentData(options);
+export const updateProductRecord = (payload) => getAdapter().updateProductRecord(payload);
 
 export const readPublicInsightsData = async () => {
   const adapter = getAdapter();

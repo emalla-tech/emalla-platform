@@ -2,8 +2,10 @@ import {
   ensureDb,
   readDb,
   readProducts,
+  updateProductRecord,
   readOrders,
   readCheckoutData,
+  readManualPaymentData,
   readPublicInsightsData,
   readAdminStatsData,
   readAdminRidersData,
@@ -49,8 +51,10 @@ export const databaseService = {
   getStatus: () => getDatabaseStatus(),
   readSnapshot: () => readDb(),
   readProducts: () => readProducts(),
+  updateProduct: (payload) => updateProductRecord(payload),
   readOrders: () => readOrders(),
   readCheckoutData: (options) => readCheckoutData(options),
+  readManualPaymentData: (options) => readManualPaymentData(options),
   readPublicInsightsData: () => readPublicInsightsData(),
   readAdminStatsData: () => readAdminStatsData(),
   readAdminRidersData: () => readAdminRidersData(),
@@ -79,8 +83,10 @@ export const ensureDatabaseReady = () => databaseService.ensureReady();
 export const getDatabaseServiceStatus = () => databaseService.getStatus();
 export const readDatabaseSnapshot = () => databaseService.readSnapshot();
 export const readProductRecords = () => databaseService.readProducts();
+export const updateProductRecordInDatabase = (payload) => databaseService.updateProduct(payload);
 export const readOrderRecords = () => databaseService.readOrders();
 export const readCheckoutSnapshot = (options) => databaseService.readCheckoutData(options);
+export const readManualPaymentSnapshot = (options) => databaseService.readManualPaymentData(options);
 export const readPublicInsightsRecords = () => databaseService.readPublicInsightsData();
 export const readAdminStatsRecords = () => databaseService.readAdminStatsData();
 export const readAdminRiderRecords = () => databaseService.readAdminRidersData();

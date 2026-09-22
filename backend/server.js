@@ -5,8 +5,10 @@ import { GoogleGenAI } from '@google/genai';
 import {
   readDatabaseSnapshot as readDb,
   readProductRecords,
+  updateProductRecordInDatabase,
   readOrderRecords,
   readCheckoutSnapshot,
+  readManualPaymentSnapshot,
   readPublicInsightsRecords,
   readAdminStatsRecords,
   readAdminRiderRecords,
@@ -5728,7 +5730,7 @@ const server = http.createServer(async (req, res) => {
 
       const productId = pathname.split('/').pop();
       const body = await readBody(req);
-      const db = await readDb();
+      const db = { products: await readProductRecords(), auditLogs: [] };
       const index = db.products.findIndex((product) => product.id === productId);
 
       if (index === -1) {
@@ -5772,6 +5774,10 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 400, { error: 'Product name must be between 2 and 180 characters.' });
         return;
       }
+      if (body.status !== undefined && !['pending', 'approved', 'rejected', 'draft'].includes(body.status)) {
+        sendJson(res, 400, { error: 'Invalid product status.' });
+        return;
+      }
       const deliveryFieldsChanged = [
         'fulfillmentType',
         'deliveryMinDays',
@@ -5802,11 +5808,16 @@ const server = http.createServer(async (req, res) => {
             reviewsCount: existing.reviewsCount
           };
 
-      db.products[index] = normalizeProductMedia({ ...existing, ...safeUpdates });
-      invalidateProductsCache();
+      db.products[index] = normalizeProductMedia({
+        ...existing,
+        ...safeUpdates,
+        id: existing.id,
+        createdAt: existing.createdAt,
+        updatedAt: new Date().toISOString()
+      });
       const nextMediaUrls = getProductMediaUrls(db.products[index]);
       const removedMediaUrls = collectRemovedAssetUrls(previousMediaUrls, nextMediaUrls);
-      createAuditLog(db, {
+      const auditLog = createAuditLog(db, {
         event: `Product updated: ${db.products[index].name}`,
         actor: user.name || user.email,
         category: 'products',
@@ -5820,7 +5831,13 @@ const server = http.createServer(async (req, res) => {
           removedAssets: removedMediaUrls.length
         }
       });
-      await writeDb(db);
+      await updateProductRecordInDatabase({
+        product: db.products[index],
+        expectedRowVersion: existing.rowVersion,
+        expectedUpdatedAt: existing.updatedAt,
+        auditLog
+      });
+      invalidateProductsCache();
       await purgeAssetUrls(removedMediaUrls);
       sendJson(res, 200, { product: db.products[index] });
       return;
@@ -7233,12 +7250,12 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/payments/manual/submit' && req.method === 'POST') {
       const user = await getOptionalUser(req);
       const body = await readBody(req);
-      const db = await readDb();
       const txRef = String(body.txRef || '').trim();
       const orderId = String(body.orderId || '').trim();
       const bankReference = String(body.bankReference || '').trim();
       const payerPhone = String(body.payerPhone || '').trim();
       const checkoutEmail = String(body.email || '').trim().toLowerCase();
+      const db = await readManualPaymentSnapshot({ orderId, txRef, bankReference });
       const paymentIndex = (db.payments || []).findIndex((entry) => entry.tx_ref === txRef && entry.orderId === orderId);
       const orderIndex = (db.orders || []).findIndex((entry) => entry.id === orderId);
 

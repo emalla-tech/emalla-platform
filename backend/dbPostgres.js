@@ -323,26 +323,32 @@ const mapUser = (row) => ({
   updatedAt: toIso(row.updated_at)
 });
 
-const mapProduct = (row) => ({
-  ...(row.metadata || {}),
-  id: row.id,
-  merchantId: row.merchant_id || undefined,
-  merchantName: row.metadata?.merchantName || '',
-  name: row.name,
-  description: row.description || '',
-  specifications: row.specifications || '',
-  category: row.category,
-  price: toNumber(row.price),
-  stock: toNumber(row.stock),
-  image: row.image || '',
-  images: json(row.images, []),
-  status: row.status,
-  featured: row.featured,
-  rating: toNumber(row.rating),
-  reviewsCount: toNumber(row.reviews),
-  createdAt: toIso(row.created_at),
-  updatedAt: toIso(row.updated_at)
-});
+const mapProduct = (row) => {
+  const product = {
+    ...(row.metadata || {}),
+    id: row.id,
+    merchantId: row.merchant_id || undefined,
+    merchantName: row.metadata?.merchantName || '',
+    name: row.name,
+    description: row.description || '',
+    specifications: row.specifications || '',
+    category: row.category,
+    price: toNumber(row.price),
+    stock: toNumber(row.stock),
+    image: row.image || '',
+    images: json(row.images, []),
+    status: row.status,
+    featured: row.featured,
+    rating: toNumber(row.rating),
+    reviewsCount: toNumber(row.reviews),
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at)
+  };
+  if (row.row_version) {
+    Object.defineProperty(product, 'rowVersion', { value: row.row_version });
+  }
+  return product;
+};
 
 const mapOrder = (row) => ({
   ...(row.metadata || {}),
@@ -512,8 +518,36 @@ export const createPostgresAdapter = () => {
     },
 
     async readProducts() {
-      const products = await readRows('products');
-      return products.map(mapProduct);
+      const result = await query(`SELECT ${READ_COLUMNS.products}, xmin::text AS row_version FROM products`);
+      return result.rows.map(mapProduct);
+    },
+
+    async updateProductRecord({ product, expectedRowVersion, auditLog }) {
+      return tx(async (client) => {
+        const result = await client.query(
+          `UPDATE products SET merchant_id = $2, name = $3, description = $4,
+            specifications = $5, category = $6, price = $7, stock = $8,
+            image = $9, images = $10, status = $11, featured = $12,
+            rating = $13, reviews = $14, updated_at = $15, metadata = $16
+           WHERE id = $1 AND xmin::text = $17 RETURNING id`,
+          [
+            product.id, product.merchantId || null, product.name,
+            product.description || '', product.specifications || '',
+            product.category, toNumber(product.price), toNumber(product.stock),
+            product.image || null, normalizeJsonValue(product.images || [], '[]'),
+            product.status || 'pending', Boolean(product.featured),
+            toNumber(product.rating), toNumber(product.reviewsCount ?? product.reviews),
+            product.updatedAt, normalizeJsonValue(product), expectedRowVersion
+          ]
+        );
+        if (!result.rowCount) {
+          const error = new Error('Product changed while you were editing it. Refresh and try again.');
+          error.statusCode = 409;
+          throw error;
+        }
+        if (auditLog) await upsertAuditLogRecord(client, auditLog);
+        return product;
+      });
     },
 
     async readOrders() {
@@ -573,6 +607,33 @@ export const createPostgresAdapter = () => {
           delivery: delivery || undefined
         };
       });
+    },
+
+    async readManualPaymentData({ orderId, txRef, bankReference }) {
+      const orders = await query(`SELECT ${READ_COLUMNS.orders} FROM orders WHERE id = $1 LIMIT 1`, [orderId]);
+      const payments = await query(
+        `SELECT ${READ_COLUMNS.payments} FROM payments
+         WHERE (order_id = $1 AND tx_ref = $2)
+            OR LOWER(metadata->>'bankReference') = LOWER($3)`,
+        [orderId, txRef, bankReference]
+      );
+      return {
+        orders: orders.rows.map(mapOrder),
+        payments: payments.rows.map((row) => ({
+          ...(row.metadata || {}),
+          id: row.id,
+          orderId: row.order_id || undefined,
+          userId: row.user_id || undefined,
+          amount: toNumber(row.amount),
+          status: row.status,
+          method: row.method || '',
+          tx_ref: row.tx_ref || '',
+          createdAt: toIso(row.created_at),
+          updatedAt: toIso(row.updated_at)
+        })),
+        notifications: [],
+        auditLogs: []
+      };
     },
 
     async readCheckoutData(options = {}) {

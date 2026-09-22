@@ -25,24 +25,16 @@ const request = async (path = '', init: RequestInit = {}) => {
   const data = await response.json().catch(() => null);
   if (!response.ok) {
     const message = data?.error || 'Product request failed';
+    const requestId = data?.requestId || response.headers.get('x-request-id');
     if (response.status >= 500) {
       monitoringService.reportApiError({
         path: `/products${path}`,
         statusCode: response.status,
         message,
-        requestId: data?.requestId || response.headers.get('x-request-id') || undefined
+        requestId: requestId || undefined
       });
     }
-    throw new Error(message);
-  }
-
-  if (!data || !Array.isArray(data.products)) {
-    monitoringService.reportApiError({
-      path: `/products${path}`,
-      statusCode: response.status,
-      message: 'Products API returned an invalid response'
-    });
-    throw new Error('Products API returned an invalid response');
+    throw new Error(response.status >= 500 && requestId ? `${message} Reference: ${requestId}` : message);
   }
 
   return data;
@@ -97,6 +89,9 @@ export const ProductService = {
     inflightProductsRequest = (async () => {
       try {
         const response = await request();
+        if (!response || !Array.isArray(response.products)) {
+          throw new Error('Products API returned an invalid response');
+        }
         cachedProducts = response.products;
       } catch (error) {
         monitoringService.reportApiError({

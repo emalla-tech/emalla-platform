@@ -27,15 +27,17 @@ const request = async (path: string, init: RequestInit = {}) => {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
+    const requestId = data.requestId || response.headers.get('x-request-id');
     if (response.status >= 500) {
       monitoringService.reportApiError({
         path,
         statusCode: response.status,
         message: data.error || 'Server request failed',
-        requestId: data.requestId || response.headers.get('x-request-id') || undefined
+        requestId: requestId || undefined
       });
     }
-    throw new Error(data.error || 'Request failed');
+    const message = data.error || 'Request failed';
+    throw new Error(response.status >= 500 && requestId ? `${message} Reference: ${requestId}` : message);
   }
 
   return data;

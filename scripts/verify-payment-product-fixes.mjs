@@ -34,7 +34,8 @@ const ids = {
 };
 const email = `${marker}@example.test`;
 const port = 42000 + Math.floor(Math.random() * 2000);
-const base = `http://127.0.0.1:${port}`;
+const externalBase = process.env.COMMERCE_FIX_BASE_URL;
+const base = externalBase || `http://127.0.0.1:${port}`;
 let server;
 
 const request = async (path, init) => {
@@ -94,23 +95,25 @@ try {
     })]
   );
 
-  server = spawn(process.execPath, ['backend/server.js'], {
-    cwd: process.cwd(),
-    env: {
-      ...process.env,
-      NODE_ENV: 'development',
-      DB_PROVIDER: 'postgres',
-      PORT: String(port),
-      EMAIL_PROVIDER: 'log',
-      STORAGE_PROVIDER: 'log',
-      EGN_FINANCE_ENABLED: 'false'
-    },
-    stdio: 'ignore',
-    windowsHide: true
-  });
+  if (!externalBase) {
+    server = spawn(process.execPath, ['backend/server.js'], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        NODE_ENV: 'development',
+        DB_PROVIDER: 'postgres',
+        PORT: String(port),
+        EMAIL_PROVIDER: 'log',
+        STORAGE_PROVIDER: 'log',
+        EGN_FINANCE_ENABLED: 'false'
+      },
+      stdio: 'ignore',
+      windowsHide: true
+    });
+  }
   let ready = false;
   for (let attempt = 0; attempt < 50; attempt += 1) {
-    if (server.exitCode !== null) throw new Error('Local API exited before tests.');
+    if (server && server.exitCode !== null) throw new Error('Local API exited before tests.');
     try {
       const health = await request('/api/health');
       if (health.status === 200) { ready = true; break; }

@@ -409,20 +409,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
           <div className="flex flex-col justify-start">
             <div className="mb-6">
               <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4 leading-tight">{product.name}</h1>
-              {product.tags?.length ? (
-                <div className="mb-4 flex flex-wrap gap-2">
-                  {product.tags.slice(0, 6).map((tag) => (
-                    <Link
-                      key={tag}
-                      to={`/shop?search=${encodeURIComponent(tag)}`}
-                      className="rounded-full border border-orange-100 bg-orange-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-orange-600 transition-colors hover:border-orange-300 hover:bg-orange-100"
-                    >
-                      #{tag}
-                    </Link>
-                  ))}
-                </div>
-              ) : null}
-              
+
               <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center text-yellow-500 bg-yellow-50 px-2 py-1 rounded-lg">
                   <Star size={16} fill="currentColor" />

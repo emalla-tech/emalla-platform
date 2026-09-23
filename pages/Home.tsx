@@ -50,26 +50,6 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
     () => [...products].sort((left, right) => getProductTimestamp(right) - getProductTimestamp(left)).slice(0, 4),
     [products]
   );
-  const todaysPicks = useMemo(
-    () =>
-      [...products]
-        .filter((product) => product.stock > 0 || product.pricingType === 'quote')
-        .sort((left, right) => {
-          const leftScore = Number(Boolean(left.featured)) * 4 + Number(left.rating || 0) + Math.min(Number(left.stock || 0), 10) / 10;
-          const rightScore = Number(Boolean(right.featured)) * 4 + Number(right.rating || 0) + Math.min(Number(right.stock || 0), 10) / 10;
-          return rightScore - leftScore;
-        })
-        .slice(0, 4),
-    [products]
-  );
-  const popularInKigali = useMemo(
-    () =>
-      [...products]
-        .filter((product) => product.stock > 0 && product.fulfillmentType !== 'imported_on_demand')
-        .sort((left, right) => Number(right.rating || 0) - Number(left.rating || 0))
-        .slice(0, 4),
-    [products]
-  );
   const heroSlides = useMemo(() => {
     const availableProducts = products.filter((product) => product.stock > 0 || product.pricingType === 'quote');
     const pickMixedProducts = () => {
@@ -245,26 +225,6 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
       badge: t.home.newArrival,
       cardEyebrow: 'New Arrival',
       products: newArrivalProducts
-    },
-    {
-      eyebrow: 'Curated today',
-      title: "Today's Picks",
-      subtitle: 'A rotating selection of useful products worth checking today.',
-      cta: "Explore today's picks",
-      href: '/shop?search=today',
-      badge: 'Today',
-      cardEyebrow: "Today's Pick",
-      products: todaysPicks
-    },
-    {
-      eyebrow: 'E-Malla Hub Kigali',
-      title: 'Popular in Kigali',
-      subtitle: 'Ready-stock items that fit fast local fulfillment through our Kigali hub.',
-      cta: 'Shop Kigali-ready items',
-      href: '/shop?search=Kigali',
-      badge: 'Kigali',
-      cardEyebrow: 'Hub Ready',
-      products: popularInKigali
     }
   ];
 
@@ -528,20 +488,18 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
       {/* Marketplace Shelves */}
       {hasMarketplaceProducts && <section className="bg-white py-20">
         <div className="mx-auto max-w-7xl space-y-16 px-4">
-          {marketplaceShelves.map((shelf, index) => (
+          {marketplaceShelves.map((shelf) => (
             shelf.products.length > 0 ? (
-              <div key={shelf.title} className={`rounded-[40px] border border-gray-100 p-6 md:p-10 ${index === 1 ? 'bg-gray-950 text-white shadow-2xl shadow-gray-200' : 'bg-gray-50'}`}>
+              <div key={shelf.title} className="rounded-[40px] border border-gray-100 bg-gray-50 p-6 md:p-10">
                 <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
                   <div>
-                    <p className={`mb-2 text-[10px] font-black uppercase tracking-[0.28em] ${index === 1 ? 'text-orange-300' : 'text-orange-500'}`}>{shelf.eyebrow}</p>
-                    <h2 className={`text-3xl font-black md:text-4xl ${index === 1 ? 'text-white' : 'text-gray-900'}`}>{shelf.title}</h2>
-                    <p className={`mt-3 max-w-xl text-sm font-medium leading-6 ${index === 1 ? 'text-gray-300' : 'text-gray-500'}`}>{shelf.subtitle}</p>
+                    <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-orange-500">{shelf.eyebrow}</p>
+                    <h2 className="text-3xl font-black text-gray-900 md:text-4xl">{shelf.title}</h2>
+                    <p className="mt-3 max-w-xl text-sm font-medium leading-6 text-gray-500">{shelf.subtitle}</p>
                   </div>
                   <Link
                     to={shelf.href}
-                    className={`inline-flex items-center rounded-2xl px-5 py-3 text-xs font-black uppercase tracking-widest transition-all active:scale-95 ${
-                      index === 1 ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-black text-white hover:bg-orange-500'
-                    }`}
+                    className="inline-flex items-center rounded-2xl bg-black px-5 py-3 text-xs font-black uppercase tracking-widest text-white transition-all hover:bg-orange-500 active:scale-95"
                   >
                     {shelf.cta}
                     <ArrowRight size={16} className="ml-2" />

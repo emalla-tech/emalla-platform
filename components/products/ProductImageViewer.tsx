@@ -51,19 +51,19 @@ const ProductImageViewer = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex flex-col bg-gray-950/96 text-white backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex flex-col bg-gray-950 text-white"
       role="dialog"
       aria-modal="true"
       aria-label={`${productName} image viewer`}
       onClick={onClose}
     >
       <div
-        className="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-3 sm:px-6"
+        className="relative z-30 flex min-h-[72px] items-center justify-between gap-4 border-b border-white/10 bg-gray-900 px-4 py-3 shadow-2xl sm:px-6"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold sm:text-base">{productName}</p>
-          <p className="mt-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-white/45">
+          <p className="truncate text-sm font-black text-white sm:text-base">{productName}</p>
+          <p className="mt-1 text-[10px] font-black uppercase tracking-[0.2em] text-orange-400">
             Image {activeIndex + 1} of {images.length}
           </p>
         </div>
@@ -72,7 +72,7 @@ const ProductImageViewer = ({
           <button
             type="button"
             onClick={() => setIsZoomed((current) => !current)}
-            className="flex h-11 items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 text-xs font-black transition hover:bg-white/20"
+            className="flex h-11 items-center gap-2 rounded-full border border-white bg-white px-4 text-xs font-black text-gray-950 shadow-lg transition hover:border-orange-200 hover:bg-orange-50"
             aria-label={isZoomed ? 'Zoom out' : 'Zoom in'}
           >
             {isZoomed ? <Minus size={17} /> : <Plus size={17} />}
@@ -90,7 +90,7 @@ const ProductImageViewer = ({
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1 overflow-auto overscroll-contain p-4 sm:p-8">
+      <div className="relative min-h-0 flex-1 overflow-auto overscroll-contain bg-gray-950 p-4 sm:p-8">
         <div className={`flex min-h-full items-center justify-center ${isZoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'}`}>
           <img
             src={images[activeIndex]}
@@ -136,7 +136,7 @@ const ProductImageViewer = ({
 
       {hasMultipleImages && (
         <div
-          className="border-t border-white/10 bg-gray-950/80 px-4 py-3"
+          className="relative z-30 border-t border-white/10 bg-gray-900 px-4 py-3 shadow-[0_-12px_30px_rgba(0,0,0,0.35)]"
           onClick={(event) => event.stopPropagation()}
         >
           <div className="mx-auto flex max-w-3xl justify-center gap-2 overflow-x-auto pb-1">

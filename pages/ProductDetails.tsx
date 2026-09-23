@@ -32,6 +32,7 @@ import {
 } from '../lib/productDelivery';
 import { DEFAULT_FULFILLMENT_HUB, getPublicFulfillmentHubLabel } from '../lib/fulfillmentHub';
 import QuoteRequestModal from '../components/products/QuoteRequestModal';
+import ProductImageViewer from '../components/products/ProductImageViewer';
 
 const RECENTLY_VIEWED_KEY = 'emalla_recently_viewed_products';
 
@@ -70,6 +71,9 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
   
   // Gallery State
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
+  const [isHoverZoomVisible, setIsHoverZoomVisible] = useState(false);
+  const [zoomPosition, setZoomPosition] = useState({ x: 50, y: 50 });
 
   useEffect(() => {
     if (products.length === 0) {
@@ -82,6 +86,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
     setAiDescription(null);
     setIsAdded(false);
     setActiveImageIndex(0);
+    setIsImageViewerOpen(false);
+    setIsHoverZoomVisible(false);
     setReviewMessage(null);
     setReviewError(null);
     
@@ -172,6 +178,13 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
 
   const prevImage = () => {
     setActiveImageIndex((prev) => (prev - 1 + productImages.length) % productImages.length);
+  };
+
+  const handleImageMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = Math.min(100, Math.max(0, ((event.clientX - bounds.left) / bounds.width) * 100));
+    const y = Math.min(100, Math.max(0, ((event.clientY - bounds.top) / bounds.height) * 100));
+    setZoomPosition({ x, y });
   };
 
   const relatedProducts = useMemo(() => {
@@ -336,7 +349,18 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
           
           {/* Product Gallery */}
           <div className="space-y-6">
-            <div className="aspect-square bg-gray-50 rounded-[40px] overflow-hidden border border-gray-100 shadow-sm relative group">
+            <div
+              className="aspect-square rounded-[40px] border border-gray-100 bg-gray-50 shadow-sm relative group"
+              onMouseEnter={() => setIsHoverZoomVisible(true)}
+              onMouseLeave={() => setIsHoverZoomVisible(false)}
+              onMouseMove={handleImageMouseMove}
+            >
+              <button
+                type="button"
+                onClick={() => setIsImageViewerOpen(true)}
+                className="absolute inset-0 overflow-hidden rounded-[40px] text-left focus:outline-none focus-visible:ring-4 focus-visible:ring-orange-400/60"
+                aria-label={`Open larger view of ${product.name}`}
+              >
               <img 
                 src={productImages[activeImageIndex] || getProductPrimaryImage(product)} 
                 alt={product.name} 
@@ -346,19 +370,58 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
                 decoding="async"
                 className="w-full h-full object-cover transition-all duration-700"
               />
+
+                <div
+                  className={`pointer-events-none absolute hidden h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/80 bg-white/20 shadow-xl backdrop-blur-[1px] lg:block ${
+                    isHoverZoomVisible ? 'opacity-100' : 'opacity-0'
+                  }`}
+                  style={{ left: `${zoomPosition.x}%`, top: `${zoomPosition.y}%` }}
+                />
+
+                <span className="absolute bottom-7 right-7 rounded-full border border-white/70 bg-white/90 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-gray-700 shadow-lg backdrop-blur transition group-hover:bg-gray-950 group-hover:text-white">
+                  <span className="hidden lg:inline">Hover to zoom · </span>Click to view
+                </span>
+              </button>
+
+              <div
+                className={`pointer-events-none absolute left-[calc(100%+1.5rem)] top-0 z-40 hidden h-full w-full overflow-hidden rounded-[36px] border border-gray-200 bg-white shadow-2xl lg:block ${
+                  isHoverZoomVisible ? 'opacity-100' : 'opacity-0'
+                }`}
+                style={{
+                  backgroundImage: `url("${productImages[activeImageIndex] || getProductPrimaryImage(product)}")`,
+                  backgroundPosition: `${zoomPosition.x}% ${zoomPosition.y}%`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: '220%'
+                }}
+                aria-hidden="true"
+              >
+                <div className="absolute left-5 top-5 rounded-full bg-gray-950/80 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur">
+                  Enlarged view
+                </div>
+              </div>
               
               {/* Navigation Controls */}
               {productImages.length > 1 && (
                 <>
                   <button 
-                    onClick={prevImage}
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      prevImage();
+                    }}
                     className="absolute left-6 top-1/2 -translate-y-1/2 p-3 bg-white/90 backdrop-blur rounded-full shadow-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-orange-500 hover:text-white"
+                    aria-label="View previous product image"
                   >
                     <ChevronLeft size={24} />
                   </button>
                   <button 
-                    onClick={nextImage}
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      nextImage();
+                    }}
                     className="absolute right-6 top-1/2 -translate-y-1/2 p-3 bg-white/90 backdrop-blur rounded-full shadow-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-orange-500 hover:text-white"
+                    aria-label="View next product image"
                   >
                     <ChevronRight size={24} />
                   </button>
@@ -388,6 +451,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
             <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
               {productImages.map((img, i) => (
                 <button 
+                  type="button"
                   key={i} 
                   onClick={() => setActiveImageIndex(i)}
                   className={`aspect-square w-24 rounded-2xl overflow-hidden border-2 flex-shrink-0 transition-all ${activeImageIndex === i ? 'border-orange-500 shadow-md scale-105' : 'border-gray-100 hover:border-orange-200 opacity-70 hover:opacity-100'}`}
@@ -964,6 +1028,17 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ onAddToCart }) => {
         isOpen={isQuoteModalOpen}
         onClose={() => setIsQuoteModalOpen(false)}
       />
+
+      {isImageViewerOpen && (
+        <ProductImageViewer
+          images={productImages}
+          activeIndex={activeImageIndex}
+          productName={product.name}
+          onClose={() => setIsImageViewerOpen(false)}
+          onIndexChange={setActiveImageIndex}
+          onImageError={(event) => handleProductImageError(event, product.category)}
+        />
+      )}
 
       <div className="mobile-product-action-bar md:hidden fixed inset-x-0 bottom-[calc(5.3rem+env(safe-area-inset-bottom,0px))] z-[65] px-4">
         <div className="mx-auto max-w-lg rounded-[28px] border border-gray-200 bg-white/96 p-3 shadow-2xl backdrop-blur-xl">

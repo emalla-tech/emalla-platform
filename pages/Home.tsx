@@ -366,44 +366,6 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
         </div>
       </section>
 
-      {/* Popular Brands */}
-      <section className="trusted-brands-section" aria-labelledby="trusted-brands-title">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-7">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-orange-500 mb-2">Popular brands</p>
-              <h2 id="trusted-brands-title" className="text-2xl md:text-3xl font-black text-gray-900">Explore brands shoppers know</h2>
-            </div>
-            <p className="max-w-md text-sm text-gray-500 font-medium md:text-right">
-              Explore the marketplace by brand and discover current listings from sellers across Rwanda.
-            </p>
-          </div>
-        </div>
-
-        <div className="trusted-brands-marquee" aria-label="Browse products by brand">
-          <div className="trusted-brands-track">
-            {[...TRUSTED_BRANDS, ...TRUSTED_BRANDS].map((brand, index) => (
-              <Link
-                key={`${brand.name}-${index}`}
-                to={`/shop?search=${encodeURIComponent(brand.name)}`}
-                className="trusted-brand-card"
-                aria-label={`Shop ${brand.name} products`}
-                aria-hidden={index >= TRUSTED_BRANDS.length}
-                tabIndex={index >= TRUSTED_BRANDS.length ? -1 : 0}
-              >
-                <img
-                  src={brand.logo}
-                  alt={brand.name}
-                  loading="lazy"
-                  decoding="async"
-                  className={`trusted-brand-logo${brand.wordmark ? ' trusted-brand-logo--wordmark' : ''}`}
-                />
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Categories Grid */}
       <section className="py-20 max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-end mb-10">
@@ -530,6 +492,41 @@ const Home: React.FC<HomeProps> = ({ onAddToCart }) => {
              <div className="w-64 h-64 bg-black/10 rounded-full flex items-center justify-center p-8 backdrop-blur-sm border border-black/5">
                 <Store size={120} className="text-black" />
              </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Popular Brands */}
+      <section className="trusted-brands-section" aria-labelledby="trusted-brands-title">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="mb-7">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-orange-500 mb-2">Popular brands</p>
+              <h2 id="trusted-brands-title" className="text-2xl md:text-3xl font-black text-gray-900">Explore brands shoppers know</h2>
+            </div>
+          </div>
+        </div>
+
+        <div className="trusted-brands-marquee" aria-label="Browse products by brand">
+          <div className="trusted-brands-track">
+            {[...TRUSTED_BRANDS, ...TRUSTED_BRANDS].map((brand, index) => (
+              <Link
+                key={`${brand.name}-${index}`}
+                to={`/shop?search=${encodeURIComponent(brand.name)}`}
+                className="trusted-brand-card"
+                aria-label={`Shop ${brand.name} products`}
+                aria-hidden={index >= TRUSTED_BRANDS.length}
+                tabIndex={index >= TRUSTED_BRANDS.length ? -1 : 0}
+              >
+                <img
+                  src={brand.logo}
+                  alt={brand.name}
+                  loading="lazy"
+                  decoding="async"
+                  className={`trusted-brand-logo${brand.wordmark ? ' trusted-brand-logo--wordmark' : ''}`}
+                />
+              </Link>
+            ))}
           </div>
         </div>
       </section>

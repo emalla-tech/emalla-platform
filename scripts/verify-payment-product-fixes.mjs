@@ -29,6 +29,7 @@ const ids = {
   order: `${marker}-order`,
   payment: `${marker}-payment`,
   token: `${marker}-token`,
+  sellerToken: `${marker}-seller-token`,
   txRef: `${marker}-tx`,
   reference: `${marker}-bank-ref`
 };
@@ -51,8 +52,8 @@ try {
     [ids.admin, ids.merchant, email, `merchant-${email}`]
   );
   await client.query(
-    'INSERT INTO auth_tokens (token, user_id) VALUES ($1, $2)',
-    [ids.token, ids.admin]
+    'INSERT INTO auth_tokens (token, user_id) VALUES ($1, $2), ($3, $4)',
+    [ids.token, ids.admin, ids.sellerToken, ids.merchant]
   );
   await client.query(
     'INSERT INTO categories (id, name, slug) VALUES ($1, $2, $3)',
@@ -121,6 +122,47 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
   assert.ok(ready, 'Local API did not start.');
+
+  const egnCountsBeforeProductCreate = (await client.query(
+    `SELECT
+      (SELECT count(*)::int FROM egn_attribution_decisions) AS attributions,
+      (SELECT count(*)::int FROM egn_conversions) AS conversions,
+      (SELECT count(*)::int FROM egn_commissions) AS commissions`
+  )).rows[0];
+  const created = await request('/api/products', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ids.sellerToken}` },
+    body: JSON.stringify({
+      name: 'Seller Created Test Product', category: ids.category,
+      price: 2500, stock: 4, status: 'approved', featured: true,
+      description: 'Local product-create regression fixture.',
+      tags: ['local-test'], fulfillmentType: 'ready_stock',
+      deliveryMinDays: 1, deliveryMaxDays: 3
+    })
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  ids.createdProduct = created.body.product.id;
+  assert.equal(created.body.product.merchantId, ids.merchant);
+  assert.equal(created.body.product.status, 'pending');
+  assert.equal(created.body.product.featured, false);
+  const createdProductRow = (await client.query(
+    'SELECT merchant_id, status FROM products WHERE id = $1',
+    [ids.createdProduct]
+  )).rows[0];
+  assert.equal(createdProductRow.merchant_id, ids.merchant);
+  assert.equal(createdProductRow.status, 'pending');
+  assert.equal((await client.query(
+    `SELECT count(*)::int AS count FROM audit_logs
+     WHERE metadata->>'productId' = $1 AND category = 'products'`,
+    [ids.createdProduct]
+  )).rows[0].count, 1);
+  const egnCountsAfterProductCreate = (await client.query(
+    `SELECT
+      (SELECT count(*)::int FROM egn_attribution_decisions) AS attributions,
+      (SELECT count(*)::int FROM egn_conversions) AS conversions,
+      (SELECT count(*)::int FROM egn_commissions) AS commissions`
+  )).rows[0];
+  assert.deepEqual(egnCountsAfterProductCreate, egnCountsBeforeProductCreate);
 
   const unauthorized = await request(`/api/products/${ids.product}`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -202,7 +244,7 @@ try {
   });
   assert.equal(checkoutPayment.status, 200, JSON.stringify(checkoutPayment.body));
   assert.equal(checkoutPayment.body.payment.status, 'VERIFICATION_PENDING');
-  console.log('Local checkout, product status, and BK payment submission: PASS');
+  console.log('Local seller product creation, checkout, product status, and BK payment submission: PASS');
 } finally {
   if (server && server.exitCode === null) {
     server.kill();
@@ -215,8 +257,8 @@ try {
   );
   await client.query(
     `DELETE FROM audit_logs WHERE metadata->>'orderId' = ANY($1)
-     OR metadata->>'productId' = $2`,
-    [[ids.order, ids.checkoutOrder].filter(Boolean), ids.product]
+     OR metadata->>'productId' = ANY($2)`,
+    [[ids.order, ids.checkoutOrder].filter(Boolean), [ids.product, ids.createdProduct].filter(Boolean)]
   );
   if (ids.checkoutOrder) {
     await client.query('DELETE FROM payments WHERE order_id = $1', [ids.checkoutOrder]);
@@ -227,8 +269,11 @@ try {
   await client.query('DELETE FROM order_items WHERE order_id = $1', [ids.order]);
   await client.query('DELETE FROM orders WHERE id = $1', [ids.order]);
   await client.query('DELETE FROM products WHERE id = $1', [ids.product]);
+  if (ids.createdProduct) {
+    await client.query('DELETE FROM products WHERE id = $1', [ids.createdProduct]);
+  }
   await client.query('DELETE FROM categories WHERE id = $1', [ids.category]);
-  await client.query('DELETE FROM auth_tokens WHERE token = $1', [ids.token]);
+  await client.query('DELETE FROM auth_tokens WHERE token = ANY($1)', [[ids.token, ids.sellerToken]]);
   await client.query('DELETE FROM users WHERE id = ANY($1)', [[ids.admin, ids.merchant]]);
   await client.end();
 }

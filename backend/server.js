@@ -5,6 +5,7 @@ import { GoogleGenAI } from '@google/genai';
 import {
   readDatabaseSnapshot as readDb,
   readProductRecords,
+  createProductRecordInDatabase,
   updateProductRecordInDatabase,
   readOrderRecords,
   readCheckoutSnapshot,
@@ -5675,11 +5676,11 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 400, { error: 'Price must be a valid non-negative amount.' });
         return;
       }
-      const db = await readDb();
       const canControlApproval = user.role === 'ADMIN';
       const deliverySettings = normalizeProductDeliverySettings(body);
       const tags = normalizeProductTags(body.tags);
       const subcategory = normalizeProductSubcategory(body.subcategory);
+      const createdAt = new Date().toISOString();
       const product = normalizeProductMedia({
         id: `p${Date.now()}`,
         name: productName,
@@ -5700,12 +5701,12 @@ const server = http.createServer(async (req, res) => {
         featured: canControlApproval ? body.featured ?? true : false,
         reviewsCount: body.reviewsCount || 0,
         variants: body.variants,
+        createdAt,
+        updatedAt: createdAt,
         ...deliverySettings
       });
 
-      db.products.unshift(product);
-      invalidateProductsCache();
-      createAuditLog(db, {
+      const auditLog = createAuditLog({ auditLogs: [] }, {
         event: `Product created: ${product.name}`,
         actor: user.name || user.email,
         category: 'products',
@@ -5719,8 +5720,9 @@ const server = http.createServer(async (req, res) => {
           status: product.status
         }
       });
-      await writeDb(db);
-      sendJson(res, 201, { product });
+      const savedProduct = await createProductRecordInDatabase({ product, auditLog });
+      invalidateProductsCache();
+      sendJson(res, 201, { product: savedProduct });
       return;
     }
 

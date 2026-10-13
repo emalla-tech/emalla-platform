@@ -2,6 +2,7 @@ import {
   ensureDb,
   readDb,
   readProducts,
+  createProductRecord,
   updateProductRecord,
   readOrders,
   readCheckoutData,
@@ -51,6 +52,7 @@ export const databaseService = {
   getStatus: () => getDatabaseStatus(),
   readSnapshot: () => readDb(),
   readProducts: () => readProducts(),
+  createProduct: (payload) => createProductRecord(payload),
   updateProduct: (payload) => updateProductRecord(payload),
   readOrders: () => readOrders(),
   readCheckoutData: (options) => readCheckoutData(options),
@@ -83,6 +85,7 @@ export const ensureDatabaseReady = () => databaseService.ensureReady();
 export const getDatabaseServiceStatus = () => databaseService.getStatus();
 export const readDatabaseSnapshot = () => databaseService.readSnapshot();
 export const readProductRecords = () => databaseService.readProducts();
+export const createProductRecordInDatabase = (payload) => databaseService.createProduct(payload);
 export const updateProductRecordInDatabase = (payload) => databaseService.updateProduct(payload);
 export const readOrderRecords = () => databaseService.readOrders();
 export const readCheckoutSnapshot = (options) => databaseService.readCheckoutData(options);

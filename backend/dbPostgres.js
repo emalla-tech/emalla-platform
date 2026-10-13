@@ -522,6 +522,37 @@ export const createPostgresAdapter = () => {
       return result.rows.map(mapProduct);
     },
 
+    async createProductRecord({ product, auditLog }) {
+      return tx(async (client) => {
+        const createdAt = product.createdAt || new Date().toISOString();
+        const updatedAt = product.updatedAt || createdAt;
+        const persistedProduct = { ...product, createdAt, updatedAt };
+        const result = await client.query(
+          `INSERT INTO products (
+            id, merchant_id, name, description, specifications, category,
+            price, stock, image, images, status, featured, rating, reviews,
+            created_at, updated_at, metadata
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6,
+            $7, $8, $9, $10, $11, $12, $13, $14,
+            $15, $16, $17
+          )
+          RETURNING ${READ_COLUMNS.products}, xmin::text AS row_version`,
+          [
+            product.id, product.merchantId || null, product.name,
+            product.description || '', product.specifications || '',
+            product.category, toNumber(product.price), toNumber(product.stock),
+            product.image || null, normalizeJsonValue(product.images || [], '[]'),
+            product.status || 'pending', Boolean(product.featured),
+            toNumber(product.rating), toNumber(product.reviewsCount ?? product.reviews),
+            createdAt, updatedAt, normalizeJsonValue(persistedProduct)
+          ]
+        );
+        if (auditLog) await upsertAuditLogRecord(client, auditLog);
+        return mapProduct(result.rows[0]);
+      });
+    },
+
     async updateProductRecord({ product, expectedRowVersion, auditLog }) {
       return tx(async (client) => {
         const result = await client.query(

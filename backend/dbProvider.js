@@ -51,6 +51,22 @@ const getJsonAdapter = () => {
       const snapshot = await jsonDb.readDb();
       return snapshot.products || [];
     },
+    createProductRecord: async ({ product, auditLog }) => {
+      const snapshot = await jsonDb.readDb();
+      snapshot.products = snapshot.products || [];
+      if (snapshot.products.some((entry) => entry.id === product.id)) {
+        const error = new Error('A product with this identifier already exists.');
+        error.statusCode = 409;
+        throw error;
+      }
+      snapshot.products.unshift(product);
+      if (auditLog) {
+        snapshot.auditLogs = snapshot.auditLogs || [];
+        snapshot.auditLogs.unshift(auditLog);
+      }
+      await jsonDb.writeDb(snapshot);
+      return product;
+    },
     updateProductRecord: async ({ product, expectedUpdatedAt, auditLog }) => {
       const snapshot = await jsonDb.readDb();
       const index = (snapshot.products || []).findIndex((entry) => entry.id === product.id);
@@ -406,6 +422,7 @@ const createActiveAdapter = () => {
       ensureDb: () => callWithFallback('ensureDb'),
       readDb: () => callWithFallback('readDb'),
       readProducts: () => callWithFallback('readProducts'),
+      createProductRecord: (payload) => callWithFallback('createProductRecord', payload),
       updateProductRecord: (payload) => callWithFallback('updateProductRecord', payload),
       readOrders: () => callWithFallback('readOrders'),
       readCheckoutData: (options) => callWithFallback('readCheckoutData', options),
@@ -503,6 +520,7 @@ export const readCheckoutData = async (options = {}) => {
 };
 
 export const readManualPaymentData = (options) => getAdapter().readManualPaymentData(options);
+export const createProductRecord = (payload) => getAdapter().createProductRecord(payload);
 export const updateProductRecord = (payload) => getAdapter().updateProductRecord(payload);
 
 export const readPublicInsightsData = async () => {

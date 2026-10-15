@@ -581,6 +581,20 @@ export const createPostgresAdapter = () => {
       });
     },
 
+    async deleteProductRecord({ productId, merchantId, auditLog }) {
+      return tx(async (client) => {
+        const result = await client.query(
+          `DELETE FROM products
+           WHERE id = $1 AND ($2::text IS NULL OR merchant_id = $2)
+           RETURNING id`,
+          [productId, merchantId || null]
+        );
+        if (!result.rowCount) return false;
+        if (auditLog) await upsertAuditLogRecord(client, auditLog);
+        return true;
+      });
+    },
+
     async readOrders() {
       const orders = await readRows('orders');
       const orderItems = await readRows('order_items', 'order_id ASC, id ASC');
@@ -701,6 +715,93 @@ export const createPostgresAdapter = () => {
           type: row.metadata?.type || ''
         }))
       };
+    },
+
+    async readUserSessions(userId) {
+      const result = await query(
+        `SELECT ${READ_COLUMNS.sessions}
+         FROM sessions
+         WHERE user_id = $1 AND revoked_at IS NULL
+         ORDER BY last_seen_at DESC`,
+        [userId]
+      );
+      return result.rows.map((row) => ({
+        id: row.id,
+        token: row.token_hash,
+        userId: row.user_id,
+        createdAt: toIso(row.created_at),
+        lastSeenAt: toIso(row.last_seen_at),
+        userAgent: row.user_agent || 'Unknown device'
+      }));
+    },
+
+    async updateMerchantSettings({ userId, settings, updatedAt, auditLog }) {
+      return tx(async (client) => {
+        const userResult = await client.query(
+          `SELECT ${READ_COLUMNS.users} FROM users WHERE id = $1 AND role = ANY($2::text[]) FOR UPDATE`,
+          [userId, ['MERCHANT', 'ADMIN']]
+        );
+        if (!userResult.rowCount) return null;
+        const currentUser = mapUser(userResult.rows[0]);
+        const nextUser = { ...currentUser, storeSettings: settings, updatedAt };
+        await client.query(
+          `UPDATE users SET metadata = $2::jsonb, updated_at = $3 WHERE id = $1`,
+          [userId, JSON.stringify(nextUser), updatedAt]
+        );
+        if (currentUser.role === 'MERCHANT') {
+          await client.query(
+            `UPDATE seller_profiles
+             SET support_email = $2, logo_url = $3, cover_url = $4,
+                 metadata = $5::jsonb, updated_at = $6
+             WHERE user_id = $1`,
+            [userId, settings.supportEmail || currentUser.email || null,
+              settings.storeLogoUrl || null, settings.storeCoverUrl || null,
+              JSON.stringify(settings), updatedAt]
+          );
+        }
+        if (auditLog) await upsertAuditLogRecord(client, auditLog);
+        return nextUser;
+      });
+    },
+
+    async readUserNotifications(userId, role) {
+      const result = await query(
+        `SELECT ${READ_COLUMNS.notifications}
+         FROM notifications
+         WHERE user_id = $1 OR (user_id IS NULL AND role = $2)
+         ORDER BY created_at DESC`,
+        [userId, role]
+      );
+      return result.rows.map((row) => ({
+        ...(row.metadata || {}), id: row.id,
+        userId: row.user_id || row.metadata?.userId || undefined,
+        role: row.role || '', title: row.title, message: row.message,
+        type: row.type, read: row.read, createdAt: toIso(row.created_at)
+      }));
+    },
+
+    async markNotificationRead({ notificationId, userId, role }) {
+      const result = await query(
+        `UPDATE notifications SET read = TRUE
+         WHERE id = $1 AND (user_id = $2 OR (user_id IS NULL AND role = $3))
+         RETURNING id`,
+        [notificationId, userId, role]
+      );
+      if (result.rowCount) return 'updated';
+      const existing = await query('SELECT id FROM notifications WHERE id = $1', [notificationId]);
+      return existing.rowCount ? 'forbidden' : 'missing';
+    },
+
+    async markAllNotificationsRead(userId) {
+      await query('UPDATE notifications SET read = TRUE WHERE user_id = $1', [userId]);
+    },
+
+    async deleteUserNotification({ notificationId, userId }) {
+      const result = await query(
+        'DELETE FROM notifications WHERE id = $1 AND user_id = $2 RETURNING id',
+        [notificationId, userId]
+      );
+      return Boolean(result.rowCount);
     },
 
     async readManualPaymentData({ orderId, txRef, bankReference }) {

@@ -7,8 +7,15 @@ import {
   readProductRecords,
   createProductRecordInDatabase,
   updateProductRecordInDatabase,
+  deleteProductRecordInDatabase,
   readOrderRecords,
   readMerchantWalletSnapshot,
+  readUserSessionRecords,
+  updateMerchantSettingsRecord,
+  readUserNotificationRecords,
+  markNotificationReadRecord,
+  markAllNotificationsReadRecords,
+  deleteUserNotificationRecord,
   readCheckoutSnapshot,
   readManualPaymentSnapshot,
   readPublicInsightsRecords,
@@ -2983,9 +2990,7 @@ const server = http.createServer(async (req, res) => {
 
         const authHeader = req.headers.authorization || '';
         const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-        const db = await readDb();
-        const sessions = (db.sessions || [])
-          .filter((entry) => entry.userId === user.id)
+        const sessions = (await readUserSessionRecords(user.id))
           .map((entry) => ({
             id: entry.id,
             createdAt: entry.createdAt,
@@ -3016,10 +3021,8 @@ const server = http.createServer(async (req, res) => {
         const user = await requireUser(req, res);
         if (!user) return;
 
-        const db = await readDb();
         await deleteAuthTokensForUser(user.id);
-
-        createAuditLog(db, {
+        const auditLog = createAuditLog({ auditLogs: [] }, {
           event: 'All sessions logged out',
           actor: user.name || user.email,
           category: 'users',
@@ -3030,7 +3033,7 @@ const server = http.createServer(async (req, res) => {
           }
         });
 
-        await writeDb(db);
+        await persistAuditLogRecord(auditLog);
         sendJson(res, 200, { success: true });
         return;
       }
@@ -5851,8 +5854,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
 
       const productId = pathname.split('/').pop();
-      const db = await readDb();
-      const product = db.products.find((entry) => entry.id === productId);
+      const product = (await readProductRecords()).find((entry) => entry.id === productId);
       if (!product) {
         sendJson(res, 404, { error: 'Product not found' });
         return;
@@ -5864,9 +5866,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const removedMediaUrls = getProductMediaUrls(product);
-      db.products = db.products.filter((entry) => entry.id !== productId);
-      invalidateProductsCache();
-      createAuditLog(db, {
+      const auditLog = createAuditLog({ auditLogs: [] }, {
         event: `Product removed: ${product.name}`,
         actor: user.name || user.email,
         category: 'products',
@@ -5879,7 +5879,16 @@ const server = http.createServer(async (req, res) => {
           removedAssets: removedMediaUrls.length
         }
       });
-      await writeDb(db);
+      const deleted = await deleteProductRecordInDatabase({
+        productId,
+        merchantId: user.role === 'ADMIN' ? null : user.id,
+        auditLog
+      });
+      if (!deleted) {
+        sendJson(res, 409, { error: 'Product changed before it could be removed. Refresh and try again.' });
+        return;
+      }
+      invalidateProductsCache();
       await purgeAssetUrls(removedMediaUrls);
       sendJson(res, 200, { success: true });
       return;
@@ -6097,38 +6106,48 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
 
       const body = await readBody(req);
-      const db = await readDb();
-      const userIndex = (db.users || []).findIndex((entry) => entry.id === user.id);
-
-      if (userIndex === -1) {
-        sendJson(res, 404, { error: 'Merchant account not found.' });
+      const allowedSettings = {
+        payoutMethod: String(body?.payoutMethod || '').trim(),
+        momoNumber: String(body?.momoNumber || '').trim().slice(0, 40),
+        bankName: String(body?.bankName || '').trim().slice(0, 120),
+        bankAccountName: String(body?.bankAccountName || '').trim().slice(0, 160),
+        bankAccountNumber: String(body?.bankAccountNumber || '').trim().slice(0, 80),
+        settlementSchedule: String(body?.settlementSchedule || '').trim(),
+        supportEmail: String(body?.supportEmail || '').trim().slice(0, 254),
+        storeLogoUrl: String(body?.storeLogoUrl || '').trim().slice(0, 2000),
+        storeCoverUrl: String(body?.storeCoverUrl || '').trim().slice(0, 2000)
+      };
+      if (!['momo', 'bank'].includes(allowedSettings.payoutMethod)) {
+        sendJson(res, 400, { error: 'Choose a valid payout method.' });
         return;
       }
-
+      if (!['daily', 'weekly', 'biweekly', 'monthly'].includes(allowedSettings.settlementSchedule)) {
+        sendJson(res, 400, { error: 'Choose a valid settlement schedule.' });
+        return;
+      }
       const nextSettings = {
-        ...(db.users[userIndex].storeSettings || {}),
-        ...(body || {})
+        ...(user.storeSettings || {}),
+        ...allowedSettings
       };
-
-      db.users[userIndex] = {
-        ...db.users[userIndex],
-        storeSettings: nextSettings,
-        updatedAt: new Date().toISOString()
-      };
-
-      createAuditLog(db, {
+      const updatedAt = new Date().toISOString();
+      const auditLog = createAuditLog({ auditLogs: [] }, {
         event: 'Merchant settings updated',
         actor: user.name || user.email,
         category: 'sellers',
         status: 'success',
         metadata: {
           merchantId: user.id,
-          settingsKeys: Object.keys(body || {})
+          settingsKeys: Object.keys(allowedSettings)
         }
       });
-
-      await writeDb(db);
-      sendJson(res, 200, { settings: nextSettings, user: sanitizeUser(db.users[userIndex]) });
+      const updatedUser = await updateMerchantSettingsRecord({
+        userId: user.id, settings: nextSettings, updatedAt, auditLog
+      });
+      if (!updatedUser) {
+        sendJson(res, 404, { error: 'Merchant account not found.' });
+        return;
+      }
+      sendJson(res, 200, { settings: nextSettings, user: sanitizeUser(updatedUser) });
       return;
     }
 
@@ -6464,6 +6483,10 @@ const server = http.createServer(async (req, res) => {
       }
 
       const current = db.orders[index];
+      const transactionCountBefore = (db.transactions || []).length;
+      const notificationCountBefore = (db.notifications || []).length;
+      const auditLogCountBefore = (db.auditLogs || []).length;
+      const emailLogCountBefore = (db.emailLogs || []).length;
       const guestEmail = String(body.email || '').trim().toLowerCase();
       const guestPhone = String(body.phone || '').trim();
       const customerMatches = user?.role === 'CUSTOMER' && current.customerId === user.id;
@@ -6557,7 +6580,16 @@ const server = http.createServer(async (req, res) => {
         })
       });
 
-      await writeDb(db);
+      await persistCheckoutBundleRecord({
+        orders: [db.orders[index]],
+        payments: current.paymentMethod === 'CASH_ON_DELIVERY'
+          ? (db.payments || []).filter((payment) => payment.orderId === current.id)
+          : [],
+        transactions: (db.transactions || []).slice(0, (db.transactions || []).length - transactionCountBefore),
+        notifications: db.notifications.slice(0, db.notifications.length - notificationCountBefore),
+        auditLogs: db.auditLogs.slice(0, db.auditLogs.length - auditLogCountBefore),
+        emailLogs: db.emailLogs.slice(0, db.emailLogs.length - emailLogCountBefore)
+      });
       sendJson(res, 200, { order: withRiderPayout(db.orders[index]) });
       return;
     }
@@ -6607,6 +6639,7 @@ const server = http.createServer(async (req, res) => {
         body.status === 'cancelled' &&
         current.inventoryReservedAt &&
         !current.inventoryRestockedAt;
+      const transactionCountBefore = (db.transactions || []).length;
       const notificationCountBefore = db.notifications.length;
       const auditLogCountBefore = db.auditLogs.length;
       const emailLogCountBefore = db.emailLogs.length;
@@ -6716,19 +6749,19 @@ const server = http.createServer(async (req, res) => {
         })
       });
 
-      if (shouldRestockInventory) {
-        await persistCheckoutBundleRecord({
-          orders: [db.orders[index]],
-          notifications: db.notifications.slice(0, db.notifications.length - notificationCountBefore),
-          auditLogs: db.auditLogs.slice(0, db.auditLogs.length - auditLogCountBefore),
-          emailLogs: db.emailLogs.slice(0, db.emailLogs.length - emailLogCountBefore),
-          inventoryReleaseOrderId: current.id,
-          inventoryAdjustments: buildInventoryAdjustments(current.items, 1)
-        });
-        invalidateProductsCache();
-      } else {
-        await writeDb(db);
-      }
+      await persistCheckoutBundleRecord({
+        orders: [db.orders[index]],
+        payments: body.status === 'completed' && current.paymentMethod === 'CASH_ON_DELIVERY'
+          ? (db.payments || []).filter((payment) => payment.orderId === current.id)
+          : [],
+        transactions: (db.transactions || []).slice(0, (db.transactions || []).length - transactionCountBefore),
+        notifications: db.notifications.slice(0, db.notifications.length - notificationCountBefore),
+        auditLogs: db.auditLogs.slice(0, db.auditLogs.length - auditLogCountBefore),
+        emailLogs: db.emailLogs.slice(0, db.emailLogs.length - emailLogCountBefore),
+        inventoryReleaseOrderId: shouldRestockInventory ? current.id : null,
+        inventoryAdjustments: shouldRestockInventory ? buildInventoryAdjustments(current.items, 1) : []
+      });
+      if (shouldRestockInventory) invalidateProductsCache();
       sendJson(res, 200, { order: presentOrderForUser(db.orders[index], user) });
       return;
     }
@@ -7385,11 +7418,7 @@ const server = http.createServer(async (req, res) => {
       const user = await requireUser(req, res);
       if (!user) return;
 
-      const db = await readDb();
-      const notifications = db.notifications.filter(
-        (notification) =>
-          notification.userId === user.id || notification.userId === `broadcast_${notification.role}`
-      );
+      const notifications = await readUserNotificationRecords(user.id, user.role);
       sendJson(res, 200, { notifications });
       return;
     }
@@ -7399,7 +7428,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
 
       const body = await readBody(req);
-      const db = await readDb();
+      const db = { notifications: [] };
       const notification = createNotification(db, {
         userId: body.userId,
         role: body.role,
@@ -7409,7 +7438,7 @@ const server = http.createServer(async (req, res) => {
         metadata: body.metadata
       });
 
-      await writeDb(db);
+      await persistCheckoutBundleRecord({ notifications: [notification] });
       sendJson(res, 201, { notification });
       return;
     }
@@ -7419,19 +7448,13 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
 
       const notificationId = pathname.split('/')[3];
-      const db = await readDb();
-      const notification = (db.notifications || []).find((entry) => entry.id === notificationId);
-      const canReadNotification =
-        notification &&
-        (notification.userId === user.id || (!notification.userId && notification.role === user.role));
-      if (!canReadNotification) {
-        sendJson(res, notification ? 403 : 404, { error: notification ? 'Forbidden' : 'Notification not found' });
+      const result = await markNotificationReadRecord({ notificationId, userId: user.id, role: user.role });
+      if (result !== 'updated') {
+        sendJson(res, result === 'forbidden' ? 403 : 404, {
+          error: result === 'forbidden' ? 'Forbidden' : 'Notification not found'
+        });
         return;
       }
-      db.notifications = db.notifications.map((entry) =>
-        entry.id === notificationId ? { ...entry, read: true } : entry
-      );
-      await writeDb(db);
       sendJson(res, 200, { success: true });
       return;
     }
@@ -7440,11 +7463,7 @@ const server = http.createServer(async (req, res) => {
       const user = await requireUser(req, res);
       if (!user) return;
 
-      const db = await readDb();
-      db.notifications = db.notifications.map((notification) =>
-        notification.userId === user.id ? { ...notification, read: true } : notification
-      );
-      await writeDb(db);
+      await markAllNotificationsReadRecords(user.id);
       sendJson(res, 200, { success: true });
       return;
     }
@@ -7454,11 +7473,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
 
       const notificationId = pathname.split('/').pop();
-      const db = await readDb();
-      db.notifications = db.notifications.filter(
-        (notification) => !(notification.id === notificationId && notification.userId === user.id)
-      );
-      await writeDb(db);
+      await deleteUserNotificationRecord({ notificationId, userId: user.id });
       sendJson(res, 200, { success: true });
       return;
     }
@@ -7498,7 +7513,11 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
 
       const body = await readBody(req);
-      const db = await readDb();
+      const db = {
+        ...(await readMerchantWalletSnapshot(user.id)),
+        notifications: [],
+        emailLogs: []
+      };
       const existingTransactions = db.transactions.filter((transaction) => transaction.userId === user.id);
       const currentBalance = calculateMerchantAvailableBalance(db, user.id);
       const requestedAmount = Number(body.amount || 0);
@@ -7545,7 +7564,11 @@ const server = http.createServer(async (req, res) => {
           closing: 'Uzoherezwa email yongeyeho iyo payout yawe yemerewe cyangwa yanze.'
         })
       });
-      await writeDb(db);
+      await persistCheckoutBundleRecord({
+        transactions: [transaction],
+        notifications: db.notifications,
+        emailLogs: db.emailLogs
+      });
       sendJson(res, 201, { transaction });
       return;
     }

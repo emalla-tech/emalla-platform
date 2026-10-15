@@ -83,6 +83,20 @@ const getJsonAdapter = () => {
       await jsonDb.writeDb(snapshot);
       return product;
     },
+    deleteProductRecord: async ({ productId, merchantId, auditLog }) => {
+      const snapshot = await jsonDb.readDb();
+      const index = (snapshot.products || []).findIndex((entry) =>
+        entry.id === productId && (!merchantId || entry.merchantId === merchantId)
+      );
+      if (index < 0) return false;
+      snapshot.products.splice(index, 1);
+      if (auditLog) {
+        snapshot.auditLogs = snapshot.auditLogs || [];
+        snapshot.auditLogs.unshift(auditLog);
+      }
+      await jsonDb.writeDb(snapshot);
+      return true;
+    },
     readOrders: async () => {
       const snapshot = await jsonDb.readDb();
       return snapshot.orders || [];
@@ -94,6 +108,56 @@ const getJsonAdapter = () => {
         products: (snapshot.products || []).filter((entry) => entry.merchantId === merchantId),
         transactions: (snapshot.transactions || []).filter((entry) => entry.userId === merchantId)
       };
+    },
+    readUserSessions: async (userId) => {
+      const snapshot = await jsonDb.readDb();
+      return (snapshot.sessions || []).filter((entry) => entry.userId === userId);
+    },
+    updateMerchantSettings: async ({ userId, settings, updatedAt, auditLog }) => {
+      const snapshot = await jsonDb.readDb();
+      const index = (snapshot.users || []).findIndex((entry) => entry.id === userId);
+      if (index < 0) return null;
+      snapshot.users[index] = { ...snapshot.users[index], storeSettings: settings, updatedAt };
+      if (auditLog) {
+        snapshot.auditLogs = snapshot.auditLogs || [];
+        snapshot.auditLogs.unshift(auditLog);
+      }
+      await jsonDb.writeDb(snapshot);
+      return snapshot.users[index];
+    },
+    readUserNotifications: async (userId, role) => {
+      const snapshot = await jsonDb.readDb();
+      return (snapshot.notifications || []).filter((entry) =>
+        entry.userId === userId || entry.userId === `broadcast_${role}` || (!entry.userId && entry.role === role)
+      );
+    },
+    markNotificationRead: async ({ notificationId, userId, role }) => {
+      const snapshot = await jsonDb.readDb();
+      const notification = (snapshot.notifications || []).find((entry) => entry.id === notificationId);
+      const allowed = notification && (
+        notification.userId === userId || notification.userId === `broadcast_${role}` ||
+        (!notification.userId && notification.role === role)
+      );
+      if (!allowed) return notification ? 'forbidden' : 'missing';
+      notification.read = true;
+      await jsonDb.writeDb(snapshot);
+      return 'updated';
+    },
+    markAllNotificationsRead: async (userId) => {
+      const snapshot = await jsonDb.readDb();
+      snapshot.notifications = (snapshot.notifications || []).map((entry) =>
+        entry.userId === userId ? { ...entry, read: true } : entry
+      );
+      await jsonDb.writeDb(snapshot);
+    },
+    deleteUserNotification: async ({ notificationId, userId }) => {
+      const snapshot = await jsonDb.readDb();
+      const before = (snapshot.notifications || []).length;
+      snapshot.notifications = (snapshot.notifications || []).filter((entry) =>
+        !(entry.id === notificationId && entry.userId === userId)
+      );
+      await jsonDb.writeDb(snapshot);
+      return snapshot.notifications.length < before;
     },
     readCheckoutData: async (options = {}) => {
       const snapshot = await jsonDb.readDb();
@@ -432,8 +496,15 @@ const createActiveAdapter = () => {
       readProducts: () => callWithFallback('readProducts'),
       createProductRecord: (payload) => callWithFallback('createProductRecord', payload),
       updateProductRecord: (payload) => callWithFallback('updateProductRecord', payload),
+      deleteProductRecord: (payload) => callWithFallback('deleteProductRecord', payload),
       readOrders: () => callWithFallback('readOrders'),
       readMerchantWalletData: (merchantId) => callWithFallback('readMerchantWalletData', merchantId),
+      readUserSessions: (userId) => callWithFallback('readUserSessions', userId),
+      updateMerchantSettings: (payload) => callWithFallback('updateMerchantSettings', payload),
+      readUserNotifications: (userId, role) => callWithFallback('readUserNotifications', userId, role),
+      markNotificationRead: (payload) => callWithFallback('markNotificationRead', payload),
+      markAllNotificationsRead: (userId) => callWithFallback('markAllNotificationsRead', userId),
+      deleteUserNotification: (payload) => callWithFallback('deleteUserNotification', payload),
       readCheckoutData: (options) => callWithFallback('readCheckoutData', options),
       readManualPaymentData: (options) => callWithFallback('readManualPaymentData', options),
       readPublicInsightsData: () => callWithFallback('readPublicInsightsData'),
@@ -529,10 +600,17 @@ export const readCheckoutData = async (options = {}) => {
 };
 
 export const readMerchantWalletData = (merchantId) => getAdapter().readMerchantWalletData(merchantId);
+export const readUserSessions = (userId) => getAdapter().readUserSessions(userId);
+export const updateMerchantSettings = (payload) => getAdapter().updateMerchantSettings(payload);
+export const readUserNotifications = (userId, role) => getAdapter().readUserNotifications(userId, role);
+export const markNotificationRead = (payload) => getAdapter().markNotificationRead(payload);
+export const markAllNotificationsRead = (userId) => getAdapter().markAllNotificationsRead(userId);
+export const deleteUserNotification = (payload) => getAdapter().deleteUserNotification(payload);
 
 export const readManualPaymentData = (options) => getAdapter().readManualPaymentData(options);
 export const createProductRecord = (payload) => getAdapter().createProductRecord(payload);
 export const updateProductRecord = (payload) => getAdapter().updateProductRecord(payload);
+export const deleteProductRecord = (payload) => getAdapter().deleteProductRecord(payload);
 
 export const readPublicInsightsData = async () => {
   const adapter = getAdapter();

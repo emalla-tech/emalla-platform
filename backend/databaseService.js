@@ -4,8 +4,15 @@ import {
   readProducts,
   createProductRecord,
   updateProductRecord,
+  deleteProductRecord,
   readOrders,
   readMerchantWalletData,
+  readUserSessions,
+  updateMerchantSettings,
+  readUserNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  deleteUserNotification,
   readCheckoutData,
   readManualPaymentData,
   readPublicInsightsData,
@@ -55,8 +62,15 @@ export const databaseService = {
   readProducts: () => readProducts(),
   createProduct: (payload) => createProductRecord(payload),
   updateProduct: (payload) => updateProductRecord(payload),
+  deleteProduct: (payload) => deleteProductRecord(payload),
   readOrders: () => readOrders(),
   readMerchantWallet: (merchantId) => readMerchantWalletData(merchantId),
+  readUserSessions: (userId) => readUserSessions(userId),
+  updateMerchantSettings: (payload) => updateMerchantSettings(payload),
+  readUserNotifications: (userId, role) => readUserNotifications(userId, role),
+  markNotificationRead: (payload) => markNotificationRead(payload),
+  markAllNotificationsRead: (userId) => markAllNotificationsRead(userId),
+  deleteUserNotification: (payload) => deleteUserNotification(payload),
   readCheckoutData: (options) => readCheckoutData(options),
   readManualPaymentData: (options) => readManualPaymentData(options),
   readPublicInsightsData: () => readPublicInsightsData(),
@@ -89,8 +103,15 @@ export const readDatabaseSnapshot = () => databaseService.readSnapshot();
 export const readProductRecords = () => databaseService.readProducts();
 export const createProductRecordInDatabase = (payload) => databaseService.createProduct(payload);
 export const updateProductRecordInDatabase = (payload) => databaseService.updateProduct(payload);
+export const deleteProductRecordInDatabase = (payload) => databaseService.deleteProduct(payload);
 export const readOrderRecords = () => databaseService.readOrders();
 export const readMerchantWalletSnapshot = (merchantId) => databaseService.readMerchantWallet(merchantId);
+export const readUserSessionRecords = (userId) => databaseService.readUserSessions(userId);
+export const updateMerchantSettingsRecord = (payload) => databaseService.updateMerchantSettings(payload);
+export const readUserNotificationRecords = (userId, role) => databaseService.readUserNotifications(userId, role);
+export const markNotificationReadRecord = (payload) => databaseService.markNotificationRead(payload);
+export const markAllNotificationsReadRecords = (userId) => databaseService.markAllNotificationsRead(userId);
+export const deleteUserNotificationRecord = (payload) => databaseService.deleteUserNotification(payload);
 export const readCheckoutSnapshot = (options) => databaseService.readCheckoutData(options);
 export const readManualPaymentSnapshot = (options) => databaseService.readManualPaymentData(options);
 export const readPublicInsightsRecords = () => databaseService.readPublicInsightsData();

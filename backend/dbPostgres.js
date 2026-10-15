@@ -640,6 +640,69 @@ export const createPostgresAdapter = () => {
       });
     },
 
+    async readMerchantWalletData(merchantId) {
+      const [ordersResult, productsResult, transactionsResult] = await Promise.all([
+        query(
+          `SELECT ${READ_COLUMNS.orders} FROM orders WHERE merchant_id = $1 ORDER BY created_at DESC`,
+          [merchantId]
+        ),
+        query(
+          `SELECT ${READ_COLUMNS.products} FROM products WHERE merchant_id = $1 ORDER BY created_at DESC`,
+          [merchantId]
+        ),
+        query(
+          `SELECT ${READ_COLUMNS.transactions} FROM transactions WHERE user_id = $1 ORDER BY timestamp DESC`,
+          [merchantId]
+        )
+      ]);
+      const orderIds = ordersResult.rows.map((row) => row.id);
+      const orderItems = orderIds.length > 0
+        ? (await query(
+            `SELECT ${READ_COLUMNS.order_items} FROM order_items WHERE order_id = ANY($1::text[]) ORDER BY order_id, id`,
+            [orderIds]
+          )).rows
+        : [];
+      const orderItemsMap = new Map();
+      for (const row of orderItems) {
+        const current = orderItemsMap.get(row.order_id) || [];
+        current.push({
+          ...(row.metadata || {}),
+          id: row.id,
+          productId: row.product_id || undefined,
+          merchantId: row.merchant_id || undefined,
+          productName: row.product_name || '',
+          quantity: Number(row.quantity || 0),
+          price: toNumber(row.price),
+          subtotal: toNumber(row.subtotal),
+          variant: row.variant || undefined
+        });
+        orderItemsMap.set(row.order_id, current);
+      }
+
+      return {
+        orders: ordersResult.rows.map((row) => {
+          const order = mapOrder(row);
+          const normalizedItems = orderItemsMap.get(row.id);
+          return {
+            ...order,
+            items: normalizedItems && normalizedItems.length > 0 ? normalizedItems : order.items
+          };
+        }),
+        products: productsResult.rows.map(mapProduct),
+        transactions: transactionsResult.rows.map((row) => ({
+          ...(row.metadata || {}),
+          id: row.id,
+          userId: row.user_id || undefined,
+          amount: toNumber(row.amount),
+          status: row.status,
+          method: row.method || '',
+          tx_ref: row.tx_ref || '',
+          timestamp: toIso(row.timestamp),
+          type: row.metadata?.type || ''
+        }))
+      };
+    },
+
     async readManualPaymentData({ orderId, txRef, bankReference }) {
       const orders = await query(`SELECT ${READ_COLUMNS.orders} FROM orders WHERE id = $1 LIMIT 1`, [orderId]);
       const payments = await query(

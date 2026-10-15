@@ -164,6 +164,13 @@ try {
   )).rows[0];
   assert.deepEqual(egnCountsAfterProductCreate, egnCountsBeforeProductCreate);
 
+  const sellerWallet = await request('/api/wallet/merchant', {
+    headers: { Authorization: `Bearer ${ids.sellerToken}` }
+  });
+  assert.equal(sellerWallet.status, 200, JSON.stringify(sellerWallet.body));
+  assert.equal(typeof sellerWallet.body.wallet.currentBalance, 'number');
+  assert.ok(Array.isArray(sellerWallet.body.transactions));
+
   const unauthorized = await request(`/api/products/${ids.product}`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status: 'draft' })
@@ -244,7 +251,7 @@ try {
   });
   assert.equal(checkoutPayment.status, 200, JSON.stringify(checkoutPayment.body));
   assert.equal(checkoutPayment.body.payment.status, 'VERIFICATION_PENDING');
-  console.log('Local seller product creation, checkout, product status, and BK payment submission: PASS');
+  console.log('Local seller overview, product creation, checkout, product status, and BK payment submission: PASS');
 } finally {
   if (server && server.exitCode === null) {
     server.kill();

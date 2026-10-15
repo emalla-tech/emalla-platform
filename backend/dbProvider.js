@@ -87,6 +87,14 @@ const getJsonAdapter = () => {
       const snapshot = await jsonDb.readDb();
       return snapshot.orders || [];
     },
+    readMerchantWalletData: async (merchantId) => {
+      const snapshot = await jsonDb.readDb();
+      return {
+        orders: (snapshot.orders || []).filter((entry) => entry.merchantId === merchantId),
+        products: (snapshot.products || []).filter((entry) => entry.merchantId === merchantId),
+        transactions: (snapshot.transactions || []).filter((entry) => entry.userId === merchantId)
+      };
+    },
     readCheckoutData: async (options = {}) => {
       const snapshot = await jsonDb.readDb();
       if (!options.orderId) {
@@ -425,6 +433,7 @@ const createActiveAdapter = () => {
       createProductRecord: (payload) => callWithFallback('createProductRecord', payload),
       updateProductRecord: (payload) => callWithFallback('updateProductRecord', payload),
       readOrders: () => callWithFallback('readOrders'),
+      readMerchantWalletData: (merchantId) => callWithFallback('readMerchantWalletData', merchantId),
       readCheckoutData: (options) => callWithFallback('readCheckoutData', options),
       readManualPaymentData: (options) => callWithFallback('readManualPaymentData', options),
       readPublicInsightsData: () => callWithFallback('readPublicInsightsData'),
@@ -518,6 +527,8 @@ export const readCheckoutData = async (options = {}) => {
 
   return adapter.readDb();
 };
+
+export const readMerchantWalletData = (merchantId) => getAdapter().readMerchantWalletData(merchantId);
 
 export const readManualPaymentData = (options) => getAdapter().readManualPaymentData(options);
 export const createProductRecord = (payload) => getAdapter().createProductRecord(payload);

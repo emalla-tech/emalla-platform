@@ -8,6 +8,7 @@ import {
   createProductRecordInDatabase,
   updateProductRecordInDatabase,
   readOrderRecords,
+  readMerchantWalletSnapshot,
   readCheckoutSnapshot,
   readManualPaymentSnapshot,
   readPublicInsightsRecords,
@@ -7466,7 +7467,7 @@ const server = http.createServer(async (req, res) => {
       const user = await requireRole(req, res, ['MERCHANT', 'ADMIN']);
       if (!user) return;
 
-      const db = await readDb();
+      const db = await readMerchantWalletSnapshot(user.id);
       const transactions = db.transactions.filter((transaction) => transaction.userId === user.id);
       const commissionSummary = buildMerchantCommissionSummary(db, user.id);
       const currentBalance = calculateMerchantAvailableBalance(db, user.id);

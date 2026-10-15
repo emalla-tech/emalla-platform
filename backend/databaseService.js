@@ -5,6 +5,7 @@ import {
   createProductRecord,
   updateProductRecord,
   readOrders,
+  readMerchantWalletData,
   readCheckoutData,
   readManualPaymentData,
   readPublicInsightsData,
@@ -55,6 +56,7 @@ export const databaseService = {
   createProduct: (payload) => createProductRecord(payload),
   updateProduct: (payload) => updateProductRecord(payload),
   readOrders: () => readOrders(),
+  readMerchantWallet: (merchantId) => readMerchantWalletData(merchantId),
   readCheckoutData: (options) => readCheckoutData(options),
   readManualPaymentData: (options) => readManualPaymentData(options),
   readPublicInsightsData: () => readPublicInsightsData(),
@@ -88,6 +90,7 @@ export const readProductRecords = () => databaseService.readProducts();
 export const createProductRecordInDatabase = (payload) => databaseService.createProduct(payload);
 export const updateProductRecordInDatabase = (payload) => databaseService.updateProduct(payload);
 export const readOrderRecords = () => databaseService.readOrders();
+export const readMerchantWalletSnapshot = (merchantId) => databaseService.readMerchantWallet(merchantId);
 export const readCheckoutSnapshot = (options) => databaseService.readCheckoutData(options);
 export const readManualPaymentSnapshot = (options) => databaseService.readManualPaymentData(options);
 export const readPublicInsightsRecords = () => databaseService.readPublicInsightsData();

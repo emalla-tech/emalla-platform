@@ -202,6 +202,44 @@ const getJsonAdapter = () => {
         notifications: snapshot.notifications || []
       };
     },
+    readAdminOperationsData: async () => {
+      const snapshot = await jsonDb.readDb();
+      return {
+        users: snapshot.users || [], sessions: snapshot.sessions || [], orders: snapshot.orders || [],
+        sellerApplications: snapshot.sellerApplications || [], riderApplications: snapshot.riderApplications || [],
+        transactions: snapshot.transactions || [], payments: snapshot.payments || [],
+        contactSubmissions: snapshot.contactSubmissions || snapshot.inquiries || [],
+        inquiries: snapshot.inquiries || snapshot.contactSubmissions || [], emailLogs: snapshot.emailLogs || [],
+        adminSettings: snapshot.adminSettings || { preferences: {}, categoryCommissionRates: {} },
+        auditLogs: snapshot.auditLogs || [], products: snapshot.products || [], notifications: snapshot.notifications || []
+      };
+    },
+    saveAccountUser: async (user) => {
+      const snapshot = await jsonDb.readDb();
+      snapshot.users = snapshot.users || [];
+      const index = snapshot.users.findIndex((entry) => entry.id === user.id);
+      if (index >= 0) snapshot.users[index] = user;
+      else snapshot.users.unshift(user);
+      await jsonDb.writeDb(snapshot);
+      return user;
+    },
+    saveAdminSettings: async (settings) => {
+      const snapshot = await jsonDb.readDb();
+      snapshot.adminSettings = settings;
+      await jsonDb.writeDb(snapshot);
+      return settings;
+    },
+    saveInquiry: async (inquiry) => {
+      const snapshot = await jsonDb.readDb();
+      for (const key of ['contactSubmissions', 'inquiries']) {
+        snapshot[key] = snapshot[key] || [];
+        const index = snapshot[key].findIndex((entry) => entry.id === inquiry.id);
+        if (index >= 0) snapshot[key][index] = inquiry;
+        else snapshot[key].unshift(inquiry);
+      }
+      await jsonDb.writeDb(snapshot);
+      return inquiry;
+    },
     readAdminRidersData: async () => {
       const snapshot = await jsonDb.readDb();
       return {
@@ -509,6 +547,10 @@ const createActiveAdapter = () => {
       readManualPaymentData: (options) => callWithFallback('readManualPaymentData', options),
       readPublicInsightsData: () => callWithFallback('readPublicInsightsData'),
       readAdminStatsData: () => callWithFallback('readAdminStatsData'),
+      readAdminOperationsData: () => callWithFallback('readAdminOperationsData'),
+      saveAccountUser: (user) => callWithFallback('saveAccountUser', user),
+      saveAdminSettings: (settings) => callWithFallback('saveAdminSettings', settings),
+      saveInquiry: (inquiry) => callWithFallback('saveInquiry', inquiry),
       readAdminRidersData: () => callWithFallback('readAdminRidersData'),
       readRiderDashboardData: (userId) => callWithFallback('readRiderDashboardData', userId),
       readStaffUsers: () => callWithFallback('readStaffUsers'),
@@ -643,6 +685,16 @@ export const readAdminStatsData = async () => {
     notifications: snapshot.notifications || []
   };
 };
+
+export const readAdminOperationsData = async () => {
+  const adapter = getAdapter();
+  if (typeof adapter.readAdminOperationsData === 'function') return adapter.readAdminOperationsData();
+  return adapter.readDb();
+};
+
+export const saveAccountUser = (user) => getAdapter().saveAccountUser(user);
+export const saveAdminSettings = (settings) => getAdapter().saveAdminSettings(settings);
+export const saveInquiry = (inquiry) => getAdapter().saveInquiry(inquiry);
 
 export const readAdminRidersData = async () => {
   const adapter = getAdapter();

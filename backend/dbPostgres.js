@@ -292,6 +292,62 @@ const upsertEmailLogRecord = async (client, entry) =>
     metadata: entry.metadata || entry
   });
 
+const upsertAccountUserRecord = async (client, user) => {
+  const timestamp = user.updatedAt || user.createdAt || new Date().toISOString();
+  await upsert(client, 'users', {
+    id: user.id,
+    name: user.name || user.email || 'User',
+    username: user.username || null,
+    email: user.email,
+    password: user.password || '',
+    role: user.role || 'CUSTOMER',
+    status: user.status || 'active',
+    phone: user.phone || null,
+    avatar: user.avatar || null,
+    must_change_password: Boolean(user.mustChangePassword),
+    last_login_at: user.lastLoginAt || null,
+    password_changed_at: user.passwordChangedAt || null,
+    created_at: user.createdAt || timestamp,
+    updated_at: timestamp,
+    metadata: user
+  });
+
+  if (user.role === 'MERCHANT') {
+    await upsert(client, 'seller_profiles', {
+      user_id: user.id,
+      business_name: user.name || user.email || 'Seller',
+      primary_category_id: user.primaryCategoryId || null,
+      support_email: user.storeSettings?.supportEmail || user.email || null,
+      logo_url: user.storeSettings?.storeLogoUrl || null,
+      cover_url: user.storeSettings?.coverUrl || null,
+      commission_rate: toNumber(user.commissionRate),
+      total_sales: toNumber(user.totalSales),
+      gross_sales: toNumber(user.grossSales),
+      commission_amount: toNumber(user.commissionAmount),
+      documents_verified: Boolean(user.documentsVerified),
+      created_at: user.createdAt || timestamp,
+      updated_at: timestamp,
+      metadata: user.storeSettings || {}
+    }, 'user_id');
+  }
+
+  if (user.role === 'DELIVERY') {
+    await upsert(client, 'rider_profiles', {
+      user_id: user.id,
+      vehicle_number: user.riderSettings?.vehicleNumber || null,
+      mobile_money_number: user.riderSettings?.mobileMoneyNumber || null,
+      emergency_contact: user.riderSettings?.emergencyContact || null,
+      operational_status: user.status === 'active' ? 'available' : user.status || 'offline',
+      rating: toNumber(user.riderSettings?.rating),
+      total_deliveries: Number(user.riderSettings?.totalDeliveries || 0),
+      earnings: toNumber(user.riderSettings?.earnings),
+      created_at: user.createdAt || timestamp,
+      updated_at: timestamp,
+      metadata: user.riderSettings || {}
+    }, 'user_id');
+  }
+};
+
 const readRows = async (table, orderBy = 'created_at DESC') => {
   try {
     const columns = READ_COLUMNS[table] || '*';
@@ -970,6 +1026,85 @@ export const createPostgresAdapter = () => {
           type: row.metadata?.type || ''
         }))
       };
+    },
+
+    async readAdminOperationsData() {
+      const base = await this.readAdminStatsData();
+      const [transactions, payments, riderApplications, inquiries, emailLogs, adminSettings] = await Promise.all([
+        readRows('transactions', 'timestamp DESC'),
+        readRows('payments', 'updated_at DESC'),
+        readRows('rider_applications'),
+        readRows('inquiries'),
+        readRows('email_logs', 'sent_at DESC'),
+        readRows('admin_settings', 'updated_at DESC')
+      ]);
+
+      return {
+        ...base,
+        riderApplications: riderApplications.map((row) => mapApplication(row, 'rider')),
+        transactions: transactions.map((row) => ({
+          ...(row.metadata || {}), id: row.id, userId: row.user_id || undefined,
+          amount: toNumber(row.amount), status: row.status, method: row.method || '',
+          tx_ref: row.tx_ref || '', timestamp: toIso(row.timestamp)
+        })),
+        payments: payments.map((row) => ({
+          ...(row.metadata || {}), id: row.id, orderId: row.order_id || undefined,
+          userId: row.user_id || undefined, amount: toNumber(row.amount), status: row.status,
+          method: row.method || '', tx_ref: row.tx_ref || '', createdAt: toIso(row.created_at),
+          updatedAt: toIso(row.updated_at)
+        })),
+        contactSubmissions: inquiries.map(mapInquiry),
+        inquiries: inquiries.map(mapInquiry),
+        emailLogs: emailLogs.map((row) => ({
+          ...(row.metadata || {}), id: row.id,
+          to: Array.isArray(row.to_addresses) ? row.to_addresses[0] : undefined,
+          toAddresses: json(row.to_addresses, []), subject: row.subject, template: row.template || '',
+          body: row.body || '', html: row.html || '', sentAt: toIso(row.sent_at), status: row.status,
+          provider: row.provider, providerMessageId: row.provider_message_id || undefined,
+          error: row.error || undefined, note: row.note || undefined
+        })),
+        adminSettings: adminSettings[0]
+          ? {
+              preferences: adminSettings[0].preferences || {},
+              categoryCommissionRates: adminSettings[0].category_commission_rates || {},
+              updatedAt: toIso(adminSettings[0].updated_at),
+              updatedBy: adminSettings[0].updated_by || undefined
+            }
+          : { preferences: {}, categoryCommissionRates: {} }
+      };
+    },
+
+    async saveAccountUser(user) {
+      await tx((client) => upsertAccountUserRecord(client, user));
+      return user;
+    },
+
+    async saveAdminSettings(settings) {
+      await query(
+        `INSERT INTO admin_settings (id, preferences, category_commission_rates, updated_at, updated_by)
+         VALUES ('platform', $1::jsonb, $2::jsonb, $3, $4)
+         ON CONFLICT (id) DO UPDATE SET preferences = EXCLUDED.preferences,
+           category_commission_rates = EXCLUDED.category_commission_rates,
+           updated_at = EXCLUDED.updated_at, updated_by = EXCLUDED.updated_by`,
+        [JSON.stringify(settings.preferences || {}), JSON.stringify(settings.categoryCommissionRates || {}), settings.updatedAt, settings.updatedBy || null]
+      );
+      return settings;
+    },
+
+    async saveInquiry(inquiry) {
+      await query(
+        `INSERT INTO inquiries (id, type, name, email, subject, company, message, status, assigned_to,
+          internal_notes, replied_at, resolved_at, created_at, updated_at, metadata)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb)
+         ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, assigned_to = EXCLUDED.assigned_to,
+          internal_notes = EXCLUDED.internal_notes, replied_at = EXCLUDED.replied_at,
+          resolved_at = EXCLUDED.resolved_at, updated_at = EXCLUDED.updated_at, metadata = EXCLUDED.metadata`,
+        [inquiry.id, inquiry.type || 'contact', inquiry.name || 'Visitor', inquiry.email || '', inquiry.subject || null,
+          inquiry.company || null, inquiry.message || '', inquiry.status || 'new', inquiry.assignedTo || inquiry.assignedAdminId || null,
+          inquiry.internalNotes || null, inquiry.repliedAt || null, inquiry.resolvedAt || null,
+          inquiry.createdAt || new Date().toISOString(), inquiry.updatedAt || new Date().toISOString(), JSON.stringify(inquiry)]
+      );
+      return inquiry;
     },
 
     async readStaffUsers() {

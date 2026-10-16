@@ -20,8 +20,12 @@ import {
   readManualPaymentSnapshot,
   readPublicInsightsRecords,
   readAdminStatsRecords,
+  readAdminOperationsRecords,
   readAdminRiderRecords,
   readRiderDashboardRecords,
+  saveAccountUserRecord,
+  saveAdminSettingsRecord,
+  saveInquiryRecord,
   readStaffUserRecords,
   updateStaffUserRecord,
   persistAuditLogRecord,
@@ -3042,7 +3046,7 @@ const server = http.createServer(async (req, res) => {
         const user = await requireRole(req, res, ['ADMIN']);
         if (!user) return;
 
-        const db = await readDb();
+        const db = await readAdminStatsRecords();
         const roleFilter = String(url.searchParams.get('role') || 'all').toUpperCase();
         const suspiciousOnly = url.searchParams.get('suspicious') === 'true';
         const sessionCounts = (db.sessions || []).reduce((acc, entry) => {
@@ -3090,7 +3094,7 @@ const server = http.createServer(async (req, res) => {
         if (!user) return;
 
         const sessionId = pathname.split('/')[4];
-        const db = await readDb();
+        const db = await readAdminStatsRecords();
         const session = (db.sessions || []).find((entry) => entry.id === sessionId);
 
         if (!session) {
@@ -3111,7 +3115,7 @@ const server = http.createServer(async (req, res) => {
           }
         });
 
-        await writeDb(db);
+        await persistAuditLogRecord(db.auditLogs[0]);
         sendJson(res, 200, { success: true });
         return;
       }
@@ -3121,7 +3125,7 @@ const server = http.createServer(async (req, res) => {
         if (!user) return;
 
         const userId = pathname.split('/')[5];
-        const db = await readDb();
+        const db = await readAdminStatsRecords();
         const targetUser = (db.users || []).find((entry) => entry.id === userId);
 
         if (!targetUser) {
@@ -3143,7 +3147,7 @@ const server = http.createServer(async (req, res) => {
           }
         });
 
-        await writeDb(db);
+        await persistAuditLogRecord(db.auditLogs[0]);
         sendJson(res, 200, { success: true });
         return;
       }
@@ -3620,7 +3624,7 @@ const server = http.createServer(async (req, res) => {
       const user = await requireRole(req, res, ['ADMIN']);
       if (!user) return;
 
-      const db = await readDb();
+      const db = await readAdminStatsRecords();
       const orders = db.orders || [];
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -3706,7 +3710,7 @@ const server = http.createServer(async (req, res) => {
       const user = await requireRole(req, res, ['ADMIN']);
       if (!user) return;
 
-      const db = await readDb();
+      const db = await readAdminStatsRecords();
       const since24Hours = Date.now() - 24 * 60 * 60 * 1000;
       const monitoringEvents = (db.auditLogs || [])
         .filter((entry) => entry.category === 'monitoring')
@@ -3744,7 +3748,7 @@ const server = http.createServer(async (req, res) => {
       const user = await requireRole(req, res, ['ADMIN']);
       if (!user) return;
 
-      const db = await readDb();
+      const db = await readAdminStatsRecords();
       const requestedStatus = url.searchParams.get('status');
       let sellers = buildSellerSnapshot(db);
 
@@ -3760,7 +3764,7 @@ const server = http.createServer(async (req, res) => {
       const user = await requireRole(req, res, ['ADMIN']);
       if (!user) return;
 
-      const db = await readDb();
+      const db = await readAdminStatsRecords();
       const requestedStatus = (url.searchParams.get('status') || 'all').toLowerCase();
       let customers = buildCustomerSnapshot(db);
 
@@ -3976,7 +3980,7 @@ const server = http.createServer(async (req, res) => {
       const user = await requireRole(req, res, ['ADMIN', 'FINANCE']);
       if (!user) return;
 
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       sendJson(res, 200, { payouts: buildPayoutSnapshot(db) });
       return;
     }
@@ -3992,7 +3996,7 @@ const server = http.createServer(async (req, res) => {
       const payoutId = pathname.split('/')[4];
       const body = await readBody(req);
       const nextStatus = String(body.status || '').trim().toLowerCase();
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       const transactionIndex = (db.transactions || []).findIndex((transaction) => transaction.id === payoutId && transaction.type === 'payout');
 
       if (transactionIndex === -1) {
@@ -4072,7 +4076,12 @@ const server = http.createServer(async (req, res) => {
         }
       });
 
-      await writeDb(db);
+      await persistCheckoutBundleRecord({
+        transactions: [db.transactions[transactionIndex]],
+        notifications: db.notifications.slice(0, 1),
+        auditLogs: db.auditLogs.slice(0, 1),
+        emailLogs: db.emailLogs.slice(0, 1)
+      });
       sendJson(res, 200, { payout: buildPayoutSnapshot(db).find((entry) => entry.id === payoutId) });
       return;
     }
@@ -4081,7 +4090,7 @@ const server = http.createServer(async (req, res) => {
       const user = await requireRole(req, res, ['ADMIN']);
       if (!user) return;
 
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       const requestedType = (url.searchParams.get('type') || 'all').toLowerCase();
       let inquiries = db.contactSubmissions || [];
 
@@ -4101,7 +4110,7 @@ const server = http.createServer(async (req, res) => {
       const user = await requireRole(req, res, ['ADMIN']);
       if (!user) return;
 
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       let logs = (db.emailLogs || []).slice();
       const status = String(url.searchParams.get('status') || 'all').toLowerCase();
 
@@ -4128,7 +4137,7 @@ const server = http.createServer(async (req, res) => {
 
       const inquiryId = pathname.split('/')[4];
       const body = await readBody(req);
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       const index = (db.contactSubmissions || []).findIndex((entry) => entry.id === inquiryId);
 
       if (index === -1) {
@@ -4339,7 +4348,12 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
-      await writeDb(db);
+      await saveInquiryRecord(updatedInquiry);
+      await persistCheckoutBundleRecord({
+        notifications: (db.notifications || []).slice(0, 1),
+        auditLogs: (db.auditLogs || []).slice(0, 3),
+        emailLogs: (db.emailLogs || []).slice(0, 1)
+      });
       sendJson(res, 200, { inquiry: updatedInquiry });
       return;
     }
@@ -4350,7 +4364,7 @@ const server = http.createServer(async (req, res) => {
 
       const inquiryId = pathname.split('/')[4];
       const body = await readBody(req);
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       const index = (db.contactSubmissions || []).findIndex((entry) => entry.id === inquiryId);
 
       if (index === -1) {
@@ -4390,7 +4404,8 @@ const server = http.createServer(async (req, res) => {
         }
       });
 
-      await writeDb(db);
+      await saveInquiryRecord(db.contactSubmissions[index]);
+      await persistAuditLogRecord(db.auditLogs[0]);
       sendJson(res, 200, { inquiry: db.contactSubmissions[index] });
       return;
     }
@@ -4399,7 +4414,7 @@ const server = http.createServer(async (req, res) => {
       const user = await requireRole(req, res, ['ADMIN']);
       if (!user) return;
 
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       sendJson(res, 200, {
         settings: db.adminSettings || {}
       });
@@ -4411,7 +4426,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
 
       const body = await readBody(req);
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       const nextPreferences = {
         ...(db.adminSettings?.preferences || {}),
         ...(body.preferences || {})
@@ -4447,7 +4462,8 @@ const server = http.createServer(async (req, res) => {
         }
       });
 
-      await writeDb(db);
+      await saveAdminSettingsRecord(db.adminSettings);
+      await persistAuditLogRecord(db.auditLogs[0]);
       sendJson(res, 200, { settings: db.adminSettings });
       return;
     }
@@ -4458,7 +4474,7 @@ const server = http.createServer(async (req, res) => {
 
       const range = parseFinanceReportRange(url.searchParams.get('from'), url.searchParams.get('to'));
       const metrics = parseFinanceReportMetrics(url.searchParams.get('metrics'));
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       sendJson(res, 200, { report: buildFinanceReport(db, range, metrics) });
       return;
     }
@@ -4480,7 +4496,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       const report = buildFinanceReport(db, range, metrics);
       await persistAuditLogRecord(createAuditLogRecord({
         event: `Finance report exported (${format.toUpperCase()})`,
@@ -4508,7 +4524,7 @@ const server = http.createServer(async (req, res) => {
       const user = await requireRole(req, res, ['ADMIN', 'FINANCE']);
       if (!user) return;
 
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       sendJson(res, 200, buildAdminFinanceSummary(db));
       return;
     }
@@ -4517,7 +4533,7 @@ const server = http.createServer(async (req, res) => {
       const user = await requireRole(req, res, ['ADMIN', 'FINANCE']);
       if (!user) return;
 
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       const orderMap = new Map((db.orders || []).map((order) => [order.id, order]));
       const claims = (db.payments || [])
         .filter((payment) => MANUAL_BANK_PAYMENT_METHODS.has(payment.method) && ['VERIFICATION_PENDING', 'FAILED'].includes(payment.status))
@@ -4548,7 +4564,7 @@ const server = http.createServer(async (req, res) => {
       const paymentId = pathname.split('/')[4];
       const body = await readBody(req);
       const decision = String(body.status || '').trim().toLowerCase();
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       const paymentIndex = (db.payments || []).findIndex((entry) => entry.id === paymentId && MANUAL_BANK_PAYMENT_METHODS.has(entry.method));
       if (paymentIndex === -1) {
         sendJson(res, 404, { error: 'Bank payment claim not found.' });
@@ -4644,7 +4660,7 @@ const server = http.createServer(async (req, res) => {
       const user = await requireRole(req, res, ['ADMIN']);
       if (!user) return;
 
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       const requestedStatus = (url.searchParams.get('status') || 'all').toLowerCase();
       let applications = db.sellerApplications || [];
 
@@ -4669,7 +4685,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
 
       const applicationId = pathname.split('/')[4];
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       const index = (db.sellerApplications || []).findIndex((entry) => entry.id === applicationId);
 
       if (index === -1) {
@@ -4784,7 +4800,13 @@ const server = http.createServer(async (req, res) => {
           }
         });
 
-      await writeDb(db);
+      await saveAccountUserRecord(merchantUser);
+      await saveSellerApplicationRecord(db.sellerApplications[index]);
+      await persistCheckoutBundleRecord({
+        notifications: db.notifications.slice(0, 1),
+        auditLogs: db.auditLogs.slice(0, 1),
+        emailLogs: db.emailLogs.slice(0, 1)
+      });
         sendJson(res, 200, {
           application: db.sellerApplications[index],
           merchant: sanitizeUser(merchantUser)
@@ -4802,7 +4824,7 @@ const server = http.createServer(async (req, res) => {
 
         const applicationId = pathname.split('/')[4];
         const body = await readBody(req);
-        const db = await readDb();
+        const db = await readAdminOperationsRecords();
         const index = (db.sellerApplications || []).findIndex((entry) => entry.id === applicationId);
 
         if (index === -1) {
@@ -4864,7 +4886,11 @@ const server = http.createServer(async (req, res) => {
           }
         });
 
-        await writeDb(db);
+        await saveSellerApplicationRecord(db.sellerApplications[index]);
+        await persistCheckoutBundleRecord({
+          auditLogs: db.auditLogs.slice(0, 1),
+          emailLogs: db.emailLogs.slice(0, 1)
+        });
         sendJson(res, 200, {
           application: db.sellerApplications[index]
         });
@@ -4877,7 +4903,7 @@ const server = http.createServer(async (req, res) => {
 
       const sellerId = pathname.split('/')[4];
       const body = await readBody(req);
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       const index = db.users.findIndex((entry) => entry.id === sellerId && entry.role === 'MERCHANT');
 
       if (index === -1) {
@@ -4894,7 +4920,8 @@ const server = http.createServer(async (req, res) => {
 
       db.users[index] = {
         ...db.users[index],
-        status: nextStatus
+        status: nextStatus,
+        updatedAt: new Date().toISOString()
       };
 
       createNotification(db, {
@@ -4917,7 +4944,11 @@ const server = http.createServer(async (req, res) => {
         }
       });
 
-      await writeDb(db);
+      await saveAccountUserRecord(db.users[index]);
+      await persistCheckoutBundleRecord({
+        notifications: db.notifications.slice(0, 1),
+        auditLogs: db.auditLogs.slice(0, 1)
+      });
       sendJson(res, 200, { seller: db.users[index] });
       return;
     }
@@ -4926,7 +4957,7 @@ const server = http.createServer(async (req, res) => {
       const user = await requireRole(req, res, ['ADMIN']);
       if (!user) return;
 
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       const requestedStatus = (url.searchParams.get('status') || 'all').toLowerCase();
       let applications = db.riderApplications || [];
 
@@ -4947,7 +4978,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
 
       const applicationId = pathname.split('/')[4];
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       const index = (db.riderApplications || []).findIndex((entry) => entry.id === applicationId);
 
       if (index === -1) {
@@ -5064,7 +5095,13 @@ const server = http.createServer(async (req, res) => {
         }
       });
 
-      await writeDb(db);
+      await saveAccountUserRecord(riderUser);
+      await saveRiderApplicationRecord(db.riderApplications[index]);
+      await persistCheckoutBundleRecord({
+        notifications: db.notifications.slice(0, 1),
+        auditLogs: db.auditLogs.slice(0, 1),
+        emailLogs: db.emailLogs.slice(0, 1)
+      });
       sendJson(res, 200, {
         application: db.riderApplications[index],
         rider: sanitizeUser(riderUser)
@@ -5078,7 +5115,7 @@ const server = http.createServer(async (req, res) => {
 
       const applicationId = pathname.split('/')[4];
       const body = await readBody(req);
-      const db = await readDb();
+      const db = await readAdminOperationsRecords();
       const index = (db.riderApplications || []).findIndex((entry) => entry.id === applicationId);
 
       if (index === -1) {
@@ -5139,7 +5176,11 @@ const server = http.createServer(async (req, res) => {
         }
       });
 
-      await writeDb(db);
+      await saveRiderApplicationRecord(db.riderApplications[index]);
+      await persistCheckoutBundleRecord({
+        auditLogs: db.auditLogs.slice(0, 1),
+        emailLogs: db.emailLogs.slice(0, 1)
+      });
       sendJson(res, 200, {
         application: db.riderApplications[index]
       });
@@ -5183,7 +5224,7 @@ const server = http.createServer(async (req, res) => {
 
       const riderId = pathname.split('/')[4];
       const body = await readBody(req);
-      const db = await readDb();
+      const db = { ...(await readAdminRiderRecords()), notifications: [], auditLogs: [] };
       const index = db.users.findIndex((entry) => entry.id === riderId && entry.role === 'DELIVERY');
 
       if (index === -1) {
@@ -5224,7 +5265,11 @@ const server = http.createServer(async (req, res) => {
         }
       });
 
-      await writeDb(db);
+      await saveAccountUserRecord(db.users[index]);
+      await persistCheckoutBundleRecord({
+        notifications: db.notifications.slice(0, 1),
+        auditLogs: db.auditLogs.slice(0, 1)
+      });
       sendJson(res, 200, {
         rider: {
           ...sanitizeUser(db.users[index]),
@@ -7577,7 +7622,7 @@ const server = http.createServer(async (req, res) => {
       const user = await requireRole(req, res, ['DELIVERY', 'ADMIN']);
       if (!user) return;
 
-      const db = await readDb();
+      const db = await readRiderDashboardRecords(user.id);
       const transactions = (db.transactions || []).filter((transaction) => transaction.userId === user.id);
       const riderOrders = (db.orders || []).filter((order) => order.riderId === user.id);
       const completedOrders = riderOrders.filter((order) => order.status === 'completed');
@@ -7645,13 +7690,8 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
 
       const body = await readBody(req);
-      const db = await readDb();
-      const index = db.users.findIndex((entry) => entry.id === user.id);
-
-      if (index === -1) {
-        sendJson(res, 404, { error: 'Rider not found' });
-        return;
-      }
+      const db = { users: [user], auditLogs: [] };
+      const index = 0;
 
       const requestedStatus = body.isOnline ? 'active' : 'offline';
       db.users[index] = {
@@ -7671,7 +7711,8 @@ const server = http.createServer(async (req, res) => {
         }
       });
 
-      await writeDb(db);
+      await saveAccountUserRecord(db.users[index]);
+      await persistAuditLogRecord(db.auditLogs[0]);
       sendJson(res, 200, {
         rider: {
           ...sanitizeUser(db.users[index]),
@@ -7712,13 +7753,9 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
 
       const body = await readBody(req);
-      const db = await readDb();
-      const index = db.users.findIndex((entry) => entry.id === user.id);
-
-      if (index === -1) {
-        sendJson(res, 404, { error: 'Rider account not found.' });
-        return;
-      }
+      const dashboard = await readRiderDashboardRecords(user.id);
+      const db = { users: [user], orders: dashboard.orders, auditLogs: [] };
+      const index = 0;
 
       const nextPhone = String(body.phone || '').trim();
       if (!nextPhone) {
@@ -7749,7 +7786,8 @@ const server = http.createServer(async (req, res) => {
           riderEmail: updatedUser.email
         }
       });
-      await writeDb(db);
+      await saveAccountUserRecord(updatedUser);
+      await persistAuditLogRecord(db.auditLogs[0]);
 
       const deliveries = db.orders.filter((order) => order.riderId === updatedUser.id);
       sendJson(res, 200, {

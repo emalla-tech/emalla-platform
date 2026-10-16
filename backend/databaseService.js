@@ -17,6 +17,10 @@ import {
   readManualPaymentData,
   readPublicInsightsData,
   readAdminStatsData,
+  readAdminOperationsData,
+  saveAccountUser,
+  saveAdminSettings,
+  saveInquiry,
   readAdminRidersData,
   readRiderDashboardData,
   readStaffUsers,
@@ -75,6 +79,10 @@ export const databaseService = {
   readManualPaymentData: (options) => readManualPaymentData(options),
   readPublicInsightsData: () => readPublicInsightsData(),
   readAdminStatsData: () => readAdminStatsData(),
+  readAdminOperationsData: () => readAdminOperationsData(),
+  saveAccountUser: (user) => saveAccountUser(user),
+  saveAdminSettings: (settings) => saveAdminSettings(settings),
+  saveInquiry: (inquiry) => saveInquiry(inquiry),
   readAdminRidersData: () => readAdminRidersData(),
   readRiderDashboardData: (userId) => readRiderDashboardData(userId),
   readStaffUsers: () => readStaffUsers(),
@@ -116,6 +124,10 @@ export const readCheckoutSnapshot = (options) => databaseService.readCheckoutDat
 export const readManualPaymentSnapshot = (options) => databaseService.readManualPaymentData(options);
 export const readPublicInsightsRecords = () => databaseService.readPublicInsightsData();
 export const readAdminStatsRecords = () => databaseService.readAdminStatsData();
+export const readAdminOperationsRecords = () => databaseService.readAdminOperationsData();
+export const saveAccountUserRecord = (user) => databaseService.saveAccountUser(user);
+export const saveAdminSettingsRecord = (settings) => databaseService.saveAdminSettings(settings);
+export const saveInquiryRecord = (inquiry) => databaseService.saveInquiry(inquiry);
 export const readAdminRiderRecords = () => databaseService.readAdminRidersData();
 export const readRiderDashboardRecords = (userId) => databaseService.readRiderDashboardData(userId);
 export const readStaffUserRecords = () => databaseService.readStaffUsers();

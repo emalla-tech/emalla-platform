@@ -1,7 +1,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Menu, X, Search, Store, User, Truck, ChevronDown, LogOut, LogIn, UserPlus, Globe, Heart } from 'lucide-react';
+import { ShoppingCart, Menu, X, Search, Store, User, Truck, ChevronDown, ChevronRight, LogOut, LogIn, UserPlus, Globe, Heart, BadgePercent } from 'lucide-react';
+import { CATEGORIES, PRODUCT_SUBCATEGORIES } from '../constants';
 import NotificationBell from './notifications/NotificationBell';
 import BrandLogo from './BrandLogo';
 import { useAuth } from '../auth/AuthContext';
@@ -16,8 +17,10 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
+  const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const roleMenuRef = useRef<HTMLDivElement>(null);
+  const categoryMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
@@ -28,6 +31,18 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
     rw: 'RW',
     fr: 'FR'
   };
+  const featuredCategoryIds = ['25', '9', '8', '1', '10', '2', '17', '18'];
+  const categoryShortLabels: Record<string, string> = {
+    '1': 'Electronics',
+    '2': 'Fashion',
+    '8': 'Computers',
+    '9': 'Phones & Tablets',
+    '10': 'Appliances',
+    '17': 'Construction',
+    '18': 'Food & Beverages',
+    '25': 'Deals'
+  };
+  const activeCategory = new URLSearchParams(location.search).get('category');
 
   useEffect(() => {
     const loadWishlistCount = async () => {
@@ -48,6 +63,9 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
       if (roleMenuRef.current && !roleMenuRef.current.contains(event.target as Node)) {
         setIsRoleMenuOpen(false);
       }
+      if (categoryMenuRef.current && !categoryMenuRef.current.contains(event.target as Node)) {
+        setIsCategoryMenuOpen(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -57,15 +75,21 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
   }, []);
 
   useEffect(() => {
+    setIsCategoryMenuOpen(false);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
     document.body.classList.toggle('mobile-menu-open', isOpen);
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setIsOpen(false);
+        setIsRoleMenuOpen(false);
+        setIsCategoryMenuOpen(false);
       }
     };
 
-    if (isOpen) {
+    if (isOpen || isRoleMenuOpen || isCategoryMenuOpen) {
       document.addEventListener('keydown', handleEscape);
     }
 
@@ -73,7 +97,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
       document.body.classList.remove('mobile-menu-open');
       document.removeEventListener('keydown', handleEscape);
     };
-  }, [isOpen]);
+  }, [isCategoryMenuOpen, isOpen, isRoleMenuOpen]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -307,6 +331,102 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
               {isOpen ? <X size={28} /> : <Menu size={28} />}
             </button>
           </div>
+        </div>
+      </div>
+
+      <div className="hidden border-t border-white/10 bg-[#111827] text-white shadow-sm md:block">
+        <div className="mx-auto flex h-11 max-w-[1600px] items-stretch px-0 sm:px-6 lg:px-8">
+          <div ref={categoryMenuRef} className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsCategoryMenuOpen((current) => !current)}
+              aria-expanded={isCategoryMenuOpen}
+              aria-controls="marketplace-category-menu"
+              className="flex h-11 items-center gap-2 bg-orange-500 px-4 text-xs font-black uppercase tracking-[0.08em] transition-colors hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-orange-200 sm:rounded-t-lg sm:px-5"
+            >
+              <Menu size={18} />
+              <span>All Categories</span>
+              <ChevronDown size={14} className={`transition-transform ${isCategoryMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isCategoryMenuOpen && (
+              <div
+                id="marketplace-category-menu"
+                className="absolute left-2 top-full z-[70] mt-2 w-[calc(100vw-1rem)] max-w-5xl overflow-hidden rounded-2xl border border-gray-200 bg-white text-gray-900 shadow-2xl sm:left-0 sm:w-[min(92vw,64rem)]"
+              >
+                <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-5 py-4">
+                  <div>
+                    <p className="text-sm font-black text-gray-900">Explore all marketplace categories</p>
+                    <p className="mt-0.5 text-xs font-medium text-gray-500">Find products and services from verified E-Malla sellers.</p>
+                  </div>
+                  <Link
+                    to="/shop"
+                    onClick={() => setIsCategoryMenuOpen(false)}
+                    className="hidden items-center gap-1 text-xs font-black text-orange-600 hover:text-orange-700 sm:flex"
+                  >
+                    View all <ChevronRight size={15} />
+                  </Link>
+                </div>
+                <div className="grid max-h-[68vh] grid-cols-1 gap-x-6 gap-y-1 overflow-y-auto p-3 sm:grid-cols-2 sm:p-5 lg:grid-cols-3">
+                  {CATEGORIES.map((category) => (
+                    <div key={category.id} className="rounded-xl p-2 transition-colors hover:bg-orange-50/70">
+                      <Link
+                        to={`/shop?category=${category.id}`}
+                        onClick={() => setIsCategoryMenuOpen(false)}
+                        className="flex items-center gap-3 text-sm font-extrabold text-gray-800 hover:text-orange-600"
+                      >
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 [&>svg]:h-4 [&>svg]:w-4">
+                          {category.icon}
+                        </span>
+                        <span className="leading-tight">{category.name}</span>
+                      </Link>
+                      <div className="ml-12 mt-1.5 flex flex-wrap gap-x-2 gap-y-1">
+                        {(PRODUCT_SUBCATEGORIES[category.id] || []).slice(0, 3).map((subcategory) => (
+                          <Link
+                            key={subcategory}
+                            to={`/shop?category=${category.id}&search=${encodeURIComponent(subcategory)}`}
+                            onClick={() => setIsCategoryMenuOpen(false)}
+                            className="text-[11px] font-medium text-gray-500 hover:text-orange-600"
+                          >
+                            {subcategory}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {featuredCategoryIds.map((categoryId) => {
+              const category = CATEGORIES.find((entry) => entry.id === categoryId);
+              if (!category) return null;
+              const isActive = location.pathname === '/shop' && activeCategory === categoryId;
+
+              return (
+                <Link
+                  key={categoryId}
+                  to={`/shop?category=${categoryId}`}
+                  className={`flex h-11 shrink-0 items-center border-b-2 px-3 text-xs font-bold whitespace-nowrap transition-colors sm:px-4 ${
+                    isActive
+                      ? 'border-orange-400 bg-white/10 text-orange-300'
+                      : 'border-transparent text-gray-200 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {categoryShortLabels[categoryId] || category.name}
+                </Link>
+              );
+            })}
+          </div>
+
+          <Link
+            to="/shop?category=25"
+            className="hidden h-11 shrink-0 items-center gap-2 border-l border-white/10 bg-orange-500/10 px-5 text-xs font-black text-orange-300 transition-colors hover:bg-orange-500 hover:text-white xl:flex"
+          >
+            <BadgePercent size={16} /> Featured offers <ChevronRight size={14} />
+          </Link>
         </div>
       </div>
 

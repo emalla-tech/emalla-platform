@@ -2,7 +2,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Menu, X, Search, Store, User, Truck, ChevronDown, LogOut, LogIn, UserPlus, Globe, Heart } from 'lucide-react';
-import { NAV_LINKS } from '../constants';
 import NotificationBell from './notifications/NotificationBell';
 import BrandLogo from './BrandLogo';
 import { useAuth } from '../auth/AuthContext';
@@ -28,21 +27,6 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
     en: 'EN',
     rw: 'RW',
     fr: 'FR'
-  };
-
-  const navLabelMap: Record<string, string> = {
-    Home: t.nav.home,
-    Shop: t.nav.shop,
-    'How it Works': t.nav.howItWorks,
-    'Become a Seller': t.nav.becomeSeller
-  };
-
-  const isActiveLink = (path: string) => {
-    if (path === '/') {
-      return location.pathname === '/';
-    }
-
-    return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
   useEffect(() => {
@@ -102,8 +86,8 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
 
   return (
     <nav className="bg-white shadow-md sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-20 items-center gap-4">
+      <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8">
+        <div className="flex h-20 items-center gap-3 lg:gap-5">
           {/* Primary brand: the country name reveals without replacing the accessible label. */}
           <Link
             to="/"
@@ -114,34 +98,29 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
             <BrandLogo revealCountry showTagline />
           </Link>
 
-          {/* Desktop Nav */}
-          <div className="hidden lg:flex space-x-6 items-center">
-            {NAV_LINKS.map((link) => (
-              <Link 
-                key={link.path} 
-                to={link.path} 
-                className={`font-bold text-xs uppercase tracking-wider transition-colors ${
-                  isActiveLink(link.path) ? 'text-orange-500' : 'text-gray-500 hover:text-orange-500'
-                }`}
-              >
-                {navLabelMap[link.name] || link.name}
-              </Link>
-            ))}
-          </div>
+          <form onSubmit={handleSearch} className="relative mx-auto hidden min-w-0 max-w-3xl flex-1 md:block">
+            <label htmlFor="desktop-marketplace-search" className="sr-only">
+              {t.nav.searchPlaceholder}
+            </label>
+            <input
+              id="desktop-marketplace-search"
+              type="search"
+              placeholder={t.nav.searchPlaceholder}
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="h-12 w-full rounded-2xl border border-gray-200 bg-gray-50 pl-5 pr-14 text-sm font-semibold text-gray-900 outline-none transition-all placeholder:font-medium placeholder:text-gray-400 hover:border-gray-300 focus:border-orange-500 focus:bg-white focus:ring-4 focus:ring-orange-100"
+            />
+            <button
+              type="submit"
+              aria-label="Search marketplace"
+              className="absolute right-1.5 top-1.5 flex h-9 w-10 items-center justify-center rounded-xl bg-orange-500 text-white shadow-sm transition-all hover:bg-orange-600 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-200"
+            >
+              <Search size={18} strokeWidth={2.4} />
+            </button>
+          </form>
 
           {/* Icons */}
-          <div className="hidden md:flex items-center space-x-4">
-            <form onSubmit={handleSearch} className="relative group">
-              <input 
-                type="text" 
-                placeholder={t.nav.searchPlaceholder} 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 bg-gray-50 border-transparent border rounded-full text-xs focus:bg-white focus:border-orange-500 focus:outline-none focus:ring-4 focus:ring-orange-50 w-32 focus:w-48 transition-all font-medium"
-              />
-              <Search className="absolute left-3 top-2.5 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={16} />
-            </form>
-
+          <div className="ml-auto hidden shrink-0 items-center gap-2 md:flex lg:gap-3">
             <div className="hidden lg:flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl">
               <Globe size={14} className="text-gray-400" />
               <select
@@ -189,7 +168,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
                 <div className="w-7 h-7 rounded-lg bg-gray-900 text-white flex items-center justify-center">
                   <User size={14} />
                 </div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                <span className="hidden text-[10px] font-black uppercase tracking-widest text-gray-500 xl:inline">
                   {t.nav.workspaces}
                 </span>
                 <ChevronDown size={14} className={`text-gray-400 transition-transform ${isRoleMenuOpen ? 'rotate-180' : ''}`} />
@@ -341,6 +320,28 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
           className="mobile-navigation-panel fixed inset-x-0 bottom-0 top-20 z-[55] overflow-y-auto overscroll-contain border-t border-gray-100 bg-white px-6 py-7 shadow-2xl md:hidden"
         >
           <div className="mx-auto w-full max-w-lg space-y-6">
+          <form onSubmit={handleSearch} className="relative">
+            <label htmlFor="mobile-marketplace-search" className="sr-only">
+              {t.nav.searchPlaceholder}
+            </label>
+            <input
+              id="mobile-marketplace-search"
+              type="search"
+              placeholder={t.nav.searchPlaceholder}
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="h-14 w-full rounded-2xl border border-gray-200 bg-gray-50 pl-5 pr-16 text-sm font-semibold text-gray-900 outline-none transition-all placeholder:font-medium placeholder:text-gray-400 focus:border-orange-500 focus:bg-white focus:ring-4 focus:ring-orange-100"
+              autoFocus
+            />
+            <button
+              type="submit"
+              aria-label="Search marketplace"
+              className="absolute right-1.5 top-1.5 flex h-11 w-12 items-center justify-center rounded-xl bg-orange-500 text-white shadow-sm transition-colors hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-200"
+            >
+              <Search size={20} strokeWidth={2.4} />
+            </button>
+          </form>
+
           <div className="flex items-center justify-between gap-3 bg-gray-50 rounded-2xl px-4 py-3">
             <div className="flex items-center gap-2 text-gray-500">
               <Globe size={16} />
@@ -392,20 +393,6 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-6 border-t text-center">
-            {NAV_LINKS.map((link) => (
-              <Link 
-                key={link.path} 
-                to={link.path} 
-                className={`text-sm font-bold ${
-                  isActiveLink(link.path) ? 'text-orange-500' : 'text-gray-600 hover:text-orange-500'
-                }`}
-                onClick={() => setIsOpen(false)}
-              >
-                {navLabelMap[link.name] || link.name}
-              </Link>
-            ))}
-          </div>
           </div>
         </div>
       )}
